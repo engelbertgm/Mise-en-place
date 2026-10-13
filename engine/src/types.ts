@@ -30,6 +30,8 @@ export type Check =
   | { type: 'html'; rule: HtmlRule; name?: string; property?: string; rel?: string }
   | { type: 'sql'; rule: 'rls_enabled' | 'policies_per_operation'; glob?: string }
   | { type: 'maps'; rule: 'registry' | 'codemap' }
+  | { type: 'quality'; rule: 'thresholds' }
+  | { type: 'design'; rule: 'font_families' | 'font_weights'; max: number }
   | { type: 'manual'; prompt: string }
 
 export type HtmlRule =
@@ -86,6 +88,7 @@ export type Dimensions = {
   capabilities: string[]
   markets: string[]
   market_sublevels: Record<string, string[]>
+  market_languages: Record<string, string[]>
   audience: string[]
   context: string[]
   signals: Record<string, { values: (string | boolean)[]; default: string | boolean }>
@@ -127,6 +130,8 @@ export type Profile = {
   stack: { decided: Record<string, string> }
   /** Features of the scope that are not in the catalog; Claude sizes them and they show as "estimación a revisar". */
   custom_work?: { title: string; size: Size; phase?: string }[]
+  /** Code quality thresholds (complexity, max_lines, max_function_lines). Laxer than the defaults needs a reason. */
+  quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines', number>>
 }
 
 export type ItemState = 'active' | 'skipped' | 'overridden' | 'offered'

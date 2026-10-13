@@ -3,10 +3,10 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
 import { parse, stringify } from 'yaml'
 import { loadCatalog, validateProfile } from './catalog.ts'
-import { deployKind, mayDeploy } from './deploy.ts'
+import { deployKind, mayDeploy, prToMain } from './deploy.ts'
 import { diff, evaluate, warnings } from './evaluate.ts'
 import { matchFiles } from './files.ts'
-import { cachedGate, closePhase, formatItems, gate } from './gate.ts'
+import { cachedGate, closePhase, formatItems, gate, prReviewGate } from './gate.ts'
 import { hasProfile, loadProfile, log, normalizeProfile, saveProfile, today } from './profile.ts'
 import { linkClaudeMd, renderBrief, writeBrief, writeStackAdrs } from './render.ts'
 import { counts, formatCheck, formatProposal } from './report.ts'
@@ -21,6 +21,8 @@ import { checkCodemap, checkRegistry, writeCodemap, writeRegistry } from './maps
 import { calibrate, formatClient, formatInternal, loadRates, logTime, quote, saveQuote } from './quote.ts'
 import type { Range } from './quote.ts'
 import { applyUpdate, catalogUpdates } from './update.ts'
+import { QUALITY_DEFAULTS } from './quality.ts'
+import type { QualityKey } from './quality.ts'
 import { LEVEL_ICON } from './types.ts'
 import type { Catalog, Profile } from './types.ts'
 
@@ -135,6 +137,25 @@ function closePassingPhases(root: string, catalog: Catalog): string[] {
   return closed
 }
 
+/** Installs the Playwright responsive test (360–2560 px) and its script, without touching what exists. */
+function installResponsiveTest(root: string, catalog: Catalog): string | undefined {
+  const target = join(root, 'tests', 'responsive.spec.ts')
+  if (existsSync(target)) return undefined
+  mkdirSync(dirname(target), { recursive: true })
+  writeFileSync(target, readFileSync(join(pluginRoot(catalog), 'templates', 'tests', 'responsive.spec.ts'), 'utf8'))
+  const pkgFile = join(root, 'package.json')
+  if (existsSync(pkgFile)) {
+    const text = readFileSync(pkgFile, 'utf8')
+    const pkg = JSON.parse(text) as { scripts?: Record<string, string> }
+    if (!pkg.scripts?.['test:responsive']) {
+      pkg.scripts = { ...pkg.scripts, 'test:responsive': 'playwright test tests/responsive.spec.ts' }
+      const indent = text.match(/^\{\n([ \t]+)/)?.[1] ?? '  '
+      writeFileSync(pkgFile, JSON.stringify(pkg, null, indent) + '\n')
+    }
+  }
+  return 'tests/responsive.spec.ts'
+}
+
 /** Classic hooks: the backup where mods are not available. They never act on a repo without .mep/. */
 function runHook(event: string, root: string, catalog: Catalog): void {
   const input = hookInput()
@@ -165,6 +186,11 @@ function runHook(event: string, root: string, catalog: Catalog): void {
     case 'pre-bash': {
       const command = String(input.tool_input?.command ?? '')
       if (!mayDeploy(command)) return
+      if (prToMain(command)) {
+        const review = prReviewGate(cwd)
+        if (review.block) json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: review.message } })
+        return
+      }
       const kind = deployKind(command, currentBranch(cwd))
       if (!kind) return
       const result = cachedGate(cwd, catalog, kind)
@@ -215,12 +241,14 @@ function main(): void {
         mkdirSync(dirname(ci), { recursive: true })
         writeFileSync(ci, readFileSync(join(pluginRoot(catalog), 'templates', 'ci', 'mep.yml'), 'utf8'))
       }
+      const responsive = installResponsiveTest(root, catalog)
       log(root, 'init', `${profile.type} (${profile.capabilities.join(',')})`)
       const closed = args.flags['close-passing'] ? closePassingPhases(root, catalog) : []
       if (closed.length) regenerate(root, loadProfile(root, catalog), catalog)
       return print(
         [
           `✅ .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? 'enlazado' : 'ya estaba enlazado'}. CI: .github/workflows/mep.yml.`,
+          responsive ? `Test responsive: ${responsive} (requiere @playwright/test; edita PAGES con las rutas clave).` : '',
           closed.length ? `Sub-etapas ya cumplidas y cerradas: ${closed.join(', ')}.` : '',
           quoteOnScopeChange(loadProfile(root, catalog), catalog),
         ]
@@ -282,6 +310,12 @@ function main(): void {
       process.exitCode = result.block ? 1 : 0
       return
     }
+    case 'pr-gate': {
+      const review = prReviewGate(root)
+      if (review.message) print(review.message)
+      process.exitCode = review.block ? 1 : 0
+      return
+    }
     case 'status': {
       if (!hasProfile(root)) return args.flags.json ? json(null) : undefined
       const profile = loadProfile(root, catalog)
@@ -327,6 +361,25 @@ function main(): void {
       log(root, cmd, `${id} "${reason}"`)
       regenerate(root, profile, catalog)
       return print(cmd === 'skip' ? `⏭️ ${id} omitido: ${reason}` : `⚠️ ${id} desactivado: ${reason} (registrado en .mep/log)`)
+    }
+    case 'threshold': {
+      const [key, valueText, ...reasonParts] = rest
+      const keys = Object.keys(QUALITY_DEFAULTS)
+      if (!key || !keys.includes(key) || !(Number(valueText) > 0)) fail(`Uso: mep threshold <${keys.join('|')}> <valor> [razón --yes]`)
+      const value = Number(valueText)
+      const reason = reasonParts.join(' ').trim()
+      const profile = requireProfile(root, catalog)
+      const laxer = value > QUALITY_DEFAULTS[key as QualityKey]
+      if (laxer && !reason) fail(`Relajar ${key} a ${value} (por defecto ${QUALITY_DEFAULTS[key as QualityKey]}) requiere una razón.`)
+      if (laxer && !args.flags.yes) fail(`Relajar ${key} requiere confirmación explícita (--yes).`, 2)
+      profile.quality = { ...profile.quality, [key]: value }
+      const id = `threshold:${key}`
+      profile.selections.overrides = profile.selections.overrides.filter(o => o.id !== id)
+      if (laxer) profile.selections.overrides.push({ id, reason: `${key} = ${value} (por defecto ${QUALITY_DEFAULTS[key as QualityKey]}): ${reason}`, date: today() })
+      saveProfile(root, profile)
+      log(root, 'threshold', `${key}=${value}${laxer ? ` "${reason}"` : ''}`)
+      regenerate(root, profile, catalog)
+      return print(laxer ? `⚠️ ${key} relajado a ${value} (registrado en .mep/log y en BRIEF.md)` : `✅ ${key} = ${value}`)
     }
     case 'select': {
       const profile = requireProfile(root, catalog)
@@ -459,7 +512,7 @@ function main(): void {
     case 'export-data': {
       const profile = requireProfile(root, catalog)
       const { rates, configured } = loadRates()
-      return json(exportData(root, profile, catalog, String(args.flags.lang ?? 'es'), configured ? quote(profile, catalog, rates) : undefined))
+      return json(exportData(root, profile, catalog, String(args.flags.lang ?? 'es'), quote(profile, catalog, rates), configured))
     }
     case 'export': {
       const profile = requireProfile(root, catalog)
@@ -503,6 +556,7 @@ function main(): void {
           '  verify [--prod]                                       gate para CI (sale con 1 si bloquea)',
           '  phase [close <sub-etapa>]',
           '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> --by <nombre>',
+          '  threshold <complexity|max_lines|max_function_lines> <valor> [razón --yes]',
           '  security [record --id --result --files --notes]',
           '  audit [--from perfil.yaml]                            infiere el perfil / reporte de brecha (no escribe nada)',
           '  update [--apply]                                      ítems nuevos del catálogo que aplican',

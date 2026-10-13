@@ -25,7 +25,15 @@ export function deployKind(command: string, currentBranch?: string): DeployKind 
   return undefined
 }
 
-/** True for a command that may be a deploy, so a hook only spends time on those. */
+/** True for a command that may be a deploy or a PR, so a hook only spends time on those. */
 export function mayDeploy(command: string): boolean {
-  return /\b(vercel|netlify|git\s+push)\b/.test(command)
+  return /\b(vercel|netlify|git\s+push|gh\s+pr)\b/.test(command)
+}
+
+/** `gh pr create` into main (the default base) or `gh pr merge`: the moment for the pre-merge review. */
+export function prToMain(command: string): boolean {
+  if (/\bgh\s+pr\s+merge\b/.test(command)) return true
+  if (!/\bgh\s+pr\s+create\b/.test(command)) return false
+  const base = command.match(/(?:--base|-B)[\s=]+["']?([\w./-]+)/)?.[1]
+  return base === undefined || /^(main|master)$/.test(base)
 }

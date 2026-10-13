@@ -1,6 +1,9 @@
 # Detectores de señales en el código. El primero que encuentra evidencia gana.
 has_forms:
   - { grep: "<form\\b|onSubmit=|useForm\\(", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+has_long_forms:
+  - { dependency: ["@tiptap/react", "@tiptap/core", lexical, "@lexical/react", slate, slate-react, quill, react-quill, "@blocknote/react", "@mdxeditor/editor", "@uiw/react-md-editor", "@editorjs/editorjs"] }
+  - { count: "<(input|Input|textarea|Textarea|select|Select|Checkbox|RadioGroup)\\b|<FormField\\b", glob: "**/*.{tsx,jsx,astro,vue,svelte}", min: 8 }
 has_db:
   - { dependency: [prisma, "@prisma/client", drizzle-orm, "@supabase/supabase-js", pg, postgres, mysql2, mongoose, kysely, "@libsql/client", better-sqlite3] }
   - { file: "**/migrations/*.sql" }

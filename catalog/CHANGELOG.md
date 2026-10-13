@@ -2,6 +2,14 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.3
+
+- Los mercados activan sus idiomas (`market_languages` en dimensions.yaml); más de un idioma activa i18n sin indicarlo a mano.
+- `strict-lint`: los umbrales (complejidad, largo de archivo y de función) se leen del perfil y se comparan con la config del linter. Relajarlos: `mep threshold … --yes` con razón.
+- `font-families`, `text-hierarchy` e `interactive-states`: verificación automática de familias tipográficas, pesos de texto, colores de paleta sueltos y enlaces o botones sin hover.
+- `responsive-screenshots`: `/mep:scope` instala `tests/responsive.spec.ts` (Playwright, 360–2560 px) y el script `test:responsive`.
+- Señal `has_long_forms` detectada en el código (editores o formularios con 8+ campos).
+
 ## 2026.10.2
 
 Catálogo completo de la spec (329 ítems). Los proyectos en 2026.10.1 los reciben con `/mep:update`.

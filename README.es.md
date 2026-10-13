@@ -7,7 +7,7 @@ Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
 [![Versión](https://img.shields.io/badge/versión-0.1.0-informational.svg)](.claude-plugin/plugin.json)
-[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.2-informational.svg)](catalog/CHANGELOG.md)
+[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.3-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Funciona con batuta](https://img.shields.io/badge/funciona_con-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
@@ -100,9 +100,11 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:override <id> <razón>` | Desactiva un ítem 🔴 tras confirmar; rechaza ítems 🔒 |
 | `/mep:audit` | Para un repo existente: infiere el perfil desde el código, lo confirma contigo y reporta la brecha por sub-etapa. No cambia nada hasta que adoptes el brief |
 | `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil. Los que caen en una sub-etapa cerrada tienen periodo de gracia |
-| `/mep:quote [--client]` | Cotización desde el brief. Vista interna (horas, tarifa, márgenes) o vista cliente (precio por fase, extras, costos recurrentes, planes de mantenimiento) |
+| `/mep:quote [--client]` | Cotización desde el brief. Vista interna (horas, tarifa, márgenes) o vista cliente (precio y semanas estimadas por fase, extras, costos recurrentes, planes de mantenimiento) |
 | `/mep:export [--lang es]` | Brief para el cliente en .docx y .pdf, en su idioma, con versión y cambios respecto a la anterior |
 | `/mep:log-time <id> <horas>` | Registra horas reales por ítem fuera del repo; con datos suficientes, mep sugiere nuevos rangos |
+
+Los umbrales de calidad de código (complejidad 10, 300 líneas por archivo, 50 por función) viven en el perfil; relajar uno pide razón: `mep threshold complexity 15 "<razón>" --yes`, marcado con ⚠️ en el brief.
 
 La cotización corre sola solo al definir el scope (`/mep:scope`) y cuando cambia (`/mep:add`, que muestra el impacto en horas y precio antes de aceptar). Tarifas, horas reales y cotizaciones internas viven en `~/.config/mep-check/`, nunca en el repo.
 
@@ -171,6 +173,7 @@ Tipos de verificación: `file_exists`, `route_exists` (Next.js, Astro, Vite/Reac
 | Terminar un turno (Stop) | 🔴 de sub-etapas **cerradas** (regresiones) y violaciones 🔒. Los 🔴 pendientes de la sub-etapa activa se muestran como información |
 | Deploy de preview (`vercel`, `netlify deploy`) | Lo mismo que Stop |
 | Deploy a producción (`vercel --prod`, push a `main`) | Cualquier 🔴 pendiente, en todas las sub-etapas |
+| Abrir o fusionar un PR a `main` | Una vez por commit: primero una revisión de calidad (`/ponytail-review branch`, o la revisión propia de mep) |
 | Pull request a `main` | `mep verify --prod` en CI. Es la barrera real: el deploy a producción suele correr al hacer merge, donde los hooks de Claude Code no corren |
 | Escribir un archivo | Se rechaza escribir un secreto en un archivo versionado |
 
@@ -236,6 +239,7 @@ Mise-en-place/
 ├── templates/
 │   ├── claude-md.md           # bloque que se agrega al CLAUDE.md del proyecto
 │   ├── ci/mep.yml             # workflow de CI que se instala en cada proyecto
+│   ├── tests/responsive.spec.ts  # test responsive de Playwright que se instala en cada proyecto
 │   └── client-brief/          # plantilla del brief para el cliente (es, en)
 ├── examples/estudio-saas/     # proyecto de prueba que usa tests/e2e.spec.ts
 ├── tests/                     # tests del motor, la CLI y de punta a punta (node:test)
@@ -258,6 +262,7 @@ tu-proyecto/
 ├── docs/
 │   ├── decisions/             # ADRs, empezando por las decisiones de stack
 │   └── client/brief-vN.*      # brief para el cliente (.md, .docx, .pdf)
+├── tests/responsive.spec.ts   # 360–2560 px, sin scroll horizontal ni elementos encimados (Playwright)
 └── .github/workflows/mep.yml  # mep verify --prod como check obligatorio
 
 ~/.config/mep-check/           # fuera del repo: nunca se entrega al cliente

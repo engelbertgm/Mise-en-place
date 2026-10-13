@@ -41,3 +41,41 @@ implies:
   maps: { signals: { has_embeds: true } }
   notifications: { signals: { has_db: true } }
   realtime: { signals: { has_db: true } }
+
+# Idiomas que exige cada mercado. Elegir mercados activa idiomas y formatos; más de un idioma activa i18n.
+# El sub-nivel más específico gana (CA:QC agrega fr-CA a CA). EU sin país no fija idioma: elige los países.
+market_languages:
+  MX: [es-MX]
+  USA: [en-US]
+  CA: [en-CA]
+  "CA:QC": [en-CA, fr-CA]
+  UK: [en-GB]
+  BR: [pt-BR]
+  IN: [en-IN]
+  "EU:AT": [de-AT]
+  "EU:BE": [fr-BE, nl-BE]
+  "EU:BG": [bg]
+  "EU:HR": [hr]
+  "EU:CY": [el-CY]
+  "EU:CZ": [cs]
+  "EU:DK": [da]
+  "EU:EE": [et]
+  "EU:FI": [fi]
+  "EU:FR": [fr-FR]
+  "EU:DE": [de-DE]
+  "EU:GR": [el]
+  "EU:HU": [hu]
+  "EU:IE": [en-IE]
+  "EU:IT": [it]
+  "EU:LV": [lv]
+  "EU:LT": [lt]
+  "EU:LU": [fr-LU, de-LU]
+  "EU:MT": [en-MT, mt]
+  "EU:NL": [nl]
+  "EU:PL": [pl]
+  "EU:PT": [pt-PT]
+  "EU:RO": [ro]
+  "EU:SK": [sk]
+  "EU:SI": [sl]
+  "EU:ES": [es-ES]
+  "EU:SE": [sv]

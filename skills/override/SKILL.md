@@ -16,3 +16,5 @@ Argumentos: $ARGUMENTS
 4. Solo si confirma: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" override <id> <razón> --yes`.
 
 El motor rechaza ítems 🔒 locked y registra el override en `.mep/log`; en `BRIEF.md` queda marcado ⚠️.
+
+**Umbrales de calidad.** Para relajar complejidad o largo de archivos y funciones (por defecto 10, 300 y 50) usa `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" threshold <complexity|max_lines|max_function_lines> <valor> <razón> --yes`, con la misma confirmación explícita. Hacerlos más estrictos no requiere razón.

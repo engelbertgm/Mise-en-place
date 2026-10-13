@@ -16,7 +16,7 @@ export function exportHistory(root: string): ExportRecord[] {
 }
 
 /** Everything the client document needs, in structured form. Claude writes it in the client's language. */
-export function exportData(root: string, profile: Profile, catalog: Catalog, lang: string, q?: Quote) {
+export function exportData(root: string, profile: Profile, catalog: Catalog, lang: string, q?: Quote, priced = q !== undefined) {
   const evaluated = evaluate(profile, catalog)
   const active = evaluated.filter(e => e.state === 'active')
   const history = exportHistory(root)
@@ -48,7 +48,9 @@ export function exportData(root: string, profile: Profile, catalog: Catalog, lan
     compliance: active.filter(e => ['legal', 'security', 'accessibility', 'privacy', 'cookies'].includes(e.item.category)).map(e => ({ title: e.item.title, category: e.item.category, references: e.item.references ?? [] })),
     stack: stackGroups(stack(profile, catalog)).map(g => ({ decision: g.decisions.map(d => `${d.key}: ${d.value}`).join(', '), why: g.why })),
     deliverables: Object.fromEntries(['foundation', 'build', 'launch'].map(p => [p, active.filter(e => top(e.item.phase) === p && e.level !== 'optional').map(e => e.item.title)])),
-    quote: q ? { currency: q.currency, by_phase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance } : undefined,
+    quote: q && priced ? { currency: q.currency, by_phase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance } : undefined,
+    // The schedule needs hours, not a rate: it is there even before prices are set.
+    schedule: q ? { weeks_by_phase: q.schedule, total_weeks: q.weeks, weekly_hours_assumed: true } : undefined,
     acceptance_criteria: active.filter(e => e.level === 'required').map(e => ({ id: e.item.id, title: e.item.title, how: e.item.how })),
     legal_note: lang.startsWith('es') ? 'Checklist orientativo, no sustituye asesoría legal.' : 'Guidance checklist; not a substitute for legal advice.',
     changes,

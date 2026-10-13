@@ -85,7 +85,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
       assert.equal(mep(['security', 'record', '--id', id, '--result', 'pass', '--files', files, '--notes', 'revisado en el e2e']).code, 0, id)
     }
     const ok = mep(['phase', 'close', 'foundation.setup'])
-    assert.equal(ok.code, 0, ok.out)
+    assert.equal(ok.code, 0, ok.out + ok.err)
     assert.equal(profileFile().phase.active, 'foundation.design')
     assert.deepEqual(profileFile().phase.closed, ['foundation.setup'])
   })
@@ -173,11 +173,12 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     const file = join(root, '.mep/profile.yaml')
     writeFileSync(file, readFileSync(file, 'utf8').replace(/catalog_version: .*/, 'catalog_version: 2026.10.1'))
     const list = mep(['update'])
-    assert.match(list.out, /Catálogo 2026\.10\.1 → 2026\.10\.2/)
+    const version = readFileSync(join(REPO, 'catalog', 'VERSION'), 'utf8').trim()
+    assert.ok(list.out.includes(`Catálogo 2026.10.1 → ${version}`), list.out.slice(0, 200))
     assert.match(list.out, /a11y-contrast/)
     const applied = mep(['update', '--apply'])
     assert.match(applied.out, /Periodo de gracia .*code-maps/)
-    assert.equal(profileFile().catalog_version, '2026.10.2')
+    assert.equal(profileFile().catalog_version, version)
   })
 
   test('13. the log has every override, bypass and phase change', () => {

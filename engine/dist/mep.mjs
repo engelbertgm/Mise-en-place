@@ -7380,7 +7380,7 @@ import { fileURLToPath } from "node:url";
 var LEVELS = ["required", "recommended", "optional"];
 var SIZES = ["XS", "S", "M", "L", "XL"];
 var SCALES = ["pages", "entities", "languages", "markets", "integrations"];
-var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "manual"];
+var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "manual"];
 function defaultCatalogDir() {
   if (process.env.MEP_CATALOG) return resolve(process.env.MEP_CATALOG);
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -7464,6 +7464,8 @@ function validateCheck(check, where) {
     html: ["rule"],
     sql: ["rule"],
     maps: ["rule"],
+    quality: ["rule"],
+    design: ["rule", "max"],
     manual: ["prompt"]
   };
   const errors = required[check.type].filter((f) => check[f] === void 0).map((f) => `${where}: verify ${check.type} needs "${f}"`);
@@ -7555,7 +7557,13 @@ function deployKind(command, currentBranch2) {
   return void 0;
 }
 function mayDeploy(command) {
-  return /\b(vercel|netlify|git\s+push)\b/.test(command);
+  return /\b(vercel|netlify|git\s+push|gh\s+pr)\b/.test(command);
+}
+function prToMain(command) {
+  if (/\bgh\s+pr\s+merge\b/.test(command)) return true;
+  if (!/\bgh\s+pr\s+create\b/.test(command)) return false;
+  const base = command.match(/(?:--base|-B)[\s=]+["']?([\w./-]+)/)?.[1];
+  return base === void 0 || /^(main|master)$/.test(base);
 }
 
 // engine/src/conditions.ts
@@ -7701,7 +7709,7 @@ function diff(before, after, catalog) {
 // engine/src/files.ts
 import { existsSync as existsSync2, readdirSync as readdirSync2, readFileSync as readFileSync2, statSync } from "node:fs";
 import { join as join2, relative, sep } from "node:path";
-var IGNORED_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", ".mep", "dist", "build", "out", "coverage", ".astro", ".svelte-kit"]);
+var IGNORED_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", ".mep", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", "test-results", "playwright-report", "blob-report", "storybook-static"]);
 var MAX_FILE_BYTES = 1e6;
 function globToRegExp(glob) {
   return new RegExp(`^${globSource(glob)}$`);
@@ -7864,7 +7872,21 @@ function normalizeProfile(raw, catalog) {
   }
   return applyImplications(profile, catalog);
 }
+function marketLocales(profile, catalog) {
+  const table = catalog.dimensions.market_languages ?? {};
+  const out = /* @__PURE__ */ new Set();
+  for (const market of profile.markets) {
+    const parent = market.split(":")[0];
+    for (const l of table[market] ?? table[parent] ?? []) out.add(l);
+  }
+  return [...out].sort();
+}
+function languageCount(locales) {
+  return new Set(locales.map((l) => l.split("-")[0])).size;
+}
 function applyImplications(profile, catalog) {
+  const fromMarkets = languageCount(marketLocales(profile, catalog));
+  if (fromMarkets > (profile.counts.languages ?? 0)) profile.counts = { ...profile.counts, languages: fromMarkets };
   if ((profile.counts.languages ?? 1) > 1 && !profile.capabilities.includes("i18n")) {
     profile.capabilities.push("i18n");
   }
@@ -8231,7 +8253,7 @@ function codemapData(catalog) {
   const file = join5(catalog.dir, "codemap.yaml");
   return existsSync5(file) ? (0, import_yaml3.parse)(readFileSync4(file, "utf8")) : { folders: {}, conventions: {} };
 }
-var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", ".mep"]);
+var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", "test-results", "playwright-report", "blob-report", "storybook-static", ".mep"]);
 function folders(root) {
   const dirs = (dir) => existsSync5(join5(root, dir)) ? readdirSync3(join5(root, dir)).filter((d) => !SKIP_DIRS.has(d) && !d.startsWith(".") && statSync2(join5(root, dir, d)).isDirectory()) : [];
   const top = dirs(".").sort();
@@ -8352,6 +8374,87 @@ function checkSql(root, check) {
   return incomplete.length ? { ok: false, detail: incomplete.slice(0, 5).map((x) => `${x.t}: sin pol\xEDtica ${x.missing.join("/")}`).join("; ") } : { ok: true, detail: "pol\xEDticas por operaci\xF3n en todas las tablas" };
 }
 
+// engine/src/quality.ts
+var QUALITY_DEFAULTS = { complexity: 10, max_lines: 300, max_function_lines: 50 };
+var ESLINT_RULE = { complexity: "complexity", max_lines: "max-lines", max_function_lines: "max-lines-per-function" };
+function thresholds(profile) {
+  return { ...QUALITY_DEFAULTS, ...profile.quality };
+}
+function eslintValue(text, rule) {
+  const name = rule.replace(/-/g, "\\-");
+  const m = text.match(new RegExp(`["']?${name}["']?\\s*:\\s*\\[\\s*["']?(?:error|warn|1|2)["']?\\s*,\\s*(?:\\{[^}]*?\\bmax\\s*:\\s*)?(\\d+)`));
+  return m ? Number(m[1]) : void 0;
+}
+function checkThresholds(root, profile) {
+  const wanted = thresholds(profile);
+  const eslint = matchFiles(root, "{eslint.config.{js,mjs,cjs,ts},.eslintrc,.eslintrc.{json,js,cjs,yml,yaml}}")[0];
+  if (!eslint) {
+    const biome = matchFiles(root, "biome.{json,jsonc}")[0];
+    if (!biome) return { ok: false, detail: "sin config de ESLint ni Biome" };
+    const max = Number((readText(root, biome) ?? "").match(/"maxAllowedComplexity"\s*:\s*(\d+)/)?.[1]);
+    if (!max) return { ok: false, detail: `${biome}: falta noExcessiveCognitiveComplexity con maxAllowedComplexity` };
+    if (max > wanted.complexity) return { ok: false, detail: `${biome}: complejidad ${max} > ${wanted.complexity}` };
+    return { ok: null, detail: "Biome no tiene max-lines: revisa el largo de archivos y funciones a mano" };
+  }
+  const text = readText(root, eslint) ?? "";
+  const problems = [];
+  for (const key of Object.keys(ESLINT_RULE)) {
+    const value = eslintValue(text, ESLINT_RULE[key]);
+    if (value === void 0) problems.push(`falta ${ESLINT_RULE[key]} (\u2264 ${wanted[key]})`);
+    else if (value > wanted[key]) problems.push(`${ESLINT_RULE[key]} ${value} > ${wanted[key]}`);
+  }
+  return problems.length ? { ok: false, detail: `${eslint}: ${problems.join("; ")}` } : { ok: true, detail: `${eslint}: umbrales al d\xEDa` };
+}
+
+// engine/src/design.ts
+var UI = "**/*.{tsx,jsx,astro,vue,svelte,html}";
+var CSS = "**/*.{css,scss}";
+var GENERIC = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-sans-serif", "ui-serif", "ui-monospace", "inherit", "initial", "unset", "-apple-system", "blinkmacsystemfont", "segoe ui", "arial", "helvetica", "helvetica neue", "apple color emoji", "segoe ui emoji", "noto color emoji"]);
+var norm = (name) => name.replace(/["']/g, "").replace(/[_-]variable$/i, "").replace(/_/g, " ").trim().toLowerCase();
+function fontFamilies(root) {
+  const out = /* @__PURE__ */ new Set();
+  for (const f of matchFiles(root, "**/*.{ts,tsx,js,jsx,mjs}")) {
+    const text = readText(root, f) ?? "";
+    for (const m of text.matchAll(/import\s*\{([^}]+)\}\s*from\s*["']next\/font\/google["']/g)) {
+      for (const name of m[1].split(",").map((n) => n.trim().split(/\s+as\s+/)[0]).filter(Boolean)) out.add(norm(name));
+    }
+    for (const m of text.matchAll(/localFont\(\s*\{[^}]*?src:\s*["'`][^"'`]*?\/([\w-]+?)(?:-(?:regular|bold|medium|light|variable|\w+))?\.(?:woff2?|ttf|otf)/gi)) out.add(norm(m[1]));
+  }
+  for (const dep of dependencies(root)) {
+    const m = dep.match(/^@fontsource(?:-variable)?\/(.+)$/);
+    if (m) out.add(norm(m[1].replace(/-/g, " ")));
+  }
+  for (const f of matchFiles(root, CSS)) {
+    const text = readText(root, f) ?? "";
+    for (const m of text.matchAll(/@font-face\s*\{[^}]*?font-family:\s*([^;}]+)/g)) out.add(norm(m[1].split(",")[0]));
+    for (const m of text.matchAll(/(?<![-\w])font-family:\s*([^;}]+)/g)) {
+      const first = norm(m[1].split(",")[0]);
+      if (first && !first.startsWith("var(") && !GENERIC.has(first)) out.add(first);
+    }
+  }
+  return [...out].sort();
+}
+var TW_WEIGHT = { thin: "100", extralight: "200", light: "300", normal: "400", medium: "500\u2013600", semibold: "500\u2013600", bold: "700", extrabold: "800", black: "900" };
+function cssWeight(v) {
+  const n = v === "bold" ? 700 : v === "normal" ? 400 : Number(v);
+  return n === 500 || n === 600 ? "500\u2013600" : String(n);
+}
+function fontWeights(root) {
+  const out = /* @__PURE__ */ new Set();
+  for (const f of matchFiles(root, UI)) {
+    for (const m of (readText(root, f) ?? "").matchAll(/\bfont-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b/g)) out.add(TW_WEIGHT[m[1]]);
+  }
+  for (const f of matchFiles(root, CSS)) {
+    for (const m of (readText(root, f) ?? "").matchAll(/font-weight:\s*(\d{3}|bold|normal)\b/g)) out.add(cssWeight(m[1]));
+  }
+  return [...out].sort();
+}
+function checkDesign(root, check) {
+  const found = check.rule === "font_families" ? fontFamilies(root) : fontWeights(root);
+  const label = check.rule === "font_families" ? "familias" : "pesos";
+  return found.length <= check.max ? { ok: true, detail: `${found.length} ${label}${found.length ? `: ${found.join(", ")}` : ""}` } : { ok: false, detail: `${found.length} ${label} (m\xE1ximo ${check.max}): ${found.join(", ")}` };
+}
+
 // engine/src/security.ts
 import { createHash } from "node:crypto";
 import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync3 } from "node:fs";
@@ -8451,6 +8554,10 @@ function runCheck(root, check, profile, itemId, mode) {
       const errors = check.rule === "registry" ? checkRegistry(root) : checkCodemap(root);
       return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : "") } : { ok: true, detail: `${check.rule} al d\xEDa` };
     }
+    case "quality":
+      return checkThresholds(root, profile);
+    case "design":
+      return checkDesign(root, check);
     case "manual": {
       const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
@@ -8526,8 +8633,9 @@ function closePhase(root, catalog, sub) {
   const phases = catalog.dimensions.phases;
   if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. V\xE1lidas: ${phases.join(", ")}`, pending: [], profile };
   if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya est\xE1 cerrada`, pending: [], profile };
-  const results = verifyItems(root, profile, evaluate(profile, catalog), "full");
   const grace = new Set(profile.selections.grace);
+  const relevant = evaluate(profile, catalog).filter((e) => e.item.phase === sub || grace.has(e.item.id));
+  const results = verifyItems(root, profile, relevant, "full");
   const pending = results.filter(
     (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass"
   );
@@ -8565,6 +8673,30 @@ function cachedGate(root, catalog, kind, env = process.env) {
   writeFileSync4(file, JSON.stringify({ key, time: Date.now(), block, message }));
   return { block, message };
 }
+function prReviewGate(root) {
+  if (!hasProfile(root)) return { block: false, message: "" };
+  let sha = "no-git";
+  try {
+    sha = execSync2("git rev-parse HEAD", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+  } catch {
+  }
+  const dir = join7(root, MEP_DIR, ".cache");
+  const marker = join7(dir, `pr-review-${sha}`);
+  if (existsSync6(marker)) return { block: false, message: "" };
+  mkdirSync3(dir, { recursive: true });
+  writeFileSync4(join7(root, MEP_DIR, ".gitignore"), ".cache/\n");
+  writeFileSync4(marker, (/* @__PURE__ */ new Date()).toISOString());
+  log(root, "pr-review", sha);
+  return {
+    block: true,
+    message: [
+      "mep: antes del PR a main, revisi\xF3n de calidad de la rama.",
+      '- Si Ponytail est\xE1 instalado: corre /ponytail-review branch y resuelve sus "must fix".',
+      "- Si no: revisa duplicados, nombres, complejidad y oportunidades de reutilizar contra REGISTRY.md.",
+      "Despu\xE9s vuelve a ejecutar el mismo comando (la revisi\xF3n se pide una vez por commit)."
+    ].join("\n")
+  };
+}
 
 // engine/src/render.ts
 import { existsSync as existsSync7, mkdirSync as mkdirSync4, readdirSync as readdirSync4, readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
@@ -8590,6 +8722,10 @@ function describeCheck(c) {
       return `migraciones SQL: ${c.rule}`;
     case "maps":
       return c.rule === "registry" ? "REGISTRY.md al d\xEDa (mep registry --check)" : "CODEMAP.md al d\xEDa";
+    case "quality":
+      return "umbrales de complejidad y largo en la config del linter";
+    case "design":
+      return `${c.rule === "font_families" ? "familias tipogr\xE1ficas" : "pesos de texto"} \u2264 ${c.max}`;
     case "manual":
       return `manual: ${c.prompt}`;
   }
@@ -8603,12 +8739,12 @@ function line(e, results) {
   const verify = e.item.verify.map(describeCheck).join(" \xB7 ");
   return `- ${checkbox(e, results)} \`${e.item.id}\`${lock} \u2014 ${e.item.title} \u2014 ${verify}`;
 }
-function profileSection(p) {
+function profileSection(p, locales) {
   const signals = Object.entries(p.signals).filter(([, v]) => v !== false).map(([k, v]) => v === true ? k : `${k}=${v}`);
   return [
     `- **Tipo:** ${p.type}${p.preset ? ` (preset ${p.preset})` : ""}`,
     `- **Capacidades:** ${p.capabilities.join(", ") || "\u2014"}`,
-    `- **Mercados:** ${p.markets.join(", ") || "\u2014"}`,
+    `- **Mercados:** ${p.markets.join(", ") || "\u2014"}${locales.length ? ` \xB7 idiomas: ${locales.join(", ")}` : ""}`,
     `- **Audiencia:** ${p.audience.join(", ") || "\u2014"}`,
     `- **Contexto:** ${p.context}`,
     `- **Se\xF1ales:** ${signals.join(", ") || "\u2014"}`,
@@ -8626,7 +8762,7 @@ function renderBrief(profile, evaluated, catalog, results) {
     `# Brief \u2014 ${profile.project}`,
     "",
     "## Perfil",
-    profileSection(profile),
+    profileSection(profile, marketLocales(profile, catalog)),
     "",
     "## Stack (decisi\xF3n + por qu\xE9)",
     stackSection(stack(profile, catalog)),
@@ -8652,7 +8788,9 @@ function renderBrief(profile, evaluated, catalog, results) {
   const skipped = evaluated.filter((e) => e.state === "skipped");
   const overridden = evaluated.filter((e) => e.state === "overridden");
   out.push("", "### \u23ED\uFE0F Omitidos (\u{1F7E1}, con raz\xF3n)", skipped.length ? skipped.map((e) => `- \`${e.item.id}\` \u2014 ${e.reason}`).join("\n") : "\u2014");
-  out.push("", "### \u26A0\uFE0F Desactivados (\u{1F534} con override, con raz\xF3n)", overridden.length ? overridden.map((e) => `- \u26A0\uFE0F \`${e.item.id}\` \u2014 ${e.reason}`).join("\n") : "\u2014");
+  const relaxed = profile.selections.overrides.filter((o) => o.id.startsWith("threshold:"));
+  const disabled = [...overridden.map((e) => `- \u26A0\uFE0F \`${e.item.id}\` \u2014 ${e.reason}`), ...relaxed.map((o) => `- \u26A0\uFE0F umbral \`${o.id.slice(10)}\` \u2014 ${o.reason}`)];
+  out.push("", "### \u26A0\uFE0F Desactivados (\u{1F534} con override, con raz\xF3n)", disabled.length ? disabled.join("\n") : "\u2014");
   const warns = warnings(evaluated);
   if (warns.length) out.push("", "### Avisos", ...warns.map((w) => `- ${w.message}`));
   out.push("", "## Costos recurrentes estimados", "_Se completan con /mep:quote (hosting, dominio, servicios)._");
@@ -8787,6 +8925,11 @@ function loadDetectors(catalog, name = "signals.yaml") {
 function fires(root, d, deps) {
   if ("dependency" in d) return d.dependency.find((dep) => deps.has(dep));
   if ("file" in d) return matchFiles(root, d.file)[0];
+  if ("count" in d) {
+    const re2 = new RegExp(d.count, "g");
+    const hit = matchFiles(root, d.glob).find((f) => ((readText(root, f) ?? "").match(re2)?.length ?? 0) >= d.min);
+    return hit ? `${hit} (${d.min}+ coincidencias)` : void 0;
+  }
   const re = new RegExp(d.grep);
   return matchFiles(root, d.glob).find((f) => re.test(readText(root, f) ?? ""));
 }
@@ -9226,7 +9369,7 @@ function exportHistory(root) {
   const file = join10(root, EXPORTS_FILE);
   return existsSync9(file) ? (0, import_yaml5.parse)(readFileSync8(file, "utf8")) ?? [] : [];
 }
-function exportData(root, profile, catalog, lang, q) {
+function exportData(root, profile, catalog, lang, q, priced = q !== void 0) {
   const evaluated = evaluate(profile, catalog);
   const active = evaluated.filter((e) => e.state === "active");
   const history = exportHistory(root);
@@ -9256,7 +9399,9 @@ function exportData(root, profile, catalog, lang, q) {
     compliance: active.filter((e) => ["legal", "security", "accessibility", "privacy", "cookies"].includes(e.item.category)).map((e) => ({ title: e.item.title, category: e.item.category, references: e.item.references ?? [] })),
     stack: stackGroups(stack(profile, catalog)).map((g) => ({ decision: g.decisions.map((d) => `${d.key}: ${d.value}`).join(", "), why: g.why })),
     deliverables: Object.fromEntries(["foundation", "build", "launch"].map((p) => [p, active.filter((e) => top(e.item.phase) === p && e.level !== "optional").map((e) => e.item.title)])),
-    quote: q ? { currency: q.currency, by_phase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance } : void 0,
+    quote: q && priced ? { currency: q.currency, by_phase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance } : void 0,
+    // The schedule needs hours, not a rate: it is there even before prices are set.
+    schedule: q ? { weeks_by_phase: q.schedule, total_weeks: q.weeks, weekly_hours_assumed: true } : void 0,
     acceptance_criteria: active.filter((e) => e.level === "required").map((e) => ({ id: e.item.id, title: e.item.title, how: e.item.how })),
     legal_note: lang.startsWith("es") ? "Checklist orientativo, no sustituye asesor\xEDa legal." : "Guidance checklist; not a substitute for legal advice.",
     changes
@@ -9294,6 +9439,7 @@ var DEFAULT_RATES = {
   pm_overhead: 0.1,
   risk_buffer: 0.2,
   rounding: 50,
+  weekly_hours: 30,
   maintenance_plans: { basic: { price: 0, hours: 0 }, standard: { price: 0, hours: 0 }, premium: { price: 0, hours: 0 } }
 };
 var RATES_TEMPLATE = `# Tarifas de mep. Fuera del repo: nunca se entregan al cliente.
@@ -9302,6 +9448,7 @@ hourly_rate: 0        # define tu tarifa por hora
 pm_overhead: 0.10     # gesti\xF3n de proyecto
 risk_buffer: 0.20     # colch\xF3n de riesgo
 rounding: 50          # redondear precios a m\xFAltiplos de 50
+weekly_hours: 30      # horas por semana dedicadas al proyecto (para el cronograma)
 maintenance_plans:    # precio mensual; horas incluidas por mes
   basic:    { price: 0, hours: 0 }   # actualizaciones de seguridad + backups
   standard: { price: 0, hours: 0 }   # + cambios menores
@@ -9369,6 +9516,8 @@ function quote(profile, catalog, rates) {
   const risk = scale(add(subtotal, pm), rates.risk_buffer);
   const total = add(add(subtotal, pm), risk);
   const byPhase = Object.fromEntries(Object.entries(byPhaseHours).map(([k, v]) => [k, money(loaded(v, rates), rates)]));
+  const weeksFor = (h) => [Math.max(1, Math.ceil(h[0] / Math.max(1, rates.weekly_hours))), Math.max(1, Math.ceil(h[1] / Math.max(1, rates.weekly_hours)))];
+  const schedule = Object.fromEntries(Object.entries(byPhaseHours).map(([k, v]) => [k, weeksFor(loaded(v, rates))]));
   return {
     currency: rates.currency,
     lines,
@@ -9381,6 +9530,8 @@ function quote(profile, catalog, rates) {
     // The total is the sum of the phase prices, so the client view always adds up.
     price: Object.values(byPhase).reduce((acc, r) => add(acc, r), [0, 0]),
     byPhase,
+    schedule,
+    weeks: Object.values(schedule).reduce((acc, r) => add(acc, r), [0, 0]),
     extrasPrice: extras.map((x) => ({ id: x.id, title: x.title, price: money(loaded(x.hours, rates), rates) })),
     recurring: recurringCosts(profile, catalog),
     maintenance: profile.context === "client-project" ? rates.maintenance_plans : void 0
@@ -9411,6 +9562,9 @@ function formatClient(q) {
   const out = ["Cotizaci\xF3n"];
   for (const [phase, price] of Object.entries(q.byPhase)) out.push(`  ${PHASE_LABEL[phase] ?? phase}: ${fmtMoney(price, q.currency)}`);
   out.push(`  Total: ${fmtMoney(q.price, q.currency)}`);
+  out.push("", "Cronograma estimado:");
+  for (const [phase, w] of Object.entries(q.schedule)) out.push(`  ${PHASE_LABEL[phase] ?? phase}: ${w[0]}\u2013${w[1]} semanas`);
+  out.push(`  Total: ${q.weeks[0]}\u2013${q.weeks[1]} semanas`);
   if (q.extrasPrice.length) out.push("", "Extras opcionales:", ...q.extrasPrice.map((x) => `  ${x.title}: ${fmtMoney(x.price, q.currency)}`));
   if (q.recurring.length) {
     out.push("", "Costos recurrentes estimados (aparte del proyecto, mensuales, USD):");
@@ -9583,6 +9737,23 @@ function closePassingPhases(root, catalog) {
   }
   return closed;
 }
+function installResponsiveTest(root, catalog) {
+  const target = join12(root, "tests", "responsive.spec.ts");
+  if (existsSync11(target)) return void 0;
+  mkdirSync7(dirname3(target), { recursive: true });
+  writeFileSync8(target, readFileSync10(join12(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
+  const pkgFile = join12(root, "package.json");
+  if (existsSync11(pkgFile)) {
+    const text = readFileSync10(pkgFile, "utf8");
+    const pkg = JSON.parse(text);
+    if (!pkg.scripts?.["test:responsive"]) {
+      pkg.scripts = { ...pkg.scripts, "test:responsive": "playwright test tests/responsive.spec.ts" };
+      const indent = text.match(/^\{\n([ \t]+)/)?.[1] ?? "  ";
+      writeFileSync8(pkgFile, JSON.stringify(pkg, null, indent) + "\n");
+    }
+  }
+  return "tests/responsive.spec.ts";
+}
 function runHook(event, root, catalog) {
   const input = hookInput();
   const cwd = input.cwd ? resolve2(input.cwd) : root;
@@ -9610,6 +9781,11 @@ function runHook(event, root, catalog) {
     case "pre-bash": {
       const command = String(input.tool_input?.command ?? "");
       if (!mayDeploy(command)) return;
+      if (prToMain(command)) {
+        const review = prReviewGate(cwd);
+        if (review.block) json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: review.message } });
+        return;
+      }
       const kind = deployKind(command, currentBranch(cwd));
       if (!kind) return;
       const result = cachedGate(cwd, catalog, kind);
@@ -9658,12 +9834,14 @@ function main() {
         mkdirSync7(dirname3(ci), { recursive: true });
         writeFileSync8(ci, readFileSync10(join12(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
       }
+      const responsive = installResponsiveTest(root, catalog);
       log(root, "init", `${profile.type} (${profile.capabilities.join(",")})`);
       const closed = args.flags["close-passing"] ? closePassingPhases(root, catalog) : [];
       if (closed.length) regenerate(root, loadProfile(root, catalog), catalog);
       return print(
         [
           `\u2705 .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? "enlazado" : "ya estaba enlazado"}. CI: .github/workflows/mep.yml.`,
+          responsive ? `Test responsive: ${responsive} (requiere @playwright/test; edita PAGES con las rutas clave).` : "",
           closed.length ? `Sub-etapas ya cumplidas y cerradas: ${closed.join(", ")}.` : "",
           quoteOnScopeChange(loadProfile(root, catalog), catalog)
         ].filter(Boolean).join("\n")
@@ -9729,6 +9907,12 @@ ${signals.map((s) => `  - ${s.signal} (${s.evidence})`).join("\n")}`);
       process.exitCode = result.block ? 1 : 0;
       return;
     }
+    case "pr-gate": {
+      const review = prReviewGate(root);
+      if (review.message) print(review.message);
+      process.exitCode = review.block ? 1 : 0;
+      return;
+    }
     case "status": {
       if (!hasProfile(root)) return args.flags.json ? json(null) : void 0;
       const profile = loadProfile(root, catalog);
@@ -9777,6 +9961,25 @@ ${formatItems(pending)}` : `
       log(root, cmd, `${id} "${reason}"`);
       regenerate(root, profile, catalog);
       return print(cmd === "skip" ? `\u23ED\uFE0F ${id} omitido: ${reason}` : `\u26A0\uFE0F ${id} desactivado: ${reason} (registrado en .mep/log)`);
+    }
+    case "threshold": {
+      const [key, valueText, ...reasonParts] = rest;
+      const keys = Object.keys(QUALITY_DEFAULTS);
+      if (!key || !keys.includes(key) || !(Number(valueText) > 0)) fail(`Uso: mep threshold <${keys.join("|")}> <valor> [raz\xF3n --yes]`);
+      const value = Number(valueText);
+      const reason = reasonParts.join(" ").trim();
+      const profile = requireProfile(root, catalog);
+      const laxer = value > QUALITY_DEFAULTS[key];
+      if (laxer && !reason) fail(`Relajar ${key} a ${value} (por defecto ${QUALITY_DEFAULTS[key]}) requiere una raz\xF3n.`);
+      if (laxer && !args.flags.yes) fail(`Relajar ${key} requiere confirmaci\xF3n expl\xEDcita (--yes).`, 2);
+      profile.quality = { ...profile.quality, [key]: value };
+      const id = `threshold:${key}`;
+      profile.selections.overrides = profile.selections.overrides.filter((o) => o.id !== id);
+      if (laxer) profile.selections.overrides.push({ id, reason: `${key} = ${value} (por defecto ${QUALITY_DEFAULTS[key]}): ${reason}`, date: today() });
+      saveProfile(root, profile);
+      log(root, "threshold", `${key}=${value}${laxer ? ` "${reason}"` : ""}`);
+      regenerate(root, profile, catalog);
+      return print(laxer ? `\u26A0\uFE0F ${key} relajado a ${value} (registrado en .mep/log y en BRIEF.md)` : `\u2705 ${key} = ${value}`);
     }
     case "select": {
       const profile = requireProfile(root, catalog);
@@ -9911,7 +10114,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
     case "export-data": {
       const profile = requireProfile(root, catalog);
       const { rates, configured } = loadRates();
-      return json(exportData(root, profile, catalog, String(args.flags.lang ?? "es"), configured ? quote(profile, catalog, rates) : void 0));
+      return json(exportData(root, profile, catalog, String(args.flags.lang ?? "es"), quote(profile, catalog, rates), configured));
     }
     case "export": {
       const profile = requireProfile(root, catalog);
@@ -9955,6 +10158,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  verify [--prod]                                       gate para CI (sale con 1 si bloquea)",
           "  phase [close <sub-etapa>]",
           "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> --by <nombre>",
+          "  threshold <complexity|max_lines|max_function_lines> <valor> [raz\xF3n --yes]",
           "  security [record --id --result --files --notes]",
           "  audit [--from perfil.yaml]                            infiere el perfil / reporte de brecha (no escribe nada)",
           "  update [--apply]                                      \xEDtems nuevos del cat\xE1logo que aplican",

@@ -153,7 +153,7 @@ function codemapData(catalog: Catalog): CodemapData {
   return existsSync(file) ? (parse(readFileSync(file, 'utf8')) as CodemapData) : { folders: {}, conventions: {} }
 }
 
-const SKIP_DIRS = new Set(['node_modules', '.git', '.next', '.vercel', '.turbo', 'dist', 'build', 'out', 'coverage', '.astro', '.svelte-kit', '.mep'])
+const SKIP_DIRS = new Set(['node_modules', '.git', '.next', '.vercel', '.turbo', 'dist', 'build', 'out', 'coverage', '.astro', '.svelte-kit', 'test-results', 'playwright-report', 'blob-report', 'storybook-static', '.mep'])
 
 /** Top-level folders, and the children of src/ and app/: what a reader needs to place a file. */
 function folders(root: string): string[] {

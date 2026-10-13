@@ -18,6 +18,8 @@ export type Rates = {
   pm_overhead: number
   risk_buffer: number
   rounding: number
+  /** Hours of project work per week: turns hours into an estimated schedule. */
+  weekly_hours: number
   maintenance_plans: Record<'basic' | 'standard' | 'premium', { price: number; hours: number }>
 }
 
@@ -27,6 +29,7 @@ const DEFAULT_RATES: Rates = {
   pm_overhead: 0.1,
   risk_buffer: 0.2,
   rounding: 50,
+  weekly_hours: 30,
   maintenance_plans: { basic: { price: 0, hours: 0 }, standard: { price: 0, hours: 0 }, premium: { price: 0, hours: 0 } },
 }
 
@@ -36,6 +39,7 @@ hourly_rate: 0        # define tu tarifa por hora
 pm_overhead: 0.10     # gestión de proyecto
 risk_buffer: 0.20     # colchón de riesgo
 rounding: 50          # redondear precios a múltiplos de 50
+weekly_hours: 30      # horas por semana dedicadas al proyecto (para el cronograma)
 maintenance_plans:    # precio mensual; horas incluidas por mes
   basic:    { price: 0, hours: 0 }   # actualizaciones de seguridad + backups
   standard: { price: 0, hours: 0 }   # + cambios menores
@@ -70,6 +74,9 @@ export type Quote = {
   total: Range
   price: Range
   byPhase: Record<string, Range>
+  /** Estimated weeks per phase (foundation, build, launch) and in total, with pm and buffer included. */
+  schedule: Record<string, Range>
+  weeks: Range
   extrasPrice: { id: string; title: string; price: Range }[]
   recurring: { key: string; label: string; monthly: Range; note?: string }[]
   maintenance?: Rates['maintenance_plans']
@@ -136,6 +143,8 @@ export function quote(profile: Profile, catalog: Catalog, rates: Rates): Quote {
   const risk = scale(add(subtotal, pm), rates.risk_buffer)
   const total = add(add(subtotal, pm), risk)
   const byPhase = Object.fromEntries(Object.entries(byPhaseHours).map(([k, v]) => [k, money(loaded(v, rates), rates)]))
+  const weeksFor = (h: Range): Range => [Math.max(1, Math.ceil(h[0] / Math.max(1, rates.weekly_hours))), Math.max(1, Math.ceil(h[1] / Math.max(1, rates.weekly_hours)))]
+  const schedule = Object.fromEntries(Object.entries(byPhaseHours).map(([k, v]) => [k, weeksFor(loaded(v, rates))]))
   return {
     currency: rates.currency,
     lines,
@@ -148,6 +157,8 @@ export function quote(profile: Profile, catalog: Catalog, rates: Rates): Quote {
     // The total is the sum of the phase prices, so the client view always adds up.
     price: Object.values(byPhase).reduce<Range>((acc, r) => add(acc, r), [0, 0]),
     byPhase,
+    schedule,
+    weeks: Object.values(schedule).reduce<Range>((acc, r) => add(acc, r), [0, 0]),
     extrasPrice: extras.map(x => ({ id: x.id, title: x.title, price: money(loaded(x.hours, rates), rates) })),
     recurring: recurringCosts(profile, catalog),
     maintenance: profile.context === 'client-project' ? rates.maintenance_plans : undefined,
@@ -184,6 +195,9 @@ export function formatClient(q: Quote): string {
   const out = ['Cotización']
   for (const [phase, price] of Object.entries(q.byPhase)) out.push(`  ${PHASE_LABEL[phase] ?? phase}: ${fmtMoney(price, q.currency)}`)
   out.push(`  Total: ${fmtMoney(q.price, q.currency)}`)
+  out.push('', 'Cronograma estimado:')
+  for (const [phase, w] of Object.entries(q.schedule)) out.push(`  ${PHASE_LABEL[phase] ?? phase}: ${w[0]}–${w[1]} semanas`)
+  out.push(`  Total: ${q.weeks[0]}–${q.weeks[1]} semanas`)
   if (q.extrasPrice.length) out.push('', 'Extras opcionales:', ...q.extrasPrice.map(x => `  ${x.title}: ${fmtMoney(x.price, q.currency)}`))
   if (q.recurring.length) {
     out.push('', 'Costos recurrentes estimados (aparte del proyecto, mensuales, USD):')

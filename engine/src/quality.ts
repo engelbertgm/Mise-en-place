@@ -1,0 +1,42 @@
+import { matchFiles, readText } from './files.ts'
+import type { CheckResult, Profile } from './types.ts'
+
+export type QualityKey = 'complexity' | 'max_lines' | 'max_function_lines'
+
+/** Spec defaults. A lower number is stricter; a higher one needs a reason (`mep threshold`). */
+export const QUALITY_DEFAULTS: Record<QualityKey, number> = { complexity: 10, max_lines: 300, max_function_lines: 50 }
+
+const ESLINT_RULE: Record<QualityKey, string> = { complexity: 'complexity', max_lines: 'max-lines', max_function_lines: 'max-lines-per-function' }
+
+export function thresholds(profile: Profile): Record<QualityKey, number> {
+  return { ...QUALITY_DEFAULTS, ...profile.quality }
+}
+
+/** Reads `rule: ['error', 10]` or `rule: ['error', { max: 10 }]` from an ESLint config (flat or legacy). */
+function eslintValue(text: string, rule: string): number | undefined {
+  const name = rule.replace(/-/g, '\\-')
+  const m = text.match(new RegExp(`["']?${name}["']?\\s*:\\s*\\[\\s*["']?(?:error|warn|1|2)["']?\\s*,\\s*(?:\\{[^}]*?\\bmax\\s*:\\s*)?(\\d+)`))
+  return m ? Number(m[1]) : undefined
+}
+
+/** The project's linter enforces the profile's thresholds (or stricter ones). */
+export function checkThresholds(root: string, profile: Profile): CheckResult {
+  const wanted = thresholds(profile)
+  const eslint = matchFiles(root, '{eslint.config.{js,mjs,cjs,ts},.eslintrc,.eslintrc.{json,js,cjs,yml,yaml}}')[0]
+  if (!eslint) {
+    const biome = matchFiles(root, 'biome.{json,jsonc}')[0]
+    if (!biome) return { ok: false, detail: 'sin config de ESLint ni Biome' }
+    const max = Number((readText(root, biome) ?? '').match(/"maxAllowedComplexity"\s*:\s*(\d+)/)?.[1])
+    if (!max) return { ok: false, detail: `${biome}: falta noExcessiveCognitiveComplexity con maxAllowedComplexity` }
+    if (max > wanted.complexity) return { ok: false, detail: `${biome}: complejidad ${max} > ${wanted.complexity}` }
+    return { ok: null, detail: 'Biome no tiene max-lines: revisa el largo de archivos y funciones a mano' }
+  }
+  const text = readText(root, eslint) ?? ''
+  const problems: string[] = []
+  for (const key of Object.keys(ESLINT_RULE) as QualityKey[]) {
+    const value = eslintValue(text, ESLINT_RULE[key])
+    if (value === undefined) problems.push(`falta ${ESLINT_RULE[key]} (≤ ${wanted[key]})`)
+    else if (value > wanted[key]) problems.push(`${ESLINT_RULE[key]} ${value} > ${wanted[key]}`)
+  }
+  return problems.length ? { ok: false, detail: `${eslint}: ${problems.join('; ')}` } : { ok: true, detail: `${eslint}: umbrales al día` }
+}

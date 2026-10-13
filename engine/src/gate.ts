@@ -75,9 +75,11 @@ export function closePhase(root: string, catalog: Catalog, sub: string): PhaseCl
   if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. Válidas: ${phases.join(', ')}`, pending: [], profile }
   if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya está cerrada`, pending: [], profile }
 
-  const results = verifyItems(root, profile, evaluate(profile, catalog), 'full')
   // Items still in their grace period (from /mep:update) must be met at the next close.
   const grace = new Set(profile.selections.grace)
+  // Only this sub-phase's items (and graced ones) are verified: closing never runs other phases' commands.
+  const relevant = evaluate(profile, catalog).filter(e => e.item.phase === sub || grace.has(e.item.id))
+  const results = verifyItems(root, profile, relevant, 'full')
   const pending = results.filter(
     r => r.state === 'active' && r.level === 'required' && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass',
   )
@@ -122,4 +124,34 @@ export function cachedGate(root: string, catalog: Catalog, kind: GateKind, env =
   writeFileSync(join(root, MEP_DIR, '.gitignore'), '.cache/\n')
   writeFileSync(file, JSON.stringify({ key, time: Date.now(), block, message }))
   return { block, message }
+}
+
+/**
+ * Before a PR into main: one quality review per commit (/ponytail-review branch, or mep's own review).
+ * The first attempt is held with the instructions; the next one for the same commit goes through.
+ */
+export function prReviewGate(root: string): { block: boolean; message: string } {
+  if (!hasProfile(root)) return { block: false, message: '' }
+  let sha = 'no-git'
+  try {
+    sha = execSync('git rev-parse HEAD', { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    // Without git there is no commit to key the review on: the review is asked for every time.
+  }
+  const dir = join(root, MEP_DIR, '.cache')
+  const marker = join(dir, `pr-review-${sha}`)
+  if (existsSync(marker)) return { block: false, message: '' }
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(root, MEP_DIR, '.gitignore'), '.cache/\n')
+  writeFileSync(marker, new Date().toISOString())
+  log(root, 'pr-review', sha)
+  return {
+    block: true,
+    message: [
+      'mep: antes del PR a main, revisión de calidad de la rama.',
+      '- Si Ponytail está instalado: corre /ponytail-review branch y resuelve sus "must fix".',
+      '- Si no: revisa duplicados, nombres, complejidad y oportunidades de reutilizar contra REGISTRY.md.',
+      'Después vuelve a ejecutar el mismo comando (la revisión se pide una vez por commit).',
+    ].join('\n'),
+  }
 }

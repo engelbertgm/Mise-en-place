@@ -1,7 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative, sep } from 'node:path'
 
-const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', '.vercel', '.turbo', '.mep', 'dist', 'build', 'out', 'coverage', '.astro', '.svelte-kit'])
+const IGNORED_DIRS = new Set(['node_modules', '.git', '.next', '.vercel', '.turbo', '.mep', 'dist', 'build', 'out', 'coverage', '.astro', '.svelte-kit', 'test-results', 'playwright-report', 'blob-report', 'storybook-static'])
 const MAX_FILE_BYTES = 1_000_000
 
 /** Minimal glob → RegExp: `**`, `*`, `?`, nested `{a,b}`. Paths use `/`. */

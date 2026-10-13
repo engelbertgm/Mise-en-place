@@ -42,12 +42,12 @@
   level: required
   phase: foundation.setup
   since: "2026.10.2"
+  updated: "2026.10.3"
   effort: { size: S, hours: [1, 2] }
   why: "Los umbrales mantienen el código legible; el lint atrapa errores antes de producción."
-  how: "ESLint (o Biome) con reglas complexity, max-lines y max-lines-per-function; umbrales configurables en el perfil (bajarlos requiere /mep:override)."
+  how: "ESLint (o Biome) con complexity, max-lines y max-lines-per-function en los umbrales del perfil (quality en profile.yaml). Relajarlos requiere razón: mep threshold <clave> <valor> <razón> --yes."
   verify:
-    - { type: grep, pattern: "complexity", glob: "{eslint.config.{js,mjs,ts},.eslintrc*,biome.json,biome.jsonc}" }
-    - { type: grep, pattern: "max-lines", glob: "{eslint.config.{js,mjs,ts},.eslintrc*,biome.json,biome.jsonc}" }
+    - { type: quality, rule: thresholds }
     - { type: command, run: "pnpm -s lint", timeout: 300 }
 
 - id: strict-types

@@ -14,8 +14,9 @@ function repo(on: On, opts: { profile?: boolean; branch?: string; verifyExit?: n
     calls.push([...e.argv])
     if (e.argv[0] === 'git') return { value: { exitCode: 0, stdout: `${opts.branch ?? 'feature'}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     const cmd = e.argv[2]
-    const stdout = cmd === 'verify' ? (opts.verifyExit ? PENDING : '') : cmd === 'check' ? 'foundation.setup  🔴 3/9 ← activa' : cmd === 'phase' ? 'Sub-etapa activa: foundation.setup' : cmd === 'quote' ? 'Cotización interna (USD, tarifa 40/h)' : 'mep · foundation.setup · 🔴 6 · 🟡 2'
-    return { value: { exitCode: cmd === 'verify' ? (opts.verifyExit ?? 0) : 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
+    const stdout = cmd === 'verify' ? (opts.verifyExit ? PENDING : '') : cmd === 'check' ? 'foundation.setup  🔴 3/9 ← activa' : cmd === 'phase' ? 'Sub-etapa activa: foundation.setup' : cmd === 'quote' ? 'Cotización interna (USD, tarifa 40/h)' : cmd === 'pr-gate' ? 'mep: antes del PR a main, revisión de calidad de la rama.' : 'mep · foundation.setup · 🔴 6 · 🟡 2'
+    const code = cmd === 'verify' ? (opts.verifyExit ?? 0) : cmd === 'pr-gate' ? 1 : 0
+    return { value: { exitCode: code, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', () => ({ result: 'ran' }))
   on('command.run', ($, e) => ({ text: 'skill' }))
@@ -42,6 +43,12 @@ describe('gate', () => {
     expect((await $.tool.call({ tool: 'Bash', command: 'vercel --prod' })).result).toBe('ran')
     expect((await $.tool.call({ tool: 'Bash', command: 'pnpm test' })).result).toBe('ran')
     expect(calls.some(a => a.includes('verify'))).toBe(false)
+  })
+
+  test('a PR into main is held for the quality review', async ($, on) => {
+    repo(on)
+    const r = await $.tool.call({ tool: 'Bash', command: 'gh pr create --fill' })
+    expect(r.deny).toContain('revisión de calidad')
   })
 
   test('writing a secret into a versioned file is refused; .env.local is allowed', async ($, on) => {

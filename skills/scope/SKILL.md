@@ -21,6 +21,7 @@ Sigue el skill `mep` para interpretar el scope. Motor: `node "${CLAUDE_PLUGIN_RO
    - `select <id> <id>…` con los ⚪ elegidos (si hay).
    - Borra `.mep/draft.yaml`.
    - `codemap` y `registry` para crear `CODEMAP.md` y `REGISTRY.md`.
+   - `init` instala `tests/responsive.spec.ts` y el script `test:responsive`: pide editar `PAGES` con las rutas clave y agregar `@playwright/test` si no está.
    - `init` ya calcula la cotización (el toggle: solo corre al definir el scope y en cambios de scope). Muestra su línea; si la tarifa está en 0, indica dónde definirla.
 7. Si el plugin Ponytail no está instalado, sugiérelo una vez (`DietrichGebert/ponytail`); mep funciona igual sin él.
 8. Cierra con: sub-etapa activa (`foundation.setup`), cuántos 🔴 tiene y el siguiente paso. Recuerda hacer `mep` check obligatorio del PR a `main` en GitHub.

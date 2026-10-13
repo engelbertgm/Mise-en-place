@@ -4,6 +4,7 @@ import { stack, stackGroups, warnings } from './evaluate.ts'
 import type { StackDecision } from './evaluate.ts'
 import type { Catalog, Check, Evaluated, ItemResult, Profile } from './types.ts'
 import { LEVEL_ICON } from './types.ts'
+import { marketLocales } from './profile.ts'
 
 export const BRIEF_FILE = 'BRIEF.md'
 export const ADR_DIR = 'docs/decisions'
@@ -27,6 +28,10 @@ function describeCheck(c: Check): string {
       return `migraciones SQL: ${c.rule}`
     case 'maps':
       return c.rule === 'registry' ? 'REGISTRY.md al día (mep registry --check)' : 'CODEMAP.md al día'
+    case 'quality':
+      return 'umbrales de complejidad y largo en la config del linter'
+    case 'design':
+      return `${c.rule === 'font_families' ? 'familias tipográficas' : 'pesos de texto'} ≤ ${c.max}`
     case 'manual':
       return `manual: ${c.prompt}`
   }
@@ -43,14 +48,14 @@ function line(e: Evaluated, results?: Map<string, ItemResult>): string {
   return `- ${checkbox(e, results)} \`${e.item.id}\`${lock} — ${e.item.title} — ${verify}`
 }
 
-function profileSection(p: Profile): string {
+function profileSection(p: Profile, locales: string[]): string {
   const signals = Object.entries(p.signals)
     .filter(([, v]) => v !== false)
     .map(([k, v]) => (v === true ? k : `${k}=${v}`))
   return [
     `- **Tipo:** ${p.type}${p.preset ? ` (preset ${p.preset})` : ''}`,
     `- **Capacidades:** ${p.capabilities.join(', ') || '—'}`,
-    `- **Mercados:** ${p.markets.join(', ') || '—'}`,
+    `- **Mercados:** ${p.markets.join(', ') || '—'}${locales.length ? ` · idiomas: ${locales.join(', ')}` : ''}`,
     `- **Audiencia:** ${p.audience.join(', ') || '—'}`,
     `- **Contexto:** ${p.context}`,
     `- **Señales:** ${signals.join(', ') || '—'}`,
@@ -72,7 +77,7 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
     `# Brief — ${profile.project}`,
     '',
     '## Perfil',
-    profileSection(profile),
+    profileSection(profile, marketLocales(profile, catalog)),
     '',
     '## Stack (decisión + por qué)',
     stackSection(stack(profile, catalog)),
@@ -98,7 +103,9 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
   const skipped = evaluated.filter(e => e.state === 'skipped')
   const overridden = evaluated.filter(e => e.state === 'overridden')
   out.push('', '### ⏭️ Omitidos (🟡, con razón)', skipped.length ? skipped.map(e => `- \`${e.item.id}\` — ${e.reason}`).join('\n') : '—')
-  out.push('', '### ⚠️ Desactivados (🔴 con override, con razón)', overridden.length ? overridden.map(e => `- ⚠️ \`${e.item.id}\` — ${e.reason}`).join('\n') : '—')
+  const relaxed = profile.selections.overrides.filter(o => o.id.startsWith('threshold:'))
+  const disabled = [...overridden.map(e => `- ⚠️ \`${e.item.id}\` — ${e.reason}`), ...relaxed.map(o => `- ⚠️ umbral \`${o.id.slice(10)}\` — ${o.reason}`)]
+  out.push('', '### ⚠️ Desactivados (🔴 con override, con razón)', disabled.length ? disabled.join('\n') : '—')
   const warns = warnings(evaluated)
   if (warns.length) out.push('', '### Avisos', ...warns.map(w => `- ${w.message}`))
   out.push('', '## Costos recurrentes estimados', '_Se completan con /mep:quote (hosting, dominio, servicios)._')

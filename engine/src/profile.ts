@@ -52,8 +52,29 @@ export function normalizeProfile(raw: Partial<Profile>, catalog: Catalog): Profi
   return applyImplications(profile, catalog)
 }
 
-/** `auth` implies forms, a database and personal data; more than one language implies i18n. */
+/**
+ * Locales the chosen markets require. A sub-level adds to its parent (USA:CA uses USA's), and a
+ * country of the EU brings its own language; a bare EU fixes none.
+ */
+export function marketLocales(profile: Profile, catalog: Catalog): string[] {
+  const table = catalog.dimensions.market_languages ?? {}
+  const out = new Set<string>()
+  for (const market of profile.markets) {
+    const parent = market.split(':')[0]
+    for (const l of table[market] ?? table[parent] ?? []) out.add(l)
+  }
+  return [...out].sort()
+}
+
+/** Languages, not locales: es-MX and es-ES are one language for counting, two locales for content. */
+function languageCount(locales: string[]): number {
+  return new Set(locales.map(l => l.split('-')[0])).size
+}
+
+/** `auth` implies forms, a database and personal data; markets bring languages; more than one language implies i18n. */
 export function applyImplications(profile: Profile, catalog: Catalog): Profile {
+  const fromMarkets = languageCount(marketLocales(profile, catalog))
+  if (fromMarkets > (profile.counts.languages ?? 0)) profile.counts = { ...profile.counts, languages: fromMarkets }
   if ((profile.counts.languages ?? 1) > 1 && !profile.capabilities.includes('i18n')) {
     profile.capabilities.push('i18n')
   }

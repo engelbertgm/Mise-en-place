@@ -1,7 +1,7 @@
 // mep mods: gate, instant commands and status line, in one module (the engine follows `$`
 // only within a file). They never verify anything themselves: they call the engine.
 import type { EngineInterface, Register } from 'claude-code'
-import { deployKind, mayDeploy } from '../engine/src/deploy.ts'
+import { deployKind, mayDeploy, prToMain } from '../engine/src/deploy.ts'
 import { findSecret, LOCAL_SECRET_FILE } from '../engine/src/secrets.ts'
 
 async function runEngine($: EngineInterface, args: string[], timeoutMs = 600_000) {
@@ -30,6 +30,10 @@ export const register: Register = on => {
   // ── gate: deploys wait for the engine's gate; secrets never reach a versioned file ──
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
     if (!mayDeploy(e.command) || !(await hasProfile($))) return next(e)
+    if (prToMain(e.command)) {
+      const review = await runEngine($, ['pr-gate'], 30_000)
+      return review.exitCode !== 0 ? { deny: review.stdout.trim() } : next(e)
+    }
     const branch = await $.process.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).catch(() => undefined)
     const kind = deployKind(e.command, branch?.stdout.trim())
     if (!kind) return next(e)

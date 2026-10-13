@@ -7,7 +7,7 @@ import type { Catalog, Check, Condition, Dimensions, Item, Leaf, Matcher, Profil
 const LEVELS = ['required', 'recommended', 'optional']
 const SIZES = ['XS', 'S', 'M', 'L', 'XL']
 const SCALES = ['pages', 'entities', 'languages', 'markets', 'integrations']
-const CHECK_TYPES = ['file_exists', 'route_exists', 'grep', 'json_key', 'command', 'html', 'sql', 'maps', 'manual']
+const CHECK_TYPES = ['file_exists', 'route_exists', 'grep', 'json_key', 'command', 'html', 'sql', 'maps', 'quality', 'design', 'manual']
 
 /** The catalog ships next to the engine: `<root>/catalog`, whether run from source or from the bundle. */
 export function defaultCatalogDir(): string {
@@ -102,6 +102,8 @@ function validateCheck(check: Check, where: string): string[] {
     html: ['rule'],
     sql: ['rule'],
     maps: ['rule'],
+    quality: ['rule'],
+    design: ['rule', 'max'],
     manual: ['prompt'],
   }
   const errors = required[check.type]

@@ -1,27 +1,72 @@
 {
   "description": "mep: mods (gate, comandos instantáneos, estado) y hooks clásicos de respaldo. Ninguno actúa sin .mep/profile.yaml.",
-  "modules": ["../mods/register.ts"],
+  "modules": [
+    "../mods/register.ts"
+  ],
   "hooks": {
     "SessionStart": [
-      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook session-start", "timeout": 30 } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook session-start",
+            "timeout": 30
+          }
+        ]
+      }
     ],
     "Stop": [
-      { "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook stop", "timeout": 60 } ] }
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook stop",
+            "timeout": 60
+          }
+        ]
+      }
     ],
     "PreToolUse": [
       {
         "matcher": "Bash",
         "hooks": [
-          { "type": "command", "if": "Bash(*vercel*)", "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash", "timeout": 600 },
-          { "type": "command", "if": "Bash(*netlify*)", "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash", "timeout": 600 },
-          { "type": "command", "if": "Bash(*git push*)", "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash", "timeout": 600 }
+          {
+            "type": "command",
+            "if": "Bash(*vercel*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*netlify*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*git push*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*gh pr*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 30
+          }
         ]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Edit|Write|MultiEdit",
-        "hooks": [ { "type": "command", "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook post-edit", "timeout": 30 } ]
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook post-edit",
+            "timeout": 30
+          }
+        ]
       }
     ]
   }

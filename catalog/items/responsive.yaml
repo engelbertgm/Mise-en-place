@@ -18,11 +18,13 @@
   level: required
   phase: build.ux
   since: "2026.10.2"
+  updated: "2026.10.3"
   effort: { size: M, hours: [2, 5] }
   why: "Revisar cinco anchos a mano en cada cambio no pasa; una prueba automática sí."
-  how: "Test de Playwright (script test:responsive) que recorre las páginas clave en los cinco anchos y falla si scrollWidth > clientWidth."
+  how: "/mep:scope instala tests/responsive.spec.ts (Playwright) y el script test:responsive: recorre las páginas clave en los cinco anchos, falla con scroll horizontal o elementos interactivos encimados y guarda capturas."
   verify:
     - { type: json_key, file: package.json, key: scripts.test:responsive }
+    - { type: file_exists, path: ["tests/responsive.spec.{ts,js}", "e2e/responsive.spec.{ts,js}"] }
     - { type: command, run: "pnpm run test:responsive", timeout: 600 }
 
 - id: no-hover-only

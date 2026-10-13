@@ -7,7 +7,7 @@ You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-informational.svg)](.claude-plugin/plugin.json)
-[![Catalog](https://img.shields.io/badge/catalog-2026.10.2-informational.svg)](catalog/CHANGELOG.md)
+[![Catalog](https://img.shields.io/badge/catalog-2026.10.3-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Works with batuta](https://img.shields.io/badge/works_with-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
@@ -100,9 +100,11 @@ Then, in a new or existing project folder:
 | `/mep:override <id> <reason>` | Turns off a 🔴 item after confirmation; rejects 🔒 items |
 | `/mep:audit` | For an existing repo: infers the profile from the code, confirms it with you and reports the gap by sub-phase. Changes nothing until you adopt the brief |
 | `/mep:update` | Brings new catalog items that apply to your profile. Items that land in a closed sub-phase get a grace period |
-| `/mep:quote [--client]` | Quote from the brief. Internal view (hours, rate, margins) or client view (price per phase, extras, recurring costs, maintenance plans) |
+| `/mep:quote [--client]` | Quote from the brief. Internal view (hours, rate, margins) or client view (price and estimated weeks per phase, extras, recurring costs, maintenance plans) |
 | `/mep:export [--lang es]` | Client brief as .docx and .pdf, in the client's language, versioned, with what changed since the last version |
 | `/mep:log-time <id> <hours>` | Logs real hours per item outside the repo; with enough data, mep suggests new ranges |
+
+Code quality thresholds (complexity 10, 300 lines per file, 50 per function) live in the profile; relaxing one needs a reason: `mep threshold complexity 15 "<reason>" --yes`, marked ⚠️ in the brief.
 
 The quote runs by itself only when the scope is defined (`/mep:scope`) or changes (`/mep:add`, which shows the impact in hours and price before you accept). Rates, real hours and internal quotes live in `~/.config/mep-check/`, never in the repo.
 
@@ -171,6 +173,7 @@ Verify types: `file_exists`, `route_exists` (Next.js, Astro, Vite/React, static)
 | Ending a turn (Stop) | 🔴 items of **closed** sub-phases (regressions) and 🔒 violations. Pending 🔴 items of the active sub-phase are shown as info |
 | Preview deploy (`vercel`, `netlify deploy`) | Same as Stop |
 | Production deploy (`vercel --prod`, push to `main`) | Any pending 🔴, in every sub-phase |
+| Opening or merging a PR into `main` | Once per commit: a quality review first (`/ponytail-review branch`, or mep's own review) |
 | Pull request to `main` | `mep verify --prod` in CI. This is the real barrier: production deploys usually run on merge, where Claude Code hooks do not |
 | Writing a file | A secret written into a versioned file is refused |
 
@@ -236,6 +239,7 @@ Mise-en-place/
 ├── templates/
 │   ├── claude-md.md           # block added to the project's CLAUDE.md
 │   ├── ci/mep.yml             # CI workflow installed in each project
+│   ├── tests/responsive.spec.ts  # Playwright responsive test installed in each project
 │   └── client-brief/          # client brief template (es, en)
 ├── examples/estudio-saas/     # test project used by tests/e2e.spec.ts
 ├── tests/                     # engine, CLI and end-to-end tests (node:test)
@@ -258,6 +262,7 @@ your-project/
 ├── docs/
 │   ├── decisions/             # ADRs, starting with the stack decisions
 │   └── client/brief-vN.*      # client brief (.md, .docx, .pdf)
+├── tests/responsive.spec.ts   # 360–2560 px, no horizontal scroll, no overlaps (Playwright)
 └── .github/workflows/mep.yml  # mep verify --prod as a required check
 
 ~/.config/mep-check/           # outside the repo: never handed to the client
