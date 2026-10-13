@@ -1,0 +1,86 @@
+# Canadá (CA y CA:<provincia>). Checklist orientativo, no sustituye asesoría legal.
+
+- id: ca-language
+  title: "Contenido en en-CA y CAD"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [CA] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario canadiense espera inglés de Canadá y precios en dólares canadienses."
+  how: "Locale en-CA; Intl con en-CA; CAD."
+  verify:
+    - { type: grep, pattern: "en-CA|[\"']en[\"']", glob: "{next.config.{js,mjs,ts},astro.config.{mjs,ts},middleware.{ts,js},src/middleware.{ts,js},{src/,}i18n/**/*.{ts,json}}" }
+
+- id: ca-french
+  title: "Versión fr-CA"
+  category: i18n
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [CA] } }
+  level_overrides:
+    - { when: { markets: { any: ["CA:QC"] } }, level: required }
+  effort: { size: L, hours: [8, 20], scales_with: pages }
+  why: "La Carta de la lengua francesa (reformada por la Ley 96) exige el francés en Quebec; en el resto de Canadá amplía el mercado."
+  how: "Locale fr-CA con traducción profesional; en Quebec, el francés con al menos la misma presencia que otros idiomas."
+  verify:
+    - { type: grep, pattern: "fr-CA|[\"']fr[\"']", glob: "**/*.{ts,tsx,json}" }
+  references: ["https://www.oqlf.gouv.qc.ca/"]
+
+- id: ca-pipeda
+  title: "PIPEDA: consentimiento significativo y política de privacidad"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [CA] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [2, 4] }
+  why: "La ley federal de privacidad del sector privado exige consentimiento informado y responsabilidad sobre los datos."
+  how: "Política con finalidades, terceros, transferencias fuera de Canadá y responsable de privacidad con contacto."
+  verify:
+    - { type: grep, pattern: "PIPEDA|Privacy Officer|responsable de privacidad|Canada", glob: "**/{privacy,privacidad}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+  references: ["https://www.priv.gc.ca/en/privacy-topics/privacy-laws-in-canada/the-personal-information-protection-and-electronic-documents-act-pipeda/"]
+
+- id: ca-qc-law25
+  title: "Quebec Ley 25: responsable de protección publicado, evaluación de impacto y privacidad por defecto"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: ["CA:QC"] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "La Ley 25 exige un responsable con datos de contacto publicados, evaluaciones de impacto para transferencias fuera de Quebec y la configuración más protectora por defecto."
+  how: "Nombre y contacto del responsable en el sitio; EIVP documentada; rastreo y perfilado desactivados por defecto."
+  verify:
+    - { type: grep, pattern: "Loi 25|Law 25|responsable de la protection|Privacy Officer", glob: "**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+  references: ["https://www.cai.gouv.qc.ca/protection-renseignements-personnels/sujets-et-domaines-dinteret/principaux-changements-loi-25"]
+
+- id: ca-casl
+  title: "CASL: consentimiento expreso para mensajes comerciales, identificación y baja"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [CA] } }, { capabilities: { any: [email, newsletter] } } ] }
+  effort: { size: S, hours: [1, 2] }
+  why: "La ley antispam de Canadá tiene multas altas por enviar sin consentimiento o sin baja."
+  how: "Casilla sin marcar con texto de consentimiento; identificación y dirección del remitente; baja procesada en máximo 10 días hábiles (mejor inmediata)."
+  verify:
+    - { type: grep, pattern: "consent_(at|source|text)|consentedAt", glob: "**/*.{ts,tsx,sql,prisma}" }
+  references: ["https://crtc.gc.ca/eng/internet/anti.htm"]
+
+- id: ca-on-aoda
+  title: "AODA (Ontario): WCAG 2.0 AA"
+  category: accessibility
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: ["CA:ON"] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Organizaciones con 50 o más empleados en Ontario deben cumplir WCAG 2.0 AA en sus sitios."
+  how: "Cumplir los ítems de accesibilidad del brief y reportar cumplimiento cuando corresponda."
+  verify:
+    - { type: manual, prompt: "Cumplimiento WCAG 2.0 AA confirmado (aplica a organizaciones con 50+ empleados en Ontario)" }
+  references: ["https://www.ontario.ca/page/how-make-websites-accessible"]

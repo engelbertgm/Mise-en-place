@@ -1,0 +1,97 @@
+# Estados Unidos (USA y USA:<estado>). Checklist orientativo, no sustituye asesoría legal.
+
+- id: usa-language
+  title: "Contenido en en-US; USD, fechas mm/dd/yyyy y unidades imperiales"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [USA] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario de USA espera inglés estadounidense, dólares, mes primero y millas/libras."
+  how: "Locale en-US en la config de idiomas; Intl con en-US; unidades imperiales donde haya medidas."
+  verify:
+    - { type: grep, pattern: "en-US|[\"']en[\"']", glob: "{next.config.{js,mjs,ts},astro.config.{mjs,ts},middleware.{ts,js},src/middleware.{ts,js},{src/,}i18n/**/*.{ts,json},{src/,}app/layout.{tsx,jsx},{src/,}app/[locale]/layout.{tsx,jsx}}" }
+
+- id: usa-spanish
+  title: "Versión es-US"
+  category: i18n
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [USA] } }
+  effort: { size: L, hours: [8, 20], scales_with: pages }
+  why: "Más de 40 millones de personas en USA hablan español en casa."
+  how: "Locale es-US con textos revisados para público hispano de USA."
+  verify:
+    - { type: grep, pattern: "es-US", glob: "**/*.{ts,tsx,json}" }
+
+- id: usa-privacy-policy
+  title: "Política de privacidad conforme a CalOPPA y leyes estatales (CCPA/CPRA y otras)"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [USA] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "CalOPPA exige una política de privacidad visible a cualquier sitio comercial que recoja datos de residentes de California; CCPA/CPRA y otras leyes estatales agregan derechos y avisos según umbrales."
+  how: "Categorías de datos, fuentes, finalidades, terceros, derechos (acceso, borrado, corrección, opt-out) y cómo ejercerlos; fecha de vigencia; respuesta a Do Not Track/GPC."
+  verify:
+    - { type: grep, pattern: "California|CCPA|CPRA|Your Privacy Rights|privacy rights", glob: "**/{privacy,privacidad}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+  references: ["https://oag.ca.gov/privacy/ccpa", "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=BPC&sectionNum=22575"]
+
+- id: usa-coppa
+  title: "COPPA: consentimiento verificable de padres para menores de 13"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [USA] } }, { audience: [minors] } ] }
+  effort: { size: L, hours: [8, 20] }
+  why: "Recoger datos de menores de 13 sin consentimiento verificable de los padres está prohibido por la FTC."
+  how: "Puerta de edad neutral; consentimiento parental verificable; aviso específico para padres; minimizar datos."
+  verify:
+    - { type: grep, pattern: "parental consent|consentimiento parental|age.?gate|birth|edad", glob: "**/*.{ts,tsx}", flags: i }
+  references: ["https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa"]
+
+- id: usa-ada
+  title: "ADA: accesibilidad WCAG 2.1/2.2 AA documentada"
+  category: accessibility
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [USA] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Las demandas por accesibilidad web bajo la ADA son frecuentes; cumplir WCAG AA y documentarlo es la mejor defensa."
+  how: "Cumplir los ítems de accesibilidad del brief y publicar una declaración de accesibilidad con contacto."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{accessibility,accesibilidad}/page.{tsx,mdx,jsx}", "src/pages/{accessibility,accesibilidad}.{astro,md,mdx}"] }
+  references: ["https://www.ada.gov/resources/web-guidance/"]
+
+- id: usa-can-spam
+  title: "CAN-SPAM: remitente veraz, asunto honesto, dirección física y baja en 10 días"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [USA] } }, { capabilities: { any: [email, newsletter] } } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Cada email que la incumple puede multarse por separado."
+  how: "From y asunto veraces, identificar publicidad, dirección postal en el footer, baja funcional aplicada de inmediato."
+  verify:
+    - { type: grep, pattern: "unsubscribe|darse de baja", glob: "**/*.{tsx,jsx,ts,html,mjml}", flags: i }
+  references: ["https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business"]
+
+- id: usa-dmca-agent
+  title: "DMCA: agente designado registrado"
+  category: legal
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [USA] } }, { capabilities: [ugc] } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin agente registrado en la Copyright Office no hay protección safe harbor por contenido de usuarios."
+  how: "Registrar el agente en el directorio DMCA y publicar sus datos en los términos."
+  verify:
+    - { type: manual, prompt: "Agente DMCA registrado en copyright.gov y publicado en los términos" }
+  references: ["https://www.copyright.gov/dmca-directory/"]

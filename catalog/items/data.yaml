@@ -1,0 +1,132 @@
+# Datos y tablas (si hay listados) y búsqueda (si search).
+
+- id: table-url-state
+  title: "Paginación, filtros, orden y búsqueda guardados en la URL"
+  category: data
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: M, hours: [2, 5], scales_with: entities }
+  why: "La vista se puede compartir, sobrevive al recargar y el botón atrás funciona."
+  how: "searchParams como fuente de verdad (nuqs o useSearchParams); nada de estado local para filtros."
+  verify:
+    - { type: grep, pattern: "nuqs|useQueryState|useSearchParams|searchParams", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: table-states
+  title: "Estados de tabla: cargando (skeleton), vacío, sin resultados con filtros (con limpiar filtros), error"
+  category: data
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "\"Sin resultados\" y \"vacío\" son distintos: uno se arregla limpiando filtros, el otro creando algo."
+  how: "Skeleton de tabla, EmptyState con acción, estado sin resultados con botón \"Limpiar filtros\", error con reintentar."
+  verify:
+    - { type: grep, pattern: "Limpiar filtros|Clear filters|resetFilters|clearFilters", glob: "**/*.{tsx,jsx,json}" }
+
+- id: table-sticky-header
+  title: Encabezado fijo en tablas largas
+  category: data
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Al bajar, el usuario no pierde qué es cada columna."
+  how: "thead con position: sticky (sticky top-0) y fondo del token."
+  verify:
+    - { type: grep, pattern: "sticky", glob: "**/*.{tsx,jsx,css}" }
+
+- id: table-mobile
+  title: "En móvil, tablas como cards o con scroll horizontal contenido"
+  category: data
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Una tabla ancha que desborda la página rompe todo el layout en móvil."
+  how: "Contenedor overflow-x-auto propio de la tabla, o vista de cards bajo md."
+  verify:
+    - { type: grep, pattern: "overflow-x-auto|overflow-x: auto", glob: "**/*.{tsx,jsx,css}" }
+
+- id: table-bulk-actions
+  title: Acciones en lote
+  category: data
+  level: recommended
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: M, hours: [2, 5] }
+  why: "Hacer lo mismo a 30 filas una por una es lento."
+  how: "Selección con checkbox y barra de acciones; las destructivas siguen el patrón de severidad."
+  verify:
+    - { type: grep, pattern: "getSelectedRowModel|selectedRows|rowSelection", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: csv-export
+  title: Exportar a CSV
+  category: data
+  level: optional
+  phase: build.features
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Los usuarios de negocio viven en hojas de cálculo."
+  how: "Exportar la vista filtrada actual (server-side para volúmenes grandes)."
+  verify:
+    - { type: grep, pattern: "text/csv|\\.csv|toCSV|papaparse", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: table-virtualization
+  title: Virtualización en listas muy largas
+  category: data
+  level: optional
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_tables: true } }
+  effort: { size: M, hours: [2, 5] }
+  why: "Miles de filas en el DOM congelan el navegador."
+  how: "@tanstack/react-virtual para listas de más de ~500 filas."
+  verify:
+    - { type: grep, pattern: "react-virtual|react-window|useVirtualizer", glob: "**/*.{tsx,jsx,ts,json}" }
+
+- id: search-url-query
+  title: "Búsqueda: consulta en la URL (?q=), debounce y estado sin resultados con sugerencias"
+  category: data
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [search] }
+  effort: { size: M, hours: [2, 5] }
+  why: "La búsqueda se comparte y sobrevive al recargar; el debounce evita una consulta por tecla."
+  how: "?q= como fuente de verdad, debounce 200–300 ms, \"sin resultados\" con sugerencias o búsquedas populares."
+  verify:
+    - { type: grep, pattern: "[\"']q[\"']|\\?q=|searchParams\\.get\\([\"']q", glob: "**/*.{tsx,jsx,ts}" }
+    - { type: grep, pattern: "debounce|useDebounce|useDeferredValue", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: search-typo-tolerance
+  title: Tolerancia a errores de escritura y resaltado de coincidencias
+  category: data
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [search] }
+  effort: { size: M, hours: [2, 6] }
+  why: "La gente escribe mal; una búsqueda exacta devuelve vacío y se pierde la venta."
+  how: "Motor con fuzzy (Postgres pg_trgm, Meilisearch, Algolia) y resaltado de la coincidencia."
+  verify:
+    - { type: grep, pattern: "pg_trgm|similarity\\(|fuzzy|typoTolerance|meilisearch|algolia|fuse\\.js|<mark", glob: "**/*.{ts,tsx,sql,json}" }
+
+- id: search-shortcut
+  title: "Atajo de teclado (⌘K / Ctrl+K) y búsquedas recientes"
+  category: data
+  level: recommended
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: [search] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Los usuarios frecuentes buscan sin tocar el mouse."
+  how: "CommandDialog (cmdk) con ⌘K y lista de búsquedas recientes."
+  verify:
+    - { type: grep, pattern: "cmdk|CommandDialog|metaKey.*[\"']k[\"']", glob: "**/*.{tsx,jsx,ts,json}" }

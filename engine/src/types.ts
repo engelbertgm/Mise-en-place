@@ -44,6 +44,10 @@ export type HtmlRule =
   | 'absolute_og_image'
   | 'img_dimensions'
   | 'img_alt'
+  | 'landmarks'
+  | 'input_labels'
+  | 'iframe_title'
+  | 'skip_link'
 
 export type Size = 'XS' | 'S' | 'M' | 'L' | 'XL'
 export type ScaleDim = 'pages' | 'entities' | 'languages' | 'markets' | 'integrations'

@@ -1,0 +1,153 @@
+# Sistema de diseño: 🔴 siempre. Se genera antes de construir páginas; todo componente sale de aquí.
+
+- id: design-tokens
+  title: "Tokens en un solo lugar: color, tipografía, espaciado, radios, sombras, z-index, breakpoints y motion"
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: L, hours: [6, 14] }
+  why: "Un solo lugar de verdad hace que todo se vea congruente y que cambiar la marca sea cambiar tokens."
+  how: "Variables CSS en globals.css (y su mapeo en Tailwind): colores semánticos (primary, muted, destructive…), escala tipográfica, espaciado base 4/8, radios, sombras, z-index, breakpoints y duraciones/curvas."
+  verify:
+    - { type: grep, pattern: "--(primary|foreground|background)\\s*:", glob: "**/*.{css,scss}" }
+    - { type: grep, pattern: "--(radius|duration|ease|shadow|z-)", glob: "**/*.{css,scss,ts,js}" }
+
+- id: design-theme-ready
+  title: Tokens preparados para tema claro y oscuro
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  depends_on: [design-tokens]
+  effort: { size: S, hours: [1, 3] }
+  why: "Cambiar de tema debe ser cambiar tokens, sin tocar componentes."
+  how: "Mismos nombres de token redefinidos bajo .dark (o [data-theme=dark]); publicar el modo oscuro es el opcional dark-mode."
+  verify:
+    - { type: grep, pattern: "\\.dark\\s*\\{|\\[data-theme=[\"']?dark|prefers-color-scheme:\\s*dark", glob: "**/*.{css,scss}" }
+
+- id: dark-mode
+  title: Modo oscuro publicado
+  category: design
+  level: optional
+  phase: build.ux
+  since: "2026.10.2"
+  depends_on: [design-theme-ready]
+  effort: { size: M, hours: [3, 6] }
+  why: "Preferencia común de los usuarios; con tokens listos es barato."
+  how: "Selector de tema (claro, oscuro, sistema) con next-themes; revisar contraste en ambos."
+  verify:
+    - { type: grep, pattern: "next-themes|ThemeProvider|setTheme", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: text-hierarchy
+  title: "Jerarquía de texto: ≤6 tamaños, ≤3 pesos, ≤3 colores, como tokens"
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 5] }
+  why: "Pocos estilos con rol claro hacen que se entienda qué leer primero; estilos armados a mano rompen la congruencia."
+  how: "Estilos display, h1, h2, h3, body, small (tamaño + peso + color + interlineado) usados como token (text-h2, text-muted); colores foreground, muted, subtle + link y destructive; cada nivel difiere del siguiente en 2 de 3 ejes."
+  verify:
+    - { type: grep, pattern: "text-(display|h1|h2|h3|body|small)\\b|--text-(display|h1|h2|h3|body|small)", glob: "**/*.{css,scss,ts,js}" }
+    - { type: grep, pattern: "\\btext-\\[\\d|font-\\[\\d|\\btext-(xs|sm|base|lg|xl|[2-9]xl)\\b", glob: "{app,src,components,pages}/**/*.{tsx,jsx,astro}", exclude: "**/components/ui/**", expect: absent }
+
+- id: design-system-components
+  title: "Tema de shadcn/ui desde los tokens; componentes al primer uso"
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  depends_on: [design-tokens]
+  effort: { size: M, hours: [2, 6] }
+  why: "Los componentes que heredan los tokens salen congruentes sin trabajo extra."
+  how: "components.json de shadcn con las variables del tema; cada componente se agrega la primera vez que se usa, se adapta si hace falta y se registra en REGISTRY.md. Sin React: mismos tokens + componentes equivalentes."
+  verify:
+    - { type: file_exists, path: ["components.json", "{src/,}components/ui/*"] }
+
+- id: design-system-page
+  title: "Página /design-system con tokens, jerarquía de texto y componentes"
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: M, hours: [3, 6] }
+  why: "Muestra visualmente lo que REGISTRY.md lista: el equipo y el cliente ven las piezas antes de usarlas."
+  how: "Ruta /design-system (noindex, fuera del sitemap) con la muestra de tokens, texto y cada componente instalado con sus estados."
+  verify:
+    - { type: route_exists, path: /design-system }
+
+- id: no-hardcoded-colors
+  title: Cero colores hardcodeados fuera de los tokens
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un hex suelto no cambia con el tema ni con la marca y rompe la congruencia."
+  how: "Solo clases de tokens (bg-primary, text-muted-foreground); nada de #hex, rgb() ni bg-[#…] fuera del archivo de tokens."
+  verify:
+    - { type: grep, pattern: "#[0-9a-fA-F]{3,8}\\b|rgba?\\(|hsla?\\(\\s*\\d", glob: "{app,src,components,pages}/**/*.{tsx,jsx,astro,vue,svelte}", exclude: "**/{opengraph-image,twitter-image,icon,apple-icon}*", expect: absent }
+    - { type: grep, pattern: "-\\[(#|rgb|hsl)", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}", expect: absent }
+
+- id: no-inline-styles
+  title: Nada de estilos inline para color o espaciado
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los estilos inline esquivan los tokens y el tema."
+  how: "Clases de tokens; style solo para valores dinámicos reales (ej. progreso %)."
+  verify:
+    - { type: grep, pattern: "style=\\{\\{[^}]*\\b(color|background|backgroundColor|margin|padding|gap)\\b", glob: "**/*.{tsx,jsx}", expect: absent }
+
+- id: spacing-scale
+  title: Solo valores de la escala de espaciado
+  category: design
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Valores arbitrarios rompen el ritmo visual y la alineación a la retícula."
+  how: "Espaciado de la escala (base 4 u 8 px); nada de p-[13px]."
+  verify:
+    - { type: grep, pattern: "\\b-?(p|m|px|py|pt|pb|pl|pr|mx|my|mt|mb|ml|mr|gap|gap-x|gap-y|space-x|space-y|inset|top|left|right|bottom)-\\[\\d", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}", expect: absent }
+
+- id: font-families
+  title: Máximo 2 familias tipográficas
+  category: design
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Más de dos familias se ve desordenado y pesa más."
+  how: "Una familia para texto y opcionalmente otra para títulos, definidas en los tokens."
+  verify:
+    - { type: manual, prompt: "El sitio usa como máximo 2 familias tipográficas" }
+
+- id: interactive-states
+  title: "Estados hover, focus, active y disabled en todo elemento interactivo"
+  category: design
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Lo clicable debe parecer clicable y responder; sin estados, la interfaz se siente rota."
+  how: "Componentes del sistema con los cuatro estados definidos desde tokens."
+  verify:
+    - { type: grep, pattern: "hover:", glob: "**/*.{tsx,jsx,astro,vue,svelte,css}" }
+    - { type: grep, pattern: "disabled:", glob: "**/*.{tsx,jsx,astro,vue,svelte,css}" }
+
+- id: custom-components
+  title: "Componentes propios al primer uso: empty state, skeletons por patrón, page header, indicador de conexión, barra de progreso"
+  category: design
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: M, hours: [3, 8] }
+  why: "Lo que shadcn no trae también debe salir del sistema, no armarse distinto en cada vista."
+  how: "Cada uno en components/, con sus estados, registrado en REGISTRY.md y mostrado en /design-system."
+  verify:
+    - { type: grep, pattern: "EmptyState|empty-state", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+    - { type: grep, pattern: "Skeleton", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }

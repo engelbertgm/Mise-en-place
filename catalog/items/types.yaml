@@ -1,0 +1,134 @@
+# Ítems por tipo de proyecto: reservas y SEO local.
+
+- id: booking-no-double
+  title: "Sin dobles reservas: bloqueo a nivel de base de datos"
+  category: booking
+  level: required
+  phase: build.data
+  since: "2026.10.2"
+  when: { type: booking }
+  effort: { size: M, hours: [3, 6] }
+  why: "Dos personas reservan el mismo horario al mismo tiempo; solo la base de datos puede impedirlo con certeza."
+  how: "Restricción de exclusión (EXCLUDE USING gist con tstzrange) o índice único por recurso y horario."
+  verify:
+    - { type: grep, pattern: "exclude\\s+using\\s+gist|tstzrange|unique\\s*\\([^)]*(slot|start)", glob: "**/*.sql", flags: i }
+
+- id: booking-availability
+  title: "Disponibilidad en la zona correcta; horario, buffers y días bloqueados configurables"
+  category: booking
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { type: booking }
+  depends_on: [timezone-display]
+  effort: { size: L, hours: [8, 16] }
+  why: "Un horario mal calculado es una cita perdida o un cliente esperando."
+  how: "Horario del negocio en su zona IANA; buffers entre citas; días bloqueados; cálculo en el servidor."
+  verify:
+    - { type: grep, pattern: "buffer|business_hours|opening_hours|blocked_dates|availability|disponibilidad", glob: "**/*.{ts,sql}", flags: i }
+
+- id: booking-confirmation
+  title: "Confirmación por email con .ics y enlaces para cancelar o reprogramar; recordatorios"
+  category: booking
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { type: booking }
+  effort: { size: M, hours: [3, 6] }
+  why: "El .ics pone la cita en el calendario; los recordatorios bajan las inasistencias."
+  how: "Email con archivo .ics (text/calendar) y enlaces firmados; recordatorio 24 h y 1 h antes."
+  verify:
+    - { type: grep, pattern: "text/calendar|BEGIN:VCALENDAR|\\.ics\\b|ics\\(", glob: "**/*.{ts,tsx}" }
+    - { type: grep, pattern: "reminder|recordatorio", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: booking-cancellation-policy
+  title: Política de cancelación visible antes de reservar
+  category: booking
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { type: booking }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Evita disputas: el cliente sabe hasta cuándo puede cancelar y qué pasa si no llega."
+  how: "Texto de la política en el paso previo a confirmar, enlazado a la página completa."
+  verify:
+    - { type: grep, pattern: "política de cancelación|cancellation policy", glob: "**/*.{tsx,jsx,json,mdx}", flags: i }
+
+- id: booking-admin
+  title: "Panel para el negocio: ver, bloquear y mover citas"
+  category: booking
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { type: booking }
+  effort: { size: L, hours: [8, 20] }
+  why: "El negocio necesita operar su agenda sin pedirle al desarrollador."
+  how: "Vista de calendario con acciones de bloquear horario y mover citas (con aviso al cliente)."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{admin,panel,dashboard}/**/{agenda,calendar,citas,bookings,reservas}/**/*"] }
+
+- id: booking-extras
+  title: "Sincronización con Google o Outlook Calendar, depósito anticipado y lista de espera"
+  category: booking
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { type: booking }
+  effort: { size: L, hours: [8, 20] }
+  why: "Evitan choques con la agenda personal y reducen inasistencias."
+  how: "OAuth con Google/Microsoft Calendar; depósito activa payments; lista de espera con aviso al liberarse un horario."
+  verify:
+    - { type: grep, pattern: "googleapis|calendar\\.events|graph\\.microsoft|waitlist|lista de espera|deposit", glob: "**/*.{ts,tsx}", flags: i }
+
+- id: local-business-schema
+  title: "JSON-LD LocalBusiness (dirección, horario, teléfono)"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.2"
+  when: { type: local-business }
+  effort: { size: S, hours: [1, 2] }
+  why: "Google usa estos datos para el panel del negocio, mapas y resultados locales."
+  how: "LocalBusiness (o subtipo) con address, openingHoursSpecification, telephone y geo."
+  verify:
+    - { type: grep, pattern: "LocalBusiness|openingHoursSpecification", glob: "**/*.{tsx,jsx,ts,astro}" }
+
+- id: local-business-nap
+  title: "Nombre, dirección y teléfono idénticos en todo el sitio y perfiles externos"
+  category: seo
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { type: local-business }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Las diferencias entre el sitio, Google y directorios confunden al buscador y bajan el ranking local."
+  how: "NAP en una sola constante usada en footer, contacto y JSON-LD; mismo formato en perfiles externos."
+  verify:
+    - { type: manual, prompt: "NAP idéntico en el sitio, Google Business Profile y directorios" }
+
+- id: local-business-contact
+  title: "Página de contacto con mapa y horario"
+  category: seo
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { type: local-business }
+  effort: { size: S, hours: [1, 3] }
+  why: "Es la página más visitada de un negocio local: cómo llegar y cuándo está abierto."
+  how: "/contacto con mapa (fachada, ver embeds), horario y teléfono con tel:."
+  verify:
+    - { type: route_exists, path: /contacto }
+    - { type: grep, pattern: "href=[\"']tel:", glob: "**/*.{tsx,jsx,astro,html}" }
+
+- id: local-business-profile
+  title: "Google Business Profile reclamado y enlazado; una página por sucursal; reseñas visibles"
+  category: seo
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { type: local-business }
+  effort: { size: S, hours: [1, 3] }
+  why: "El perfil de Google trae más contactos locales que el propio sitio."
+  how: "Perfil verificado con enlace al sitio; /sucursales/<ciudad> si hay varias; reseñas reales en el sitio."
+  verify:
+    - { type: manual, prompt: "Google Business Profile verificado y enlazado" }

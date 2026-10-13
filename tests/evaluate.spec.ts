@@ -5,7 +5,11 @@ import { marketCovers, matches } from '../engine/src/conditions.ts'
 import { diff, evaluate, stack } from '../engine/src/evaluate.ts'
 import { normalizeProfile } from '../engine/src/profile.ts'
 import { SECRET_PATTERN } from '../engine/src/secrets.ts'
-import { item, profile, testCatalog } from './helpers.ts'
+import { cpSync, readFileSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { stringify } from 'yaml'
+import { compareVersions } from '../engine/src/version.ts'
+import { REAL_CATALOG, item, profile, tempDir, testCatalog } from './helpers.ts'
 
 const real = loadCatalog()
 
@@ -141,6 +145,27 @@ describe('catalog', () => {
   test('the secret pattern in the catalog is the one the gate mod uses', () => {
     const check = real.items.find(i => i.id === 'no-secrets-in-repo')!.verify[0]
     assert.equal(check.type === 'grep' && check.pattern, SECRET_PATTERN)
+  })
+
+  test('every item belongs to a released catalog version', () => {
+    for (const i of real.items) assert.ok(compareVersions(i.since, real.version) <= 0, i.id)
+  })
+
+  test('legal items cite an official source', () => {
+    const legal = real.items.filter(i => i.category === 'legal' && i.id.match(/^(mx|usa|ca|eu|uk|br|in)-/))
+    assert.ok(legal.length >= 20)
+    for (const i of legal) assert.ok(i.references?.length || i.verify.some(v => v.type === 'manual'), i.id)
+  })
+
+  test('a new market (CN) only needs catalog files, not engine changes', () => {
+    const dir = tempDir('mep-catalog-cn-')
+    cpSync(REAL_CATALOG, dir, { recursive: true })
+    const dims = readFileSync(join(dir, 'dimensions.yaml'), 'utf8').replace('markets: [MX, USA, CA, EU, UK, BR, IN]', 'markets: [MX, USA, CA, EU, UK, BR, IN, CN]')
+    writeFileSync(join(dir, 'dimensions.yaml'), dims)
+    writeFileSync(join(dir, 'markets', 'cn.yaml'), stringify([item({ id: 'cn-pipl', category: 'legal', when: { markets: { any: ['CN'] } } })]))
+    const cn = loadCatalog(dir)
+    assert.ok(evaluate(profile(cn, { markets: ['CN'] }), cn).some(e => e.item.id === 'cn-pipl'))
+    assert.ok(!evaluate(profile(cn, { markets: ['MX'] }), cn).some(e => e.item.id === 'cn-pipl'))
   })
 
   test('invalid values are rejected', () => {

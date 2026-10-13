@@ -146,7 +146,7 @@ describe('classic hooks', () => {
     writeFileSync(file, readFileSync(file, 'utf8').replace('closed: []', 'closed: [foundation.setup]'))
     const out = JSON.parse(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root })).out)
     assert.equal(out.decision, 'block')
-    assert.match(out.reason, /readme/)
+    assert.match(out.reason, /mep bloquea cerrar el trabajo: \d+ 🔴/)
     const again = JSON.parse(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root, stop_hook_active: true })).out)
     assert.equal(again.decision, undefined)
   })

@@ -1,0 +1,163 @@
+# Accesibilidad: 🔴 siempre, todo el bloque (WCAG 2.2 AA).
+
+- id: a11y-contrast
+  title: Contraste WCAG AA
+  category: accessibility
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Texto con poco contraste no se lee bajo el sol, con baja visión o en pantallas malas."
+  how: "Pares de tokens de color con contraste ≥ 4.5:1 (texto) y ≥ 3:1 (texto grande e íconos), en tema claro y oscuro; verificado con axe."
+  verify:
+    - { type: manual, prompt: "Cada par de tokens texto/fondo cumple 4.5:1 (3:1 en texto grande) en ambos temas" }
+  references: ["https://www.w3.org/TR/WCAG22/#contrast-minimum"]
+
+- id: a11y-keyboard
+  title: Navegación completa por teclado
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 6], scales_with: pages }
+  why: "Quien no usa mouse (motriz, lector de pantalla, usuarios avanzados) debe poder hacer todo."
+  how: "Todo lo interactivo es <button>/<a>/<input> real o tiene tabIndex y manejo de Enter/Espacio; orden de tab lógico; sin trampas de foco."
+  verify:
+    - { type: grep, pattern: "<(div|span)\\b[^>]*onClick=(?![^>]*(role=|tabIndex))", glob: "**/*.{tsx,jsx}", expect: absent }
+    - { type: manual, prompt: "Todos los flujos principales se completan solo con teclado" }
+  references: ["https://www.w3.org/TR/WCAG22/#keyboard"]
+
+- id: a11y-focus-visible
+  title: Foco visible
+  category: accessibility
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin indicador de foco, quien navega con teclado no sabe dónde está."
+  how: "Estilo :focus-visible desde tokens (ring); nunca outline: none sin reemplazo."
+  verify:
+    - { type: grep, pattern: "focus-visible", glob: "**/*.{css,scss,tsx,jsx,ts}" }
+    - { type: grep, pattern: "outline:\\s*(none|0)\\s*;?(?![^}]*focus-visible)", glob: "**/*.{css,scss}", expect: absent }
+  references: ["https://www.w3.org/TR/WCAG22/#focus-visible"]
+
+- id: a11y-skip-link
+  title: Skip link al contenido principal
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Evita tabular por todo el menú en cada página."
+  how: "Primer elemento enfocable: <a href=\"#main\">Saltar al contenido</a>, visible al recibir foco."
+  verify:
+    - { type: html, rule: skip_link }
+  references: ["https://www.w3.org/TR/WCAG22/#bypass-blocks"]
+
+- id: a11y-alt-text
+  title: "Alt text en imágenes (vacío en decorativas)"
+  category: accessibility
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3], scales_with: pages }
+  why: "Un lector de pantalla lee el alt; sin él, lee el nombre del archivo."
+  how: "alt descriptivo en imágenes con contenido; alt=\"\" en decorativas."
+  verify:
+    - { type: html, rule: img_alt }
+    - { type: grep, pattern: "<(img|Image)\\b(?![^>]*\\balt=)[^>]*>", glob: "**/*.{tsx,jsx,astro,html}", expect: absent }
+  references: ["https://www.w3.org/TR/WCAG22/#non-text-content"]
+
+- id: a11y-form-labels
+  title: Labels en todos los campos
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin label asociado, el lector de pantalla anuncia \"campo de edición\" sin decir cuál."
+  how: "<label for> o aria-label en cada input, select y textarea."
+  verify:
+    - { type: html, rule: input_labels }
+
+- id: a11y-form-errors
+  title: Errores de formulario anunciados y asociados al campo
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un error solo en rojo no lo percibe quien no ve el color ni quien usa lector de pantalla."
+  how: "aria-invalid + aria-describedby al mensaje; resumen con role=\"alert\" al enviar."
+  verify:
+    - { type: grep, pattern: "aria-invalid", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+    - { type: grep, pattern: "aria-describedby|FormMessage", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+  references: ["https://www.w3.org/TR/WCAG22/#error-identification"]
+
+- id: a11y-landmarks
+  title: "Landmarks: header, nav, main, footer"
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los landmarks son el índice para saltar entre zonas con lector de pantalla."
+  how: "Layout con <header>, <nav>, <main id=\"main\"> y <footer>."
+  verify:
+    - { type: html, rule: landmarks }
+
+- id: a11y-reduced-motion
+  title: Respeta prefers-reduced-motion
+  category: accessibility
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Las animaciones grandes provocan mareo en personas con trastornos vestibulares."
+  how: "Animaciones condicionadas: motion-safe:/motion-reduce: o useReducedMotion; se reducen a fades o se eliminan."
+  verify:
+    - { type: grep, pattern: "prefers-reduced-motion|motion-reduce|motion-safe|useReducedMotion|MotionConfig", glob: "**/*.{css,scss,tsx,jsx,ts}" }
+  references: ["https://www.w3.org/TR/WCAG22/#animation-from-interactions"]
+
+- id: a11y-zoom
+  title: Zoom al 200% sin romper el layout
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "Quien tiene baja visión amplía; si el layout se rompe o pierde contenido, no puede usar el sitio."
+  how: "Unidades relativas (rem), sin alturas fijas en contenedores de texto; nunca bloquear el zoom en el viewport."
+  verify:
+    - { type: grep, pattern: "user-scalable\\s*=\\s*(no|0)|maximum-scale\\s*=\\s*1(\\.0)?[\"',]", glob: "**/*.{tsx,jsx,ts,js,astro,html}", expect: absent }
+    - { type: manual, prompt: "Las páginas clave funcionan al 200% de zoom sin perder contenido" }
+  references: ["https://www.w3.org/TR/WCAG22/#resize-text", "https://www.w3.org/TR/WCAG22/#reflow"]
+
+- id: accessibility-statement
+  title: Declaración de accesibilidad
+  category: accessibility
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  level_overrides:
+    - { when: { markets: { any: [EU] } }, level: required }
+  effort: { size: S, hours: [1, 2] }
+  why: "La European Accessibility Act la exige para servicios digitales al consumidor en la UE; en otros mercados da confianza."
+  how: "Página /accesibilidad: nivel de conformidad, limitaciones conocidas y contacto para reportar barreras."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{accesibilidad,accessibility,barrierefreiheit,accessibilite}/page.{tsx,mdx,jsx}", "src/pages/{accesibilidad,accessibility}.{astro,md,mdx}"] }
+  references: ["https://eur-lex.europa.eu/eli/dir/2019/882/oj"]
+
+- id: a11y-automated-tests
+  title: Test automatizado de accesibilidad en CI (axe o similar)
+  category: accessibility
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Atrapa regresiones de contraste, labels y roles en cada PR."
+  how: "@axe-core/playwright en los tests e2e de las páginas clave."
+  verify:
+    - { type: grep, pattern: "@axe-core|axe-core|pa11y|lighthouse-ci|@lhci", glob: "{package.json,.github/workflows/*.{yml,yaml}}" }

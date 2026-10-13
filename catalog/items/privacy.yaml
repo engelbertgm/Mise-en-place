@@ -1,0 +1,226 @@
+# Cookies y consentimiento, retención de datos, términos versionados, embeds y legal general.
+
+- id: cookie-inventory
+  title: "Inventario de lo que se guarda en el navegador, con categoría"
+  category: cookies
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "No se puede pedir consentimiento ni escribir la política sin saber qué se guarda."
+  how: "docs/cookies.md (o cookies.ts): cada cookie, localStorage y píxel con categoría (esencial, preferencias, analítica, marketing), proveedor y duración."
+  verify:
+    - { type: file_exists, path: ["docs/cookies.md", "docs/**/cookies*.md", "{src/,}{lib,config}/cookies.{ts,json}"] }
+
+- id: cookie-policy
+  title: Política de cookies basada en el inventario
+  category: cookies
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  depends_on: [cookie-inventory]
+  effort: { size: S, hours: [1, 2] }
+  why: "Explica al usuario qué se guarda y por qué; la exigen ePrivacy, PECR, LGPD y otras."
+  how: "Página /cookies (o sección de la privacidad) generada del inventario."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/cookies/page.{tsx,mdx,jsx}", "src/pages/cookies.{astro,md,mdx}", "content/**/cookies.{md,mdx}"] }
+
+- id: cookie-attributes
+  title: "Cookies propias con Secure, HttpOnly cuando aplique, SameSite y expiración mínima"
+  category: cookies
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Reduce robo de sesión y rastreo innecesario."
+  how: "cookies().set con secure, httpOnly (si JS no la lee), sameSite y maxAge acotado."
+  verify:
+    - { type: grep, pattern: "(cookies\\(\\)\\.set|setCookie|document\\.cookie\\s*=)(?![^\\n]*(secure|Secure|sameSite|SameSite))", glob: "**/*.{ts,tsx,js}", expect: absent }
+
+- id: consent-banner
+  title: "Banner con Aceptar y Rechazar igual de visibles; consentimiento granular; cambiarlo en cualquier momento"
+  category: cookies
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { signals: { has_nonessential_cookies: true } }, { markets: { any: [EU, UK, BR, "CA:QC"] } } ] }
+  effort: { size: M, hours: [3, 8] }
+  why: "GDPR/ePrivacy, PECR, LGPD y la Ley 25 exigen consentimiento libre; un \"Rechazar\" escondido es inválido."
+  how: "Primer nivel con Aceptar y Rechazar iguales; categorías; enlace \"Preferencias de cookies\" en el footer; volver a preguntar si cambia la política."
+  verify:
+    - { type: grep, pattern: "Rechazar|Reject|Ablehnen|Refuser|Rejeitar", glob: "**/*.{tsx,jsx,json}" }
+    - { type: grep, pattern: "Preferencias de cookies|Cookie preferences|Cookie settings|Configurar cookies|Cookie-Einstellungen", glob: "**/*.{tsx,jsx,json}" }
+  references: ["https://edpb.europa.eu/our-work-tools/our-documents/guidelines/guidelines-052020-consent-under-regulation-2016679_en"]
+
+- id: consent-before-load
+  title: Nada no esencial se carga antes del consentimiento
+  category: cookies
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { signals: { has_nonessential_cookies: true } }, { markets: { any: [EU, UK, BR, "CA:QC"] } } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Cargar analítica o píxeles antes de aceptar es la infracción más común y más multada."
+  how: "Scripts de terceros condicionados al consentimiento (Google Consent Mode v2 o carga condicional)."
+  verify:
+    - { type: grep, pattern: "consent|Consent", glob: "**/*.{tsx,jsx,ts}" }
+    - { type: manual, prompt: "Con el consentimiento rechazado, la pestaña de red no muestra scripts ni cookies no esenciales" }
+
+- id: consent-log
+  title: "Registro del consentimiento: fecha, versión de la política y categorías"
+  category: cookies
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { signals: { has_nonessential_cookies: true } }, { markets: { any: [EU, UK, BR, "CA:QC"] } } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El responsable debe poder demostrar el consentimiento (GDPR art. 7.1)."
+  how: "Guardar fecha, versión de la política y categorías aceptadas (cookie de consentimiento + registro en servidor)."
+  verify:
+    - { type: grep, pattern: "consent_(version|at|categories)|consentVersion|policyVersion", glob: "**/*.{ts,tsx,sql}" }
+
+- id: gpc-signal
+  title: "Respetar Global Privacy Control (GPC)"
+  category: cookies
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { markets: { any: [USA, "USA:CA", "USA:CO", "USA:CT", "USA:TX", "USA:OR", "USA:NJ", "USA:MT", "USA:DE", "USA:MN", "USA:MD"] } }
+  effort: { size: S, hours: [1, 2] }
+  why: "La CCPA/CPRA (y otras leyes estatales) obliga a tratar GPC como una solicitud de no vender ni compartir. Aplica según umbrales de ingresos o volumen de datos: confirmar con asesoría."
+  how: "Leer navigator.globalPrivacyControl / Sec-GPC y desactivar venta, compartición y publicidad dirigida."
+  verify:
+    - { type: grep, pattern: "globalPrivacyControl|Sec-GPC|sec-gpc", glob: "**/*.{ts,tsx,js}" }
+  references: ["https://oag.ca.gov/privacy/ccpa"]
+
+- id: do-not-sell-link
+  title: "Enlace \"Do Not Sell or Share My Personal Information\""
+  category: cookies
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [USA, "USA:CA"] } }, { signals: { has_nonessential_cookies: true } } ] }
+  effort: { size: S, hours: [1, 2] }
+  why: "La CCPA lo exige si se comparten datos para publicidad conductual."
+  how: "Enlace en el footer a una página que aplica la exclusión."
+  verify:
+    - { type: grep, pattern: "Do Not Sell|Your Privacy Choices|Tus opciones de privacidad", glob: "**/*.{tsx,jsx,json}", flags: i }
+  references: ["https://oag.ca.gov/privacy/ccpa"]
+
+- id: cookieless-analytics
+  title: Analítica sin cookies para evitar el banner donde sea posible
+  category: cookies
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [analytics] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin cookies de analítica no hace falta banner en muchos mercados: mejor experiencia y menos riesgo."
+  how: "Vercel Analytics, Plausible o similar."
+  verify:
+    - { type: grep, pattern: "@vercel/analytics|plausible|fathom|umami|simple-analytics", glob: "package.json" }
+
+- id: data-retention
+  title: "Tabla de retención, borrado automático, borrado de cuenta en todos lados y logs acotados"
+  category: privacy
+  level: required
+  phase: build.data
+  since: "2026.10.2"
+  when: { signals: { has_personal_data: true } }
+  effort: { size: M, hours: [3, 8] }
+  why: "Guardar datos más de lo necesario es riesgo y, en varios mercados, ilegal (limitación del plazo)."
+  how: "docs/retencion-de-datos.md (dato, plazo, motivo) reflejado en la privacidad; tarea programada que borra o anonimiza; borrar cuenta limpia DB, storage y terceros; backups y logs con plazo."
+  verify:
+    - { type: file_exists, path: ["docs/**/{retencion,retention}*.md"] }
+    - { type: grep, pattern: "cron|pg_cron|schedule|vercel\\.json", glob: "{vercel.json,**/*.sql,**/cron/**/*.ts,**/jobs/**/*.ts}" }
+
+- id: terms-versioned
+  title: "Términos versionados: qué versión aceptó cada usuario y cuándo; nueva aceptación ante cambios importantes"
+  category: legal
+  level: required
+  phase: build.data
+  since: "2026.10.2"
+  when: { capabilities: [auth] }
+  effort: { size: M, hours: [2, 5] }
+  why: "En una disputa hay que demostrar qué aceptó el usuario."
+  how: "Guardar terms_version y accepted_at por usuario; casilla sin marcar en registro; versiones anteriores archivadas; pedir aceptación en el siguiente login si cambian."
+  verify:
+    - { type: grep, pattern: "terms_version|tos_version|terms_accepted_at|accepted_terms|termsVersion", glob: "**/*.{ts,tsx,sql,prisma}" }
+
+- id: embeds-facade
+  title: "Embeds con fachada, versión sin rastreo, title y espacio reservado"
+  category: privacy
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_embeds: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Un embed de YouTube o mapas pesa más que la página y pone cookies sin preguntar."
+  how: "Imagen de vista previa que carga el embed al clic; youtube-nocookie.com; title en el iframe; dimensiones fijas; chats con carga diferida; si pone cookies y el mercado exige consentimiento, solo después de aceptarlo."
+  verify:
+    - { type: grep, pattern: "youtube\\.com/embed", glob: "**/*.{tsx,jsx,astro,html,mdx}", expect: absent }
+    - { type: html, rule: iframe_title }
+
+- id: privacy-policy
+  title: Política de privacidad
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { signals: { has_personal_data: true } }
+  effort: { size: M, hours: [2, 5], scales_with: markets }
+  why: "Cualquier formulario, analítica o cookie trata datos personales: todas las leyes de privacidad exigen informarlo."
+  how: "Página de privacidad con responsable, datos, finalidades, bases legales, terceros, retención, derechos y contacto; adaptada a cada mercado."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{privacidad,privacy,aviso-de-privacidad,datenschutz,confidentialite,privacidade}/page.{tsx,mdx,jsx}", "src/pages/{privacidad,privacy,aviso-de-privacidad}.{astro,md,mdx}"] }
+
+- id: terms-of-service
+  title: Términos y condiciones
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { capabilities: { any: [auth, payments, ugc] } }
+  effort: { size: M, hours: [2, 5] }
+  why: "Definen el contrato con el usuario: uso aceptable, pagos, responsabilidad y terminación."
+  how: "Página /terminos con fecha de actualización, enlazada en el footer y en el registro o checkout."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{terminos,terms,terminos-y-condiciones,agb,cgu,termos}/page.{tsx,mdx,jsx}", "src/pages/{terminos,terms}.{astro,md,mdx}"] }
+
+- id: refund-policy
+  title: Página de política de reembolsos
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { capabilities: [payments] }, { type: { any: [ecommerce, saas, marketplace, booking] } } ] }
+  depends_on: [terms-of-service]
+  effort: { size: S, hours: [1, 3], scales_with: languages }
+  why: "Requerida por procesadores de pago y por ley de consumo en varios mercados."
+  how: "Ruta /reembolsos (o /refunds), enlazada en footer y checkout."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{reembolsos,refunds,devoluciones,returns,refund-policy}/page.{tsx,mdx,jsx}", "src/pages/{reembolsos,refunds,devoluciones}.{astro,md,mdx}"] }
+
+- id: visible-contact
+  title: Contacto o responsable visible
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Las leyes de consumo y de privacidad exigen poder contactar al responsable."
+  how: "Email o formulario de contacto y razón social en el footer o en /contacto."
+  verify:
+    - { type: grep, pattern: "mailto:|/contact|/contacto", glob: "**/*.{tsx,jsx,astro,html}" }
+
+- id: asset-licenses
+  title: Licencias válidas de fuentes, imágenes e íconos
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Una foto o tipografía sin licencia es un reclamo legal esperando a pasar."
+  how: "docs/licencias.md con la fuente y licencia de cada recurso de terceros."
+  verify:
+    - { type: file_exists, path: ["docs/**/{licencias,licenses,credits,creditos}*.md", "CREDITS.md"] }

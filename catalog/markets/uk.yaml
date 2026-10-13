@@ -1,0 +1,56 @@
+# Reino Unido. Checklist orientativo, no sustituye asesoría legal.
+
+- id: uk-language
+  title: "Contenido en en-GB; GBP y fechas dd/mm/yyyy"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [UK] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "El usuario británico espera ortografía británica, libras y día primero."
+  how: "Locale en-GB; Intl con en-GB; GBP."
+  verify:
+    - { type: grep, pattern: "en-GB", glob: "**/*.{ts,tsx,json}" }
+
+- id: uk-gdpr
+  title: "UK GDPR y DPA 2018: información, bases legales, derechos y representante si no hay sede"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [UK] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "El Reino Unido mantiene su propio GDPR; quien ofrece servicios a residentes del UK desde fuera necesita representante allí."
+  how: "Política con lo que exige el UK GDPR y el ICO como autoridad; representante en el UK si no hay sede."
+  verify:
+    - { type: grep, pattern: "UK GDPR|ICO|Information Commissioner", glob: "**/{privacy,privacidad}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+  references: ["https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/"]
+
+- id: uk-ico-fee
+  title: "Cuota de protección de datos del ICO"
+  category: legal
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [UK] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "La mayoría de las organizaciones que tratan datos personales en el UK deben pagar la cuota anual al ICO salvo exención."
+  how: "Pagar la cuota o documentar la exención con la herramienta del ICO."
+  verify:
+    - { type: manual, prompt: "Cuota del ICO pagada o exención documentada" }
+  references: ["https://ico.org.uk/for-organisations/data-protection-fee/"]
+
+- id: uk-consumer-contracts
+  title: "Consumer Contracts Regulations: información previa y 14 días de cancelación"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [UK] } }, { capabilities: [payments] }, { audience: [b2c] } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Las compras a distancia en el UK tienen 14 días de cancelación e información obligatoria antes de comprar."
+  how: "Identidad y dirección, precio total, condiciones de cancelación y formulario modelo antes del pago."
+  verify:
+    - { type: grep, pattern: "cancellation|cancelación|14 days|14 días", glob: "**/*.{tsx,jsx,mdx,md,astro,json}", flags: i }
+  references: ["https://www.legislation.gov.uk/uksi/2013/3134/contents"]

@@ -1,0 +1,112 @@
+# Responsive y portabilidad (🔴 siempre) y navegación (🔴 siempre).
+
+- id: mobile-first
+  title: "Mobile-first: móvil 360–767, tablet 768–1023, desktop 1024–1919, ultra wide ≥ 1920 con ancho máximo centrado"
+  category: responsive
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: L, hours: [4, 12], scales_with: pages }
+  why: "La mayoría del tráfico es móvil; en ultra wide el texto a todo lo ancho no se lee."
+  how: "Estilos base para móvil y breakpoints hacia arriba; contenedor con max-width centrado; fondos full-bleed."
+  verify:
+    - { type: grep, pattern: "max-w-|max-width", glob: "**/*.{tsx,jsx,astro,css}" }
+
+- id: responsive-screenshots
+  title: "Capturas automáticas en 360, 768, 1280, 1920 y 2560 px sin scroll horizontal ni elementos encimados"
+  category: responsive
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 5] }
+  why: "Revisar cinco anchos a mano en cada cambio no pasa; una prueba automática sí."
+  how: "Test de Playwright (script test:responsive) que recorre las páginas clave en los cinco anchos y falla si scrollWidth > clientWidth."
+  verify:
+    - { type: json_key, file: package.json, key: scripts.test:responsive }
+    - { type: command, run: "pnpm run test:responsive", timeout: 600 }
+
+- id: no-hover-only
+  title: "Nada depende solo de hover; orientación horizontal sin romper"
+  category: responsive
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "En pantallas táctiles el hover no existe: un menú que solo abre con hover es inaccesible."
+  how: "Menús y tooltips que abren con clic o foco; revisar móvil y tablet en horizontal."
+  verify:
+    - { type: grep, pattern: "onMouseEnter=(?![\\s\\S]{0,200}(onFocus|onClick))", glob: "**/*.{tsx,jsx}", expect: absent }
+    - { type: manual, prompt: "Móvil y tablet funcionan en orientación horizontal" }
+
+- id: safe-areas-dvh
+  title: "Áreas seguras (notch) y alturas con dvh, no vh"
+  category: responsive
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Con vh, las barras del navegador móvil tapan contenido; sin safe-area, el notch tapa botones."
+  how: "h-dvh/min-h-dvh en lugar de h-screen/100vh; padding con env(safe-area-inset-*) en barras fijas."
+  verify:
+    - { type: grep, pattern: "\\b(min-)?h-screen\\b|100vh", glob: "**/*.{tsx,jsx,astro,vue,svelte,css,scss}", expect: absent }
+
+- id: line-length
+  title: "Largo de línea 60–80 caracteres, también en ultra wide"
+  category: responsive
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Líneas muy largas cansan y hacen perder el renglón."
+  how: "Textos de lectura con max-w-prose (≈65ch)."
+  verify:
+    - { type: grep, pattern: "max-w-prose|max-width:\\s*\\d+ch|prose", glob: "**/*.{tsx,jsx,astro,css,mdx}" }
+
+- id: nav-mobile-menu
+  title: "Menú móvil accesible: cierra con Esc y mantiene el foco dentro"
+  category: navigation
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un menú que no atrapa el foco deja al usuario de teclado navegando detrás del menú."
+  how: "Sheet/Dialog del sistema (Radix) que ya maneja Esc y foco."
+  verify:
+    - { type: grep, pattern: "Sheet|Dialog|Drawer|NavigationMenu", glob: "**/*.{tsx,jsx}" }
+
+- id: nav-active-page
+  title: Página activa indicada en el menú
+  category: navigation
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario sabe dónde está."
+  how: "aria-current=\"page\" y estilo activo en el enlace de la ruta actual."
+  verify:
+    - { type: grep, pattern: "aria-current", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+
+- id: nav-history
+  title: "El botón atrás funciona; tabs, filtros y modales relevantes en la URL; scroll restaurado"
+  category: navigation
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Romper el botón atrás es la queja de navegación más común."
+  how: "Estado compartible en searchParams o rutas (incluidos modales relevantes); scroll restoration del framework."
+  verify:
+    - { type: manual, prompt: "Atrás y adelante devuelven al estado anterior, con su scroll, en las vistas clave" }
+
+- id: nav-logo-footer
+  title: "Logo enlaza al inicio; footer con legales y contacto"
+  category: navigation
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Patrones que todos esperan (ley de Jakob); los legales en el footer los exigen varias leyes."
+  how: "Logo como <Link href=\"/\">; footer con privacidad, términos, contacto."
+  verify:
+    - { type: grep, pattern: "href=[\"']/[\"']", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+    - { type: grep, pattern: "<footer", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }

@@ -1,0 +1,86 @@
+# Performance.
+
+- id: modern-image-formats
+  title: "Imágenes raster en WebP o AVIF con srcset responsive (SVG en logos e íconos; og:image en JPG/PNG)"
+  category: performance
+  level: required
+  phase: launch.seo
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Las imágenes son la mayor parte del peso de una página; WebP/AVIF pesan 30–50% menos."
+  how: "next/image (o <picture>) que sirve AVIF/WebP con srcset; nada de JPG/PNG grandes en el HTML salvo og:image."
+  verify:
+    - { type: grep, pattern: "<img\\b[^>]*src=[\"'][^\"']*\\.(jpe?g|png)[\"']", glob: "**/*.{tsx,jsx,astro,html}", exclude: "**/{opengraph-image,twitter-image}*", expect: absent }
+
+- id: image-loading-priority
+  title: "Lazy loading bajo el pliegue; la imagen principal (LCP) eager + fetchpriority=high"
+  category: performance
+  level: required
+  phase: launch.seo
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Hacer lazy la imagen principal empeora el LCP; cargar todo de inmediato desperdicia ancho de banda."
+  how: "priority (next/image) o fetchpriority=\"high\" en la imagen del hero; el resto lazy."
+  verify:
+    - { type: grep, pattern: "\\bpriority\\b|fetchPriority=|fetchpriority=", glob: "**/*.{tsx,jsx,astro,html}" }
+
+- id: media-dimensions
+  title: width y height en todas las imágenes y videos
+  category: performance
+  level: required
+  phase: launch.seo
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin dimensiones el contenido salta al cargar (CLS)."
+  how: "width/height (o fill con contenedor con aspect-ratio)."
+  verify:
+    - { type: html, rule: img_dimensions }
+
+- id: web-fonts
+  title: "Fuentes con font-display: swap, subset y self-hosted"
+  category: performance
+  level: required
+  phase: foundation.design
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Fuentes externas bloquean el texto y agregan conexiones."
+  how: "next/font (self-hosted, subset, swap) o @font-face local con font-display: swap."
+  verify:
+    - { type: grep, pattern: "next/font|font-display:\\s*swap|@fontsource", glob: "**/*.{ts,tsx,css,scss,json}" }
+    - { type: grep, pattern: "fonts\\.googleapis\\.com", glob: "**/*.{tsx,jsx,astro,html,css}", expect: absent }
+
+- id: compression-caching
+  title: Compresión (Brotli/gzip) y caché larga en assets con hash
+  category: performance
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin compresión ni caché, cada visita descarga todo otra vez."
+  how: "Vercel lo hace por defecto para assets con hash; en otro hosting, Cache-Control: public, max-age=31536000, immutable."
+  verify:
+    - { type: manual, prompt: "Assets con hash servidos con Brotli/gzip y Cache-Control immutable de un año" }
+
+- id: core-web-vitals-budget
+  title: "Presupuesto Core Web Vitals: LCP < 2.5 s · INP < 200 ms · CLS < 0.1"
+  category: performance
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 6] }
+  why: "Son las métricas que Google usa en el ranking y las que más afectan la conversión."
+  how: "Lighthouse CI con aserciones, o Speed Insights en producción."
+  verify:
+    - { type: grep, pattern: "@lhci|lighthouse|@vercel/speed-insights", glob: "{package.json,.github/workflows/*.{yml,yaml},lighthouserc*}" }
+
+- id: bundle-budget
+  title: "Presupuesto de tamaño de bundle JS y preconnect a dominios críticos"
+  category: performance
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "El JavaScript es el recurso más caro en móviles; sin presupuesto crece sin que nadie lo note."
+  how: "size-limit o el análisis del build en CI; <link rel=\"preconnect\"> a los orígenes críticos."
+  verify:
+    - { type: grep, pattern: "size-limit|bundlesize|@next/bundle-analyzer", glob: "package.json" }

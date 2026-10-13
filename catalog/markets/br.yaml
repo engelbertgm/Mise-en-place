@@ -1,0 +1,43 @@
+# Brasil. Checklist orientativo, no sustituye asesoría legal.
+
+- id: br-language
+  title: "Contenido en pt-BR y BRL"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [BR] } }
+  effort: { size: L, hours: [8, 20], scales_with: pages }
+  why: "El Código de Defensa del Consumidor exige información en portugués; el usuario espera reales."
+  how: "Locale pt-BR con traducción profesional; Intl con pt-BR; BRL."
+  verify:
+    - { type: grep, pattern: "pt-BR|[\"']pt[\"']", glob: "**/*.{ts,tsx,json}" }
+
+- id: br-lgpd
+  title: "LGPD: base legal, aviso de privacidad y encargado (DPO) con contacto público"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [BR] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "La LGPD exige base legal, transparencia y un encarregado cuya identidad y contacto sean públicos; la ANPD sanciona."
+  how: "Política en portugués con finalidades, bases legales, derechos del titular y datos del encarregado."
+  verify:
+    - { type: grep, pattern: "LGPD|encarregado|Encarregado", glob: "**/*.{tsx,jsx,mdx,md,astro,json}" }
+  references: ["https://www.planalto.gov.br/ccivil_03/_ato2015-2018/2018/lei/l13709.htm", "https://www.gov.br/anpd/"]
+
+- id: br-consumer
+  title: "CDC y decreto de comercio electrónico: identificación (CNPJ), información clara y 7 días de arrepentimiento"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [BR] } }, { capabilities: [payments] } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El Decreto 7.962/2013 exige identificar al proveedor (razón social, CNPJ, dirección) y el art. 49 del CDC da 7 días para arrepentirse de compras a distancia."
+  how: "Razón social, CNPJ y dirección visibles; resumen del contrato antes de pagar; derecho de arrepentimiento informado y operable."
+  verify:
+    - { type: grep, pattern: "CNPJ", glob: "**/*.{tsx,jsx,mdx,md,astro,json}" }
+    - { type: grep, pattern: "arrependimento|direito de arrependimento", glob: "**/*.{tsx,jsx,mdx,md,astro,json}", flags: i }
+  references: ["https://www.planalto.gov.br/ccivil_03/_ato2011-2014/2013/decreto/d7962.htm", "https://www.planalto.gov.br/ccivil_03/leis/l8078compilado.htm"]

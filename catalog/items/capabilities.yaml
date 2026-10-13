@@ -1,0 +1,779 @@
+# Funcionalidad por capacidad. La seguridad de cada capa vive en security.yaml.
+
+# ── Auth ──
+- id: password-recovery
+  title: Recuperación de contraseña
+  category: auth
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Sin recuperación, cada contraseña olvidada es un usuario perdido o un ticket de soporte."
+  how: "Flujo con enlace de un solo uso que expira, mensaje neutro (no revela si el email existe)."
+  verify:
+    - { type: grep, pattern: "resetPasswordForEmail|forgot-password|recuperar|reset-password|updateUser\\(\\{\\s*password", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: email-verification
+  title: Verificación de email
+  category: auth
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Evita cuentas con correos ajenos o falsos y asegura que los emails transaccionales llegan."
+  how: "Confirmación por email antes de activar la cuenta (Supabase: Confirm email activado)."
+  verify:
+    - { type: grep, pattern: "emailRedirectTo|verifyOtp|email_confirmed|confirm-email|verify-email|auth/confirm", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: account-deletion
+  title: Borrar cuenta desde la app
+  category: auth
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [auth] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Derecho del usuario en GDPR, LGPD, CCPA y otras; Apple y Google lo exigen para apps."
+  how: "Acción extrema (confirmación escrita + reautenticación) que borra datos en DB, storage y terceros, con periodo de gracia."
+  verify:
+    - { type: grep, pattern: "deleteUser|delete-account|eliminar-cuenta|deleteAccount|borrar-cuenta", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: data-export
+  title: Exportar mis datos
+  category: auth
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [auth] }
+  level_overrides:
+    - { when: { markets: { any: [EU, UK, BR, "CA:QC"] } }, level: required }
+  effort: { size: M, hours: [2, 5] }
+  why: "Derecho de acceso y portabilidad (GDPR art. 15 y 20, LGPD, Ley 25 de Quebec)."
+  how: "Descarga en JSON o CSV de los datos del usuario, generada en el servidor."
+  verify:
+    - { type: grep, pattern: "export-data|exportar-datos|exportUserData|download-my-data|data-export", glob: "**/*.{ts,tsx,js,jsx}" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj"]
+
+# ── Pagos ──
+- id: payment-result-pages
+  title: Páginas de éxito y fallo de pago
+  category: payments
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [payments] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El usuario necesita saber si pagó y qué sigue; el fallo debe ofrecer reintentar."
+  how: "success_url y cancel_url propias; la de éxito confirma con el estado real del pago (webhook), no con el parámetro."
+  verify:
+    - { type: grep, pattern: "success_url|cancel_url|return_url|/(checkout|pago)/(success|exito|gracias)", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: payment-receipts
+  title: Recibos por email
+  category: payments
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [payments] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Comprobante para el usuario; lo exigen las leyes de consumo."
+  how: "Recibos del procesador activados o email transaccional propio con el detalle."
+  verify:
+    - { type: grep, pattern: "receipt_email|receipt|recibo", glob: "**/*.{ts,tsx,js,jsx}", flags: i }
+
+- id: tax-handling
+  title: Manejo de impuestos
+  category: payments
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [payments] }
+  effort: { size: M, hours: [2, 6], scales_with: markets }
+  why: "IVA, sales tax y GST cambian por país y estado; cobrarlos mal es una deuda con la autoridad."
+  how: "Stripe Tax (automatic_tax) o cálculo por mercado documentado; precios con o sin impuestos claros."
+  verify:
+    - { type: grep, pattern: "automatic_tax|tax_behavior|taxRates|tax_rates|impuesto|IVA", glob: "**/*.{ts,tsx,js,jsx}" }
+
+# ── Contenido de usuarios ──
+- id: ugc-report
+  title: Reportar contenido
+  category: ugc
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ugc] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Sin forma de reportar, el contenido abusivo se queda; la DSA lo exige en la UE."
+  how: "Botón Reportar en cada contenido, con motivo, que crea un caso en la cola de moderación."
+  verify:
+    - { type: grep, pattern: "report|reportar|denunciar|flag", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: ugc-moderation
+  title: Moderación de contenido
+  category: ugc
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ugc] }
+  effort: { size: L, hours: [6, 16] }
+  why: "Responsabilidad legal y de marca por lo que se publica."
+  how: "Cola de moderación en el panel, acciones (ocultar, borrar, suspender) con registro y notificación al autor."
+  verify:
+    - { type: grep, pattern: "moderation|moderacion|moderate|is_hidden|status.*(pending|approved|rejected)", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: ugc-content-terms
+  title: Términos de contenido y aviso DMCA (USA)
+  category: ugc
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { capabilities: [ugc] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Definen qué se puede publicar y cómo se atienden reclamos de derechos de autor (DMCA safe harbor en USA)."
+  how: "Sección de contenido en los términos; en USA, agente DMCA registrado y procedimiento de notice and takedown."
+  verify:
+    - { type: grep, pattern: "DMCA|derechos de autor|copyright|contenido prohibido|community guidelines|normas de la comunidad", glob: "**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+  references: ["https://www.copyright.gov/dmca-directory/"]
+
+# ── Email ──
+- id: email-auth-dns
+  title: SPF, DKIM y DMARC
+  category: email
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { capabilities: { any: [email, newsletter] } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin autenticación, Gmail y Yahoo mandan los correos a spam o los rechazan."
+  how: "Registros SPF y DKIM del proveedor y DMARC (p=quarantine o reject) en el DNS del dominio."
+  verify:
+    - { type: manual, prompt: "SPF, DKIM y DMARC configurados y verificados en el dominio de envío" }
+  references: ["https://support.google.com/a/answer/81126"]
+
+- id: email-templates
+  title: "Plantillas transaccionales con tokens del sistema, texto plano, links absolutos, preheader, responsive y probadas en Gmail, Outlook y Apple Mail (claro y oscuro)"
+  category: email
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: { any: [email, newsletter] } }
+  effort: { size: M, hours: [3, 8] }
+  why: "Un email roto en Outlook o ilegible en modo oscuro se ve poco profesional; sin texto plano, cae en spam."
+  how: "Plantillas con los colores y tipografía de los tokens, versión texto, URLs absolutas https, preheader; pruebas en los tres clientes."
+  verify:
+    - { type: file_exists, path: ["{src/,}emails/**/*.{tsx,jsx,html,mjml}", "**/email-templates/**/*"] }
+    - { type: manual, prompt: "Plantillas probadas en Gmail, Outlook y Apple Mail, claro y oscuro" }
+
+- id: email-unsubscribe-marketing
+  title: Enlace de baja en emails de marketing
+  category: email
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: { any: [email, newsletter] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Lo exigen CAN-SPAM, CASL, GDPR y los requisitos de Gmail y Yahoo."
+  how: "Footer de todo email de marketing con enlace de baja funcional."
+  verify:
+    - { type: grep, pattern: "unsubscribe|darse de baja|dar de baja|cancelar suscripci", glob: "**/*.{tsx,jsx,ts,html,mjml}", flags: i }
+
+- id: react-email
+  title: Plantillas de email como componentes (React Email)
+  category: email
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: { any: [email, newsletter] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Reutilizan tokens y componentes; se previsualizan y prueban como código."
+  how: "@react-email/components en emails/."
+  verify:
+    - { type: grep, pattern: "@react-email|react-email", glob: package.json }
+
+# ── Newsletter ──
+- id: newsletter-signup
+  title: "Formulario de suscripción simple con anti-spam y qué se recibe y con qué frecuencia"
+  category: newsletter
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Decir qué y cada cuánto sube la conversión y baja las bajas y los reportes de spam."
+  how: "Email + nombre opcional, honeypot y rate limit, texto de qué y con qué frecuencia; éxito: \"Revisa tu correo para confirmar\"."
+  verify:
+    - { type: grep, pattern: "newsletter|suscr[ií]bete|subscribe", glob: "**/*.{tsx,jsx,astro}", flags: i }
+
+- id: newsletter-consent
+  title: "Casilla de consentimiento sin marcar, separada de los términos, con registro de fecha, origen y texto"
+  category: newsletter
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El consentimiento debe ser libre, específico y demostrable (GDPR, LGPD, CASL)."
+  how: "Checkbox desmarcado por defecto; guardar consent_at, consent_source y consent_text."
+  verify:
+    - { type: grep, pattern: "consent_(at|source|text)|consentedAt|consent_given", glob: "**/*.{ts,tsx,sql,prisma}" }
+    - { type: grep, pattern: "defaultChecked(=\\{true\\})?(?![^>]*=\\{false)", glob: "**/{newsletter,subscribe,suscripcion}*/**/*.{tsx,jsx}", expect: absent }
+
+- id: newsletter-double-opt-in
+  title: Doble opt-in
+  category: newsletter
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  level_overrides:
+    - { when: { markets: { any: [EU, UK, CA, BR] } }, level: required }
+  effort: { size: S, hours: [1, 3] }
+  why: "Confirma que el email es de quien se suscribió; es la prueba de consentimiento que piden EU, UK, CA y BR."
+  how: "Email de confirmación antes de agregar a la lista."
+  verify:
+    - { type: grep, pattern: "confirm|double.?opt|doble", glob: "**/{newsletter,subscribe,suscripcion}*/**/*.{ts,tsx}", flags: i }
+
+- id: newsletter-unsubscribe
+  title: "Baja en un clic en cada email, sin login, inmediata, con List-Unsubscribe y página de confirmación"
+  category: newsletter
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  effort: { size: M, hours: [2, 4] }
+  why: "Gmail y Yahoo exigen one-click unsubscribe para envíos masivos; las leyes exigen baja fácil."
+  how: "Enlace en el footer de cada email; encabezados List-Unsubscribe y List-Unsubscribe-Post; baja inmediata; página con opción de volver a suscribirse. No detiene emails transaccionales."
+  verify:
+    - { type: grep, pattern: "List-Unsubscribe", glob: "**/*.{ts,tsx,js}" }
+    - { type: grep, pattern: "List-Unsubscribe-Post|One-Click", glob: "**/*.{ts,tsx,js}" }
+  references: ["https://support.google.com/a/answer/81126", "https://datatracker.ietf.org/doc/html/rfc8058"]
+
+- id: newsletter-sender-address
+  title: Dirección física del remitente en el footer
+  category: newsletter
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "La exige CAN-SPAM (USA) y CASL (Canadá)."
+  how: "Dirección postal válida en el footer de cada email de marketing."
+  verify:
+    - { type: manual, prompt: "Los emails de marketing incluyen la dirección física del remitente" }
+  references: ["https://www.ftc.gov/business-guidance/resources/can-spam-act-compliance-guide-business"]
+
+- id: newsletter-no-purchased-lists
+  title: Nunca listas compradas o importadas sin consentimiento
+  category: newsletter
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  effort: { size: XS, hours: [0.5, 0.5] }
+  why: "Es ilegal en EU, UK, CA y BR, y destruye la reputación del dominio en cualquier mercado."
+  how: "Solo contactos con consentimiento registrado."
+  verify:
+    - { type: manual, prompt: "La lista solo contiene contactos con consentimiento registrado" }
+
+- id: newsletter-preferences
+  title: "Centro de preferencias, email de bienvenida y archivo de ediciones"
+  category: newsletter
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [newsletter] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Elegir temas y frecuencia evita bajas totales; la bienvenida fija expectativas."
+  how: "Página de preferencias desde el enlace de baja; email de bienvenida; archivo público y RSS."
+  verify:
+    - { type: grep, pattern: "preferences|preferencias", glob: "**/{newsletter,email,emails}*/**/*.{ts,tsx}", flags: i }
+
+# ── Notificaciones ──
+- id: notification-center
+  title: "Centro de notificaciones in-app, preferencias por canal y forma de desactivarlas"
+  category: notifications
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [notifications] }
+  effort: { size: L, hours: [6, 14] }
+  why: "Notificaciones sin control llevan a desinstalar o marcar como spam."
+  how: "Bandeja con leídas/no leídas; preferencias por canal (in-app, email, push) y por tipo."
+  verify:
+    - { type: grep, pattern: "notifications|notificaciones", glob: "**/*.{ts,tsx,sql}" }
+    - { type: grep, pattern: "notification_preferences|notificationPreferences|preferencias", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: push-permission-timing
+  title: El permiso de push se pide después de una acción del usuario, nunca al cargar
+  category: notifications
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [notifications] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Pedir al cargar se rechaza casi siempre y el navegador ya no deja volver a preguntar."
+  how: "Explicar el valor y pedir el permiso tras un clic del usuario."
+  verify:
+    - { type: grep, pattern: "useEffect\\([^)]*requestPermission|^\\s*Notification\\.requestPermission", glob: "**/*.{ts,tsx,js,jsx}", expect: absent }
+
+- id: notification-batching
+  title: "Agrupar notificaciones repetidas y resumen diario por email"
+  category: notifications
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [notifications] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Diez avisos iguales seguidos son ruido."
+  how: "Agrupar por tipo y objeto; digest diario opcional."
+  verify:
+    - { type: grep, pattern: "digest|batch|group", glob: "**/notification*/**/*.{ts,tsx}", flags: i }
+
+# ── Realtime ──
+- id: realtime-resilience
+  title: "Reconexión automática, indicador de conexión y reconciliación con el servidor"
+  category: realtime
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [realtime] }
+  effort: { size: M, hours: [3, 8] }
+  why: "Las conexiones se caen; sin reconciliar, el usuario ve datos viejos sin saberlo."
+  how: "Reconexión con backoff, indicador de estado, re-fetch al reconectar."
+  verify:
+    - { type: grep, pattern: "reconnect|CHANNEL_ERROR|onDisconnect|connection(State|Status)|online|offline", glob: "**/*.{ts,tsx}" }
+
+- id: realtime-channel-auth
+  title: Autorización por canal
+  category: realtime
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [realtime] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Un canal sin autorización deja que cualquiera escuche datos de otros."
+  how: "Canales privados con política (Supabase Realtime Authorization / RLS) o auth del proveedor."
+  verify:
+    - { type: grep, pattern: "private:\\s*true|authEndpoint|realtime\\.messages|authorizer", glob: "**/*.{ts,tsx,sql}" }
+
+- id: realtime-presence
+  title: "Presencia y \"escribiendo…\""
+  category: realtime
+  level: optional
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [realtime] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Da sensación de colaboración en vivo."
+  how: "Presence del canal con lista de quién está viendo."
+  verify:
+    - { type: grep, pattern: "presence|track\\(|typing", glob: "**/*.{ts,tsx}" }
+
+# ── PWA y offline ──
+- id: pwa-basics
+  title: "PWA: manifest completo, íconos maskable, service worker y página offline"
+  category: pwa
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [pwa] }
+  effort: { size: M, hours: [3, 8] }
+  why: "Sin estas piezas el navegador no ofrece instalar y la app muestra el dinosaurio sin conexión."
+  how: "manifest con name, icons (incluye maskable), start_url, display; service worker (Serwist); fallback offline."
+  verify:
+    - { type: grep, pattern: "maskable", glob: "{app,src/app,public}/**/*.{ts,json,webmanifest}" }
+    - { type: grep, pattern: "serwist|workbox|serviceWorker\\.register|next-pwa", glob: "**/*.{ts,tsx,js,mjs,json}" }
+
+- id: pwa-install-prompt
+  title: Prompt de instalación propio en el momento adecuado
+  category: pwa
+  level: recommended
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: [pwa] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El prompt nativo aparece en mal momento; uno propio tras una acción de valor convierte más."
+  how: "Guardar beforeinstallprompt y mostrar el botón tras una acción de valor."
+  verify:
+    - { type: grep, pattern: "beforeinstallprompt", glob: "**/*.{ts,tsx}" }
+
+- id: offline-strategy
+  title: "Offline: caché por tipo de recurso, indicador sin conexión, cola de acciones y resolución de conflictos"
+  category: offline
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [offline] }
+  effort: { size: XL, hours: [16, 40] }
+  why: "Offline real exige decidir qué se guarda, qué pasa con las acciones y quién gana en un conflicto."
+  how: "Estrategia de caché documentada (network-first, stale-while-revalidate…), cola persistente que se sincroniza al volver, regla de conflictos escrita en un ADR."
+  verify:
+    - { type: grep, pattern: "navigator\\.onLine|online|offline", glob: "**/*.{ts,tsx}" }
+    - { type: grep, pattern: "conflict|conflicto", glob: "docs/decisions/*.md", flags: i }
+
+# ── Suscripciones ──
+- id: subscription-cancel-online
+  title: Cancelar en línea tan fácil como suscribirse
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Lo exigen la ley de renovación automática de California, la FTC y la UE; los pasos de retención forzados son ilegales en varios mercados."
+  how: "Botón Cancelar en la cuenta (Customer Portal de Stripe o propio), sin llamadas ni pasos forzados."
+  verify:
+    - { type: grep, pattern: "billingPortal|cancel_at_period_end|cancelSubscription|subscriptions\\.cancel", glob: "**/*.{ts,tsx,js}" }
+  references: ["https://leginfo.legislature.ca.gov/faces/codes_displayText.xhtml?lawCode=BPC&division=7.&title=&part=3.&chapter=1.&article=9."]
+
+- id: subscription-disclosure
+  title: "Antes de pagar: precio, periodicidad, renovación automática y cómo cancelar"
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Las leyes de renovación automática exigen estos datos claros antes del cobro."
+  how: "Texto junto al botón de pago con los cuatro datos."
+  verify:
+    - { type: grep, pattern: "renueva automáticamente|renews automatically|auto-renew|se renovará", glob: "**/*.{tsx,jsx,json,mdx}", flags: i }
+
+- id: subscription-reminders
+  title: Aviso antes de renovar planes anuales y antes de que termine una prueba
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Cobros sorpresa generan disputas (contracargos) y están regulados."
+  how: "Emails en invoice.upcoming y customer.subscription.trial_will_end."
+  verify:
+    - { type: grep, pattern: "invoice\\.upcoming|trial_will_end", glob: "**/*.{ts,js}" }
+
+- id: subscription-dunning
+  title: "Cobros fallidos: reintentos, email y periodo de gracia"
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Una tarjeta vencida no debe cortar el servicio sin aviso; recuperar el cobro es ingreso."
+  how: "Smart Retries del procesador, email en invoice.payment_failed y acceso durante el periodo de gracia."
+  verify:
+    - { type: grep, pattern: "invoice\\.payment_failed|past_due", glob: "**/*.{ts,js}" }
+
+- id: subscription-plan-changes
+  title: Upgrade y downgrade con prorrateo definido
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Sin regla de prorrateo, cada cambio de plan es una discusión con el usuario."
+  how: "proration_behavior explícito; downgrade al final del periodo."
+  verify:
+    - { type: grep, pattern: "proration_behavior|proration", glob: "**/*.{ts,js}" }
+
+- id: subscription-billing-portal
+  title: "Portal de facturación: historial, facturas y método de pago"
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El usuario se sirve solo; menos tickets de soporte."
+  how: "Customer Portal de Stripe enlazado desde la cuenta."
+  verify:
+    - { type: grep, pattern: "billingPortal", glob: "**/*.{ts,js}" }
+
+- id: subscription-webhook-sync
+  title: Estado de la suscripción sincronizado por webhooks
+  category: subscriptions
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [subscriptions] }
+  effort: { size: M, hours: [2, 5] }
+  why: "El estado real vive en el procesador; leerlo solo al pagar deja accesos activos tras cancelar."
+  how: "Manejar customer.subscription.created/updated/deleted y guardar estado y fin de periodo."
+  verify:
+    - { type: grep, pattern: "customer\\.subscription\\.(updated|deleted)", glob: "**/*.{ts,js}" }
+
+# ── IA ──
+- id: ai-spend-limits
+  title: "IA: límites de gasto por usuario y globales, rate limit y alertas de costo"
+  category: ai
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ai-features] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Un usuario o un bot pueden gastar miles de dólares de API en una noche."
+  how: "Cuota por usuario (tokens o solicitudes), límite global, rate limit y alerta de presupuesto en el proveedor."
+  verify:
+    - { type: grep, pattern: "ratelimit|rateLimit|quota|cuota|usage|maxTokens|max_tokens|maxOutputTokens", glob: "**/*.{ts,tsx}" }
+    - { type: manual, prompt: "Alertas y límite de gasto configurados en el proveedor de IA" }
+
+- id: ai-prompt-injection
+  title: "Protección contra prompt injection; sin acciones peligrosas sin confirmación humana"
+  category: ai
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ai-features] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Texto del usuario o de una página puede dar órdenes al modelo."
+  how: "Instrucciones en system separadas de los datos; herramientas con permisos mínimos; acciones que cambian datos con confirmación."
+  verify:
+    - { type: manual, prompt: "Datos del usuario separados de las instrucciones; acciones con efectos piden confirmación" }
+  references: ["https://genai.owasp.org/llm-top-10/"]
+
+- id: ai-disclosure
+  title: Aviso claro de interacción o contenido generado por IA
+  category: ai
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: [ai-features] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Obligatorio en la UE (AI Act, art. 50); buena práctica en todos los mercados."
+  how: "Etiqueta visible en chats y contenido generado."
+  verify:
+    - { type: grep, pattern: "generado (con|por) IA|AI-generated|generated by AI|asistente de IA|AI assistant", glob: "**/*.{tsx,jsx,json,mdx}", flags: i }
+  references: ["https://eur-lex.europa.eu/eli/reg/2024/1689/oj"]
+
+- id: ai-resilience
+  title: "Respaldo si la API falla o tarda (timeout, mensaje, reintento) y streaming en respuestas largas"
+  category: ai
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ai-features] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Las APIs de IA fallan y tardan; sin streaming, una respuesta de 20 s parece colgada."
+  how: "AbortSignal.timeout, mensaje claro con reintentar, streaming (streamText o stream: true)."
+  verify:
+    - { type: grep, pattern: "streamText|stream:\\s*true|toDataStreamResponse|toUIMessageStreamResponse|ReadableStream", glob: "**/*.{ts,tsx}" }
+    - { type: grep, pattern: "timeout|AbortSignal", glob: "**/*.{ts,tsx}" }
+
+- id: ai-moderation-privacy
+  title: "Moderación de entradas y salidas públicas; sin datos sensibles innecesarios al proveedor"
+  category: ai
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ai-features] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Lo que el modelo publica es responsabilidad del sitio; lo que se envía al proveedor puede retenerse."
+  how: "Moderación cuando el contenido es público; minimizar datos personales; revisar la retención del proveedor."
+  verify:
+    - { type: manual, prompt: "Moderación activa en contenido público y retención del proveedor revisada" }
+
+- id: ai-evals
+  title: Casos de prueba para evaluar calidad y registro sin datos personales
+  category: ai
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [ai-features] }
+  effort: { size: M, hours: [3, 8] }
+  why: "Sin casos de prueba, un cambio de prompt o de modelo rompe cosas sin que nadie lo note."
+  how: "Set de casos con resultado esperado; registro de prompts y respuestas sin datos personales."
+  verify:
+    - { type: file_exists, path: ["**/{evals,eval}/**/*", "**/*.eval.{ts,js}"] }
+
+# ── Video y audio ──
+- id: media-captions
+  title: Subtítulos en video y transcripción en audio
+  category: media
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { capabilities: [media] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Personas sordas, quien ve sin sonido y los buscadores dependen del texto."
+  how: "<track kind=\"captions\"> en cada video; transcripción enlazada en cada audio."
+  verify:
+    - { type: grep, pattern: "<track\\b|captions|subtitles|transcrip", glob: "**/*.{tsx,jsx,astro,html,mdx}", flags: i }
+  references: ["https://www.w3.org/TR/WCAG22/#captions-prerecorded"]
+
+- id: media-playback
+  title: "Sin autoplay con sonido; controles por teclado; miniatura, dimensiones y lazy load"
+  category: media
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: [media] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El sonido sorpresa espanta; sin dimensiones, el video mueve el layout."
+  how: "autoPlay solo con muted y pausa visible; controls; poster; width/height; preload=\"none\" bajo el pliegue."
+  verify:
+    - { type: grep, pattern: "<video\\b(?=[^>]*autoPlay)(?![^>]*muted)", glob: "**/*.{tsx,jsx,astro,html}", expect: absent }
+
+- id: media-streaming
+  title: Videos largos con streaming adaptativo o hosting especializado
+  category: media
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [media] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Servir un MP4 pesado directo consume ancho de banda y tarda en arrancar."
+  how: "Mux, Cloudflare Stream, YouTube/Vimeo o HLS; nunca archivos grandes en public/."
+  verify:
+    - { type: grep, pattern: "mux|hls|stream|vimeo|youtube", glob: "**/*.{tsx,jsx,ts,json}", flags: i }
+
+- id: media-audio-description
+  title: "Audiodescripción en videos informativos y capítulos en videos largos"
+  category: media
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  when: { capabilities: [media] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Quien no ve el video también recibe la información; los capítulos facilitan navegar."
+  how: "Pista de audiodescripción o descripción en la transcripción; capítulos con <track kind=\"chapters\">."
+  verify:
+    - { type: grep, pattern: "kind=[\"'](descriptions|chapters)[\"']", glob: "**/*.{tsx,jsx,astro,html}" }
+
+# ── CMS ──
+- id: cms-editing
+  title: "El cliente edita sin código: textos, imágenes, blog y SEO por página, con bloques del sistema de diseño"
+  category: cms
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [cms] }
+  effort: { size: L, hours: [8, 20] }
+  why: "Si cada cambio de texto pasa por el desarrollador, el CMS no sirve; HTML libre rompe el diseño."
+  how: "Esquemas con bloques predefinidos, campos SEO (title, description, og:image) y sin HTML libre."
+  verify:
+    - { type: grep, pattern: "sanity|contentful|payload|strapi|tina|keystatic|storyblok|builder\\.io", glob: "package.json", flags: i }
+    - { type: grep, pattern: "seo|metaTitle|meta_description|ogImage", glob: "**/{schemas,collections,sanity,payload,cms}/**/*.{ts,js}", flags: i }
+
+- id: cms-preview-roles
+  title: "Vista previa antes de publicar; roles editor y administrador"
+  category: cms
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [cms] }
+  effort: { size: M, hours: [3, 8] }
+  why: "Publicar sin ver es publicar errores; no todo editor debe poder borrar todo."
+  how: "Draft mode con vista previa; roles con permisos distintos."
+  verify:
+    - { type: grep, pattern: "draftMode|preview", glob: "**/*.{ts,tsx}" }
+
+- id: cms-images
+  title: "Imágenes subidas optimizadas automáticamente y con alt text obligatorio"
+  category: cms
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [cms] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El cliente sube fotos de 8 MB sin alt; el sistema debe evitar ambas cosas."
+  how: "Pipeline de imágenes del CMS o next/image; campo alt requerido en el esquema."
+  verify:
+    - { type: grep, pattern: "alt", glob: "**/{schemas,collections,sanity,payload,cms}/**/*.{ts,js}" }
+
+- id: cms-guide-adr
+  title: "Guía corta de uso para el cliente y ADR de la elección del CMS"
+  category: cms
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { capabilities: [cms] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Sin guía, el cliente no usa el CMS; sin ADR, nadie recuerda por qué se eligió."
+  how: "docs/guia-cms.md con capturas; ADR en docs/decisions/."
+  verify:
+    - { type: grep, pattern: "cms|sanity|payload|contentful|strapi|tina|keystatic|storyblok", glob: "docs/decisions/*.md", flags: i }
+    - { type: file_exists, path: ["docs/**/{guia,guide}*cms*.md", "docs/**/cms*.md"] }
+
+- id: cms-versioning
+  title: "Historial de versiones, publicación programada y contenido multilenguaje desde el CMS"
+  category: cms
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { capabilities: [cms] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Restaurar un error, programar lanzamientos y traducir sin desarrollador."
+  how: "Funciones del CMS activadas y documentadas en la guía."
+  verify:
+    - { type: manual, prompt: "Historial, programación y multilenguaje activados en el CMS" }
+
+# ── Migración de sitio anterior ──
+- id: migration-url-inventory
+  title: "Inventario de URLs actuales y mapa URL vieja → nueva (redirects.csv)"
+  category: migration
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  when: { capabilities: [site-migration] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Cada URL que ya posiciona es tráfico; si se pierde, el sitio nuevo arranca de cero."
+  how: "Inventario desde sitemap, rastreo y páginas con tráfico; redirects.csv versionado."
+  verify:
+    - { type: file_exists, path: ["redirects.csv", "docs/redirects.csv", "data/redirects.csv"] }
+
+- id: migration-301
+  title: "Redirección 301 específica por URL, verificada antes de lanzar"
+  category: migration
+  level: required
+  phase: launch.seo
+  since: "2026.10.2"
+  when: { capabilities: [site-migration] }
+  depends_on: [migration-url-inventory]
+  effort: { size: M, hours: [2, 5] }
+  why: "Mandar todo al inicio es un soft 404 para Google; cada URL debe ir a su equivalente."
+  how: "redirects() desde redirects.csv con permanent: true; prueba automática: cada URL vieja responde 301 hacia una página que existe."
+  verify:
+    - { type: grep, pattern: "redirects\\.csv", glob: "{next.config.{js,mjs,ts},vercel.json,scripts/**/*.{ts,js,mjs},tests/**/*.{ts,js}}" }
+
+- id: migration-preserve-seo
+  title: "Conservar títulos y descripciones que ya posicionan; migrar contenido e imágenes con alt"
+  category: migration
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { capabilities: [site-migration] }
+  effort: { size: M, hours: [3, 8], scales_with: pages }
+  why: "Cambiar el título de una página que ya rankea puede tirarla de posición."
+  how: "Copiar title y description de las páginas con tráfico; migrar imágenes con su alt."
+  verify:
+    - { type: manual, prompt: "Títulos, descripciones, contenido e imágenes con alt migrados de las páginas que posicionan" }
+
+- id: migration-monitoring
+  title: "Tras lanzar: reenviar sitemap y vigilar 404 durante 2–4 semanas"
+  category: migration
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { capabilities: [site-migration] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Los 404 inesperados aparecen en los días siguientes; atenderlos pronto conserva el tráfico."
+  how: "Sitemap reenviado en Search Console y revisión semanal del reporte de páginas."
+  verify:
+    - { type: manual, prompt: "Sitemap reenviado y monitoreo de 404 agendado por 4 semanas" }
+
+- id: migration-backup
+  title: "Respaldo completo del sitio anterior y comparación de tráfico antes y después"
+  category: migration
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.2"
+  when: { capabilities: [site-migration] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Si algo se pierde, se recupera; la comparación prueba que la migración no costó tráfico."
+  how: "Copia completa (archivos, DB, export del CMS) y línea base de analytics."
+  verify:
+    - { type: manual, prompt: "Respaldo completo del sitio anterior guardado y línea base de tráfico registrada" }

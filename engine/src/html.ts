@@ -31,7 +31,8 @@ function isNoindex(html: string): boolean {
 }
 
 function attr(tag: string, name: string): string | undefined {
-  return tag.match(new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, 'i'))?.[1]
+  const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`, 'i'))
+  return m ? (m[1] ?? m[2] ?? m[3]) : undefined
 }
 
 function tags(html: string, name: string): string[] {
@@ -82,6 +83,28 @@ const PAGE_RULES: Record<string, PageRule> = {
   img_dimensions: p => {
     const bad = tags(p.html, 'img').filter(t => !attr(t, 'width') || !attr(t, 'height'))
     return bad.length ? `${bad.length} <img> sin width/height` : undefined
+  },
+  landmarks: p => {
+    const missing = ['header', 'nav', 'main', 'footer'].filter(t => !new RegExp(`<${t}\\b|role=["']${{ header: 'banner', nav: 'navigation', main: 'main', footer: 'contentinfo' }[t]}["']`, 'i').test(p.html))
+    return missing.length ? `faltan landmarks: ${missing.join(', ')}` : undefined
+  },
+  input_labels: p => {
+    const labelled = new Set(tags(p.html, 'label').map(t => attr(t, 'for')).filter((x): x is string => Boolean(x)))
+    const bad = [...tags(p.html, 'input'), ...tags(p.html, 'select'), ...tags(p.html, 'textarea')].filter(t => {
+      if (/type=["'](hidden|submit|button|reset|image)["']/i.test(t)) return false
+      if (attr(t, 'aria-label') || attr(t, 'aria-labelledby') || attr(t, 'title')) return false
+      const id = attr(t, 'id')
+      return !(id && labelled.has(id))
+    })
+    return bad.length ? `${bad.length} campo(s) sin label` : undefined
+  },
+  iframe_title: p => {
+    const bad = tags(p.html, 'iframe').filter(t => !attr(t, 'title'))
+    return bad.length ? `${bad.length} <iframe> sin title` : undefined
+  },
+  skip_link: p => {
+    const first = p.html.match(/<body[^>]*>[\s\S]*?<(a|button|input|select|textarea)\b[^>]*>/i)?.[0] ?? ''
+    return /<a\b[^>]*href=["']#[\w-]+["'][^>]*>$/i.test(first.slice(first.lastIndexOf('<'))) ? undefined : 'el primer elemento enfocable no es un skip link (<a href="#main">)'
   },
   img_alt: p => {
     const bad = tags(p.html, 'img').filter(t => !/\salt\s*=/.test(t))

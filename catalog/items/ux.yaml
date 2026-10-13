@@ -1,0 +1,156 @@
+# Estados, feedback, motion y principios de UX/UI: 🔴 siempre.
+
+- id: data-view-states
+  title: "Cada vista con datos tiene 4 estados: cargando, vacío, error con reintento, con datos"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_db: true } }
+  effort: { size: M, hours: [2, 6], scales_with: entities }
+  why: "Una vista que solo contempla \"con datos\" se ve rota al cargar, al estar vacía o al fallar."
+  how: "loading.tsx o Suspense con skeleton, EmptyState con acción, error.tsx con botón de reintentar."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/loading.{tsx,jsx}", "{app,src/app}/**/error.{tsx,jsx}"] }
+    - { type: grep, pattern: "reset\\(\\)|Reintentar|Try again|retry", glob: "**/*.{tsx,jsx}" }
+
+- id: skeletons
+  title: Skeletons con la forma del contenido real
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un skeleton con la forma real reduce la espera percibida y evita saltos de layout; un spinner genérico no."
+  how: "Skeletons por patrón (tabla, card, lista, perfil) del sistema de diseño; nada de spinners en layouts."
+  verify:
+    - { type: grep, pattern: "Skeleton", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+
+- id: page-progress-bar
+  title: Barra de progreso en navegación entre páginas
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin señal, el usuario cree que el clic no funcionó y vuelve a hacer clic."
+  how: "Barra superior (nextjs-toploader, @bprogress o useLinkStatus) con el color de acento."
+  verify:
+    - { type: grep, pattern: "nextjs-toploader|@bprogress|nprogress|TopLoader|useLinkStatus|ProgressBar", glob: "**/*.{tsx,jsx,ts,json}" }
+
+- id: real-progress
+  title: Progreso real (%) en operaciones largas
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: { any: [uploads, media, ai-features] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "En uploads, exports o procesos largos, un porcentaje real evita que el usuario abandone."
+  how: "Barra con porcentaje de onUploadProgress o del proceso; tiempo restante si se conoce."
+  verify:
+    - { type: grep, pattern: "onUploadProgress|progress|Progress", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: pending-buttons
+  title: Botones con estado pendiente y bloqueo de doble envío
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin estado pendiente el usuario hace clic dos veces: pedidos y pagos duplicados."
+  how: "useFormStatus/isPending: el botón se deshabilita y muestra que está trabajando en < 100 ms."
+  verify:
+    - { type: grep, pattern: "useFormStatus|isPending|isSubmitting|pending\\b", glob: "**/*.{tsx,jsx}" }
+
+- id: optimistic-ui
+  title: UI optimista donde se pueda revertir, con rollback
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_db: true } }
+  effort: { size: M, hours: [2, 5] }
+  why: "Likes, toggles y ediciones se sienten instantáneos aunque el servidor tarde (ley de Doherty)."
+  how: "useOptimistic u onMutate; si falla, revertir y avisar con toast."
+  verify:
+    - { type: grep, pattern: "useOptimistic|onMutate|optimistic", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: toasts
+  title: Toasts para confirmar acciones y para errores
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Confirma que algo pasó (o falló) sin mover al usuario de donde está."
+  how: "Sonner (shadcn) con mensajes que dicen qué pasó."
+  verify:
+    - { type: grep, pattern: "sonner|toast\\(|useToast", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: live-dropzone
+  title: "Dropzone viva: reposo, arrastrando encima, subiendo, éxito o error por archivo"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: [uploads] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Sin cambio visual al arrastrar, el usuario no sabe si puede soltar; sin estado por archivo, no sabe qué falló."
+  how: "Componente Dropzone del sistema con los cinco estados y progreso por archivo."
+  verify:
+    - { type: grep, pattern: "Dropzone|useDropzone|onDragOver|isDragActive", glob: "**/*.{tsx,jsx}" }
+
+- id: inline-validation
+  title: Validación en línea al salir del campo
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Corregir al momento es más fácil que descubrir cinco errores al enviar."
+  how: "Validar en blur; tras el primer error, revalidar en cada tecla (ver form-validation-timing)."
+  verify:
+    - { type: grep, pattern: "mode:\\s*[\"']onTouched[\"']|mode:\\s*[\"']onBlur[\"']|onBlur=", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: motion-transitions
+  title: "Transiciones en aperturas, cierres, cambios de estado y entrada de listas (150–300 ms desde tokens)"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  depends_on: [a11y-reduced-motion]
+  effort: { size: S, hours: [1, 3] }
+  why: "El movimiento explica de dónde viene y a dónde va cada cosa; sin él, los cambios son bruscos."
+  how: "Modales, menús y acordeones con transición; duraciones y curvas desde tokens; reducidas con prefers-reduced-motion."
+  verify:
+    - { type: grep, pattern: "--duration|transitionDuration|duration-(fast|normal|slow|\\d+)", glob: "**/*.{css,scss,ts,js,tsx}" }
+
+- id: ux-laws
+  title: "Leyes de UX aplicadas (Doherty, Fitts, Hick, Miller, Jakob, Gestalt, Von Restorff, Tesler, Goal-gradient, Peak-end)"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 6] }
+  why: "Son la forma más barata de que la interfaz se sienta obvia: respuesta < 400 ms, objetivos ≥ 44 px, pocas opciones por decisión, un CTA principal por vista, patrones conocidos, progreso visible, finales cuidados."
+  how: "Revisar cada vista clave contra la lista antes de cerrar build.ux."
+  verify:
+    - { type: manual, prompt: "Vistas clave revisadas contra las leyes de UX (objetivos ≥ 44 px, un CTA principal, progreso visible, finales de flujo cuidados)" }
+  references: ["https://lawsofux.com/"]
+
+- id: ui-principles
+  title: "Principios de UI aplicados (jerarquía, retícula, escala, largo de línea, espacio en blanco, 60-30-10, Gestalt, affordances, consistencia, Nielsen)"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 6] }
+  why: "Se entiende qué leer primero, todo alinea, el acento marca acciones y lo clicable parece clicable."
+  how: "Revisar cada vista clave: retícula, largo de línea 60–80 caracteres, acento solo en acciones, deshacer/cancelar, prevención de errores."
+  verify:
+    - { type: manual, prompt: "Vistas clave revisadas contra los principios de UI y las heurísticas de Nielsen" }
+  references: ["https://www.nngroup.com/articles/ten-usability-heuristics/"]

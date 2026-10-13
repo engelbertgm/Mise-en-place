@@ -1,0 +1,88 @@
+# Contenido: 🔴 siempre.
+
+- id: no-placeholder-content
+  title: "Cero lorem ipsum, placeholders o TODO visibles"
+  category: content
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un lorem ipsum en producción destruye la confianza en segundos."
+  how: "Textos reales en todas las vistas; buscar antes de lanzar."
+  verify:
+    - { type: grep, pattern: "lorem ipsum|dolor sit amet|>\\s*(TODO|TBD|Texto aquí|Your text here)\\b", glob: "**/*.{tsx,jsx,astro,vue,svelte,html,md,mdx,json}", flags: i, exclude: "**/{node_modules,tests,e2e}/**", expect: absent }
+
+- id: final-copy
+  title: "Textos finales en todas las páginas, incluidas 404 y 500 (útiles, con salida)"
+  category: content
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: M, hours: [2, 6], scales_with: pages }
+  why: "El texto es la interfaz: lo que no está escrito para el usuario lo confunde."
+  how: "Cada página con su texto aprobado; 404 y 500 explican qué pasó y ofrecen a dónde ir."
+  verify:
+    - { type: manual, prompt: "Todas las páginas tienen texto final aprobado, incluidas 404 y 500" }
+
+- id: microcopy
+  title: "Microcopy: botones con verbo claro y errores que dicen qué pasó y cómo arreglarlo"
+  category: content
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "\"Guardar cambios\" se entiende; \"OK\" o \"Error\" no."
+  how: "Botones con verbo + objeto; errores con causa y solución; empty states con acción (\"Aún no tienes proyectos · Crear proyecto\")."
+  verify:
+    - { type: grep, pattern: ">\\s*(OK|Ok|Submit|Enviar|Aceptar|Error|Click here|Haz clic aquí)\\s*<", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}", expect: absent }
+
+- id: legal-last-updated
+  title: Legales con fecha de última actualización
+  category: content
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { signals: { has_personal_data: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario y la autoridad necesitan saber qué versión rige."
+  how: "\"Última actualización: fecha\" al inicio de privacidad, términos y cookies."
+  verify:
+    - { type: grep, pattern: "Última actualización|Last updated|Actualizado el|Effective date|Stand:", glob: "**/{privacidad,privacy,terminos,terms,cookies,aviso-de-privacidad,datenschutz}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+
+- id: copy-in-translation-files
+  title: Textos fuera del código, en archivos de traducción (aunque haya un solo idioma)
+  category: content
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { not: { type: { any: [landing, portfolio] } } }
+  effort: { size: M, hours: [2, 6], scales_with: pages }
+  why: "Cambiar un texto no debe requerir buscar en componentes; agregar un idioma después no debe ser una reescritura."
+  how: "messages/<idioma>.json con next-intl (o equivalente); componentes con t('clave')."
+  verify:
+    - { type: file_exists, path: ["{messages,locales,src/messages,src/locales,i18n,src/i18n}/**/*.json"] }
+
+- id: voice-and-tone
+  title: Guía de voz y tono
+  category: content
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Mantiene el mismo tono en la web, emails y mensajes de error."
+  how: "docs/voz-y-tono.md: tú/usted, formalidad, palabras sí y no, ejemplos."
+  verify:
+    - { type: file_exists, path: ["docs/**/{voz,voice,tono,tone}*.md"] }
+
+- id: about-faq
+  title: Página Nosotros y FAQ
+  category: content
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  when: { type: { any: [corporate, local-business, ecommerce, saas, marketplace, booking] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Responden las dudas que frenan una compra o un registro."
+  how: "/nosotros y /faq (o secciones equivalentes) con FAQPage en JSON-LD."
+  verify:
+    - { type: route_exists, path: /faq }

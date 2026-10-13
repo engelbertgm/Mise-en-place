@@ -1,0 +1,141 @@
+# Unión Europea (EU y EU:<país>). Checklist orientativo, no sustituye asesoría legal.
+
+- id: eu-language
+  title: "Legales y checkout en el idioma de cada país; EUR (o moneda local) y fechas dd/mm/aaaa"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [EU] } }
+  effort: { size: L, hours: [6, 16], scales_with: languages }
+  why: "La protección al consumidor exige que la información precontractual y los términos se entiendan; en la práctica, en el idioma del país."
+  how: "Un locale por país elegido; al menos legales, checkout y emails transaccionales traducidos profesionalmente."
+  verify:
+    - { type: manual, prompt: "Legales, checkout y emails transaccionales disponibles en el idioma de cada país elegido" }
+
+- id: eu-gdpr
+  title: "GDPR: base legal por finalidad, información completa, derechos, encargados con contrato y registro de actividades"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: L, hours: [4, 12] }
+  why: "El GDPR aplica a cualquier sitio que ofrezca bienes o servicios a personas en la UE; las multas llegan al 4% de la facturación."
+  how: "Política con responsable, finalidades y bases legales (art. 13), plazos, derechos y autoridad de control; contratos de encargo (DPA) con cada proveedor; registro de actividades; transferencias fuera de la UE con garantías (SCC o marco UE-EE. UU.)."
+  verify:
+    - { type: grep, pattern: "GDPR|RGPD|DSGVO|base (legal|jurídica)|legal basis|Rechtsgrundlage", glob: "**/{privacy,privacidad,datenschutz,confidentialite}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+    - { type: manual, prompt: "DPA firmado con cada encargado (hosting, DB, email, analítica, pagos)" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj"]
+
+- id: eu-representative
+  title: "Representante en la UE si la empresa no está establecida en la UE"
+  category: legal
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El art. 27 del GDPR exige un representante en la UE a responsables de fuera que ofrecen servicios a personas en la UE (con excepciones para tratamientos ocasionales de bajo riesgo)."
+  how: "Designar representante y publicarlo en la política de privacidad, o documentar por qué no aplica."
+  verify:
+    - { type: manual, prompt: "Representante en la UE designado y publicado, o excepción documentada" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj#d1e3265-1-1"]
+
+- id: eu-withdrawal-right
+  title: "Derecho de desistimiento de 14 días y formulario modelo"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: [payments] }, { audience: [b2c] } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "La Directiva de derechos de los consumidores da 14 días para desistir de compras a distancia; si no se informa, el plazo se extiende hasta 12 meses."
+  how: "Información del derecho y sus excepciones antes de comprar, formulario modelo de desistimiento y, en contenido digital o servicios, el consentimiento expreso para empezar antes del plazo."
+  verify:
+    - { type: grep, pattern: "desistimiento|withdrawal|Widerruf|rétractation", glob: "**/*.{tsx,jsx,mdx,md,astro,json}", flags: i }
+  references: ["https://eur-lex.europa.eu/eli/dir/2011/83/oj"]
+
+- id: eu-order-button
+  title: "Botón de compra que dice que la orden obliga a pagar"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: [payments] }, { audience: [b2c] } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "La directiva exige que el botón final indique claramente la obligación de pago (\"Pedido con obligación de pago\" / \"zahlungspflichtig bestellen\"); si no, el contrato no obliga al consumidor."
+  how: "Texto del botón final: \"Comprar ahora\", \"Pagar ahora\" o \"Pedido con obligación de pago\"."
+  verify:
+    - { type: grep, pattern: "Comprar ahora|Pagar ahora|obligación de pago|zahlungspflichtig|Buy now|Pay now|Commande avec obligation de paiement", glob: "**/*.{tsx,jsx,json}", flags: i }
+  references: ["https://eur-lex.europa.eu/eli/dir/2011/83/oj"]
+
+- id: eu-sca
+  title: "Pagos con autenticación reforzada (SCA / 3-D Secure)"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: [payments] } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "PSD2 exige SCA en pagos con tarjeta en la UE; sin 3DS los bancos rechazan el cargo."
+  how: "Checkout o Payment Element del procesador (manejan 3DS); en suscripciones, SetupIntent para cobros recurrentes."
+  verify:
+    - { type: grep, pattern: "checkout\\.sessions\\.create|PaymentElement|EmbeddedCheckout|setupIntents|confirmPayment", glob: "**/*.{ts,tsx}" }
+  references: ["https://eur-lex.europa.eu/eli/dir/2015/2366/oj"]
+
+- id: eu-vat
+  title: "IVA del país del consumidor (régimen OSS) y precios con IVA incluido"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: [payments] } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "En ventas B2C de servicios digitales y a distancia se cobra el IVA del país del cliente; los precios al consumidor se muestran con IVA."
+  how: "Stripe Tax (o cálculo propio) con el país del cliente; registro en OSS; precios finales con IVA."
+  verify:
+    - { type: grep, pattern: "automatic_tax|tax_behavior|VAT|IVA|MwSt|TVA", glob: "**/*.{ts,tsx,json}" }
+  references: ["https://vat-one-stop-shop.ec.europa.eu/index_en"]
+
+- id: eu-price-reductions
+  title: "Descuentos con el precio más bajo de los 30 días previos"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { type: { any: [ecommerce, marketplace] } } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "La Directiva Ómnibus exige que todo anuncio de rebaja muestre el precio más bajo aplicado en los 30 días anteriores."
+  how: "Guardar historial de precios y mostrar el precio previo de referencia en cada descuento."
+  verify:
+    - { type: grep, pattern: "price_history|lowest_price|precio_anterior|lowest30|priceHistory", glob: "**/*.{ts,tsx,sql}" }
+  references: ["https://eur-lex.europa.eu/eli/dir/2019/2161/oj"]
+
+- id: eu-dsa
+  title: "DSA: punto de contacto, notificación y acción, y motivación de decisiones de moderación"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: [ugc] } ] }
+  effort: { size: M, hours: [3, 8] }
+  why: "La Ley de Servicios Digitales obliga a plataformas con contenido de usuarios a tener mecanismos de denuncia y a explicar cada decisión de moderación."
+  how: "Punto de contacto único publicado; formulario de denuncia; aviso con motivos al usuario afectado; términos con las reglas de moderación."
+  verify:
+    - { type: grep, pattern: "DSA|Digital Services Act|Ley de Servicios Digitales|statement of reasons|motivos", glob: "**/*.{tsx,jsx,mdx,md,ts}", flags: i }
+  references: ["https://eur-lex.europa.eu/eli/reg/2022/2065/oj"]
+
+- id: eu-de-impressum
+  title: "Impressum (Alemania)"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: ["EU:DE"] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El § 5 de la DDG exige a los servicios digitales comerciales un aviso legal accesible en todo momento; la falta se multa y se reclama entre competidores."
+  how: "Página /impressum enlazada en cada página: nombre o razón social, dirección, contacto rápido (email y teléfono), registro mercantil y número de IVA si existen."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/impressum/page.{tsx,mdx,jsx}", "src/pages/impressum.{astro,md,mdx}"] }
+  references: ["https://www.gesetze-im-internet.de/ddg/__5.html"]

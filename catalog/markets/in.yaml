@@ -1,0 +1,55 @@
+# India. Checklist orientativo, no sustituye asesoría legal.
+
+- id: in-language
+  title: "Contenido en en-IN; INR con formato lakh/crore"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [IN] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "En India los números se agrupan en lakh y crore (12,34,567) y el usuario espera rupias."
+  how: "Locale en-IN; Intl.NumberFormat('en-IN') para números y moneda."
+  verify:
+    - { type: grep, pattern: "en-IN", glob: "**/*.{ts,tsx,json}" }
+
+- id: in-hindi
+  title: "Versión en hindi"
+  category: i18n
+  level: recommended
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [IN] } }
+  effort: { size: L, hours: [8, 20], scales_with: pages }
+  why: "Amplía el alcance a cientos de millones de personas que prefieren hindi."
+  how: "Locale hi con traducción profesional."
+  verify:
+    - { type: grep, pattern: "[\"']hi(-IN)?[\"']", glob: "**/*.{ts,tsx,json}" }
+
+- id: in-dpdp
+  title: "DPDP Act: aviso de consentimiento explícito, retiro tan fácil como darlo y derechos del titular"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [IN] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "La Digital Personal Data Protection Act 2023 exige un aviso claro antes del consentimiento, consentimiento libre y específico, y retirarlo con la misma facilidad."
+  how: "Aviso con datos y finalidades antes de recabar; consentimiento explícito; mecanismo de retiro; datos de contacto para ejercer derechos."
+  verify:
+    - { type: grep, pattern: "DPDP|Digital Personal Data Protection", glob: "**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+  references: ["https://www.meity.gov.in/data-protection-framework"]
+
+- id: in-grievance-officer
+  title: "Oficial de quejas con nombre y contacto publicados"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [IN] } }, { any: [ { capabilities: [payments] }, { signals: { has_personal_data: true } } ] } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Las reglas de TI y de comercio electrónico de India exigen un oficial de quejas con datos publicados y plazos de respuesta."
+  how: "Nombre, cargo y contacto del grievance officer en el sitio; acuse en 48 h y resolución en el plazo que fije la norma."
+  verify:
+    - { type: grep, pattern: "Grievance Officer|grievance officer", glob: "**/*.{tsx,jsx,mdx,md,astro,json}" }
+  references: ["https://consumeraffairs.nic.in/acts-and-rules/consumer-protection"]

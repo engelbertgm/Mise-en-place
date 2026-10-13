@@ -8016,7 +8016,8 @@ function isNoindex(html) {
   return /<meta[^>]+name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html);
 }
 function attr(tag, name) {
-  return tag.match(new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, "i"))?.[1];
+  const m = tag.match(new RegExp(`\\s${name}\\s*=\\s*(?:"([^"]*)"|'([^']*)'|([^\\s>"']+))`, "i"));
+  return m ? m[1] ?? m[2] ?? m[3] : void 0;
 }
 function tags(html, name) {
   return [...html.matchAll(new RegExp(`<${name}\\b[^>]*>`, "gi"))].map((m) => m[0]);
@@ -8060,6 +8061,28 @@ var PAGE_RULES = {
   img_dimensions: (p) => {
     const bad = tags(p.html, "img").filter((t) => !attr(t, "width") || !attr(t, "height"));
     return bad.length ? `${bad.length} <img> sin width/height` : void 0;
+  },
+  landmarks: (p) => {
+    const missing = ["header", "nav", "main", "footer"].filter((t) => !new RegExp(`<${t}\\b|role=["']${{ header: "banner", nav: "navigation", main: "main", footer: "contentinfo" }[t]}["']`, "i").test(p.html));
+    return missing.length ? `faltan landmarks: ${missing.join(", ")}` : void 0;
+  },
+  input_labels: (p) => {
+    const labelled = new Set(tags(p.html, "label").map((t) => attr(t, "for")).filter((x) => Boolean(x)));
+    const bad = [...tags(p.html, "input"), ...tags(p.html, "select"), ...tags(p.html, "textarea")].filter((t) => {
+      if (/type=["'](hidden|submit|button|reset|image)["']/i.test(t)) return false;
+      if (attr(t, "aria-label") || attr(t, "aria-labelledby") || attr(t, "title")) return false;
+      const id = attr(t, "id");
+      return !(id && labelled.has(id));
+    });
+    return bad.length ? `${bad.length} campo(s) sin label` : void 0;
+  },
+  iframe_title: (p) => {
+    const bad = tags(p.html, "iframe").filter((t) => !attr(t, "title"));
+    return bad.length ? `${bad.length} <iframe> sin title` : void 0;
+  },
+  skip_link: (p) => {
+    const first = p.html.match(/<body[^>]*>[\s\S]*?<(a|button|input|select|textarea)\b[^>]*>/i)?.[0] ?? "";
+    return /<a\b[^>]*href=["']#[\w-]+["'][^>]*>$/i.test(first.slice(first.lastIndexOf("<"))) ? void 0 : 'el primer elemento enfocable no es un skip link (<a href="#main">)';
   },
   img_alt: (p) => {
     const bad = tags(p.html, "img").filter((t) => !/\salt\s*=/.test(t));

@@ -1,0 +1,360 @@
+# Calidad de código (🔴 siempre, mantra del proyecto), calidad y despliegue, ADR, Git, analytics, costos y entrega.
+
+- id: code-principles
+  title: "Mantra: simple primero, reutilizar antes de crear, una responsabilidad, nombres que explican, consistencia, boy scout"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El código claro y reutilizado es más barato de mantener y más difícil de romper."
+  how: "Bloque del mantra en CLAUDE.md (lo agrega /mep:scope); al tercer uso de un patrón, se extrae."
+  verify:
+    - { type: grep, pattern: "Mantra de código", glob: CLAUDE.md }
+
+- id: code-structure
+  title: "Carpetas por feature o dominio con convención documentada; UI solo del sistema; un patrón de errores"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Saber dónde va cada cosa evita duplicados y discusiones."
+  how: "Convención en el README y en CODEMAP.md; utilidades, tipos y constantes compartidos en un solo lugar; lógica de negocio fuera de los componentes."
+  verify:
+    - { type: grep, pattern: "^#+\\s*(Estructura|Structure|Convenciones|Conventions)", glob: README.md, flags: i }
+
+- id: formatter
+  title: Formato automático (Prettier o equivalente) sin diferencias
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Nadie discute formato en los PR; los diffs muestran solo cambios reales."
+  how: "Prettier (o Biome) con check en CI."
+  verify:
+    - { type: file_exists, path: [".prettierrc", ".prettierrc.json", ".prettierrc.js", ".prettierrc.mjs", "prettier.config.js", "prettier.config.mjs", "biome.json", "biome.jsonc"] }
+
+- id: strict-lint
+  title: "Lint estricto con 0 errores; complejidad ≤ 10, archivos ≤ 300 líneas, funciones ≤ 50 líneas"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "Los umbrales mantienen el código legible; el lint atrapa errores antes de producción."
+  how: "ESLint (o Biome) con reglas complexity, max-lines y max-lines-per-function; umbrales configurables en el perfil (bajarlos requiere /mep:override)."
+  verify:
+    - { type: grep, pattern: "complexity", glob: "{eslint.config.{js,mjs,ts},.eslintrc*,biome.json,biome.jsonc}" }
+    - { type: grep, pattern: "max-lines", glob: "{eslint.config.{js,mjs,ts},.eslintrc*,biome.json,biome.jsonc}" }
+    - { type: command, run: "pnpm -s lint", timeout: 300 }
+
+- id: strict-types
+  title: "TypeScript strict y 0 any explícitos"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los tipos estrictos atrapan una clase entera de errores sin escribir tests."
+  how: "\"strict\": true en tsconfig; regla no-explicit-any."
+  verify:
+    - { type: json_key, file: tsconfig.json, key: compilerOptions.strict, value: true }
+    - { type: grep, pattern: ":\\s*any\\b|<any>|as any\\b", glob: "{app,src,components,lib,hooks,services,utils}/**/*.{ts,tsx}", exclude: "**/*.d.ts", expect: absent }
+
+- id: no-duplication-dead-code
+  title: "Código duplicado ≤ 3% y 0 exports sin uso"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "El duplicado se desincroniza; el código muerto confunde y pesa."
+  how: "jscpd con umbral 3% y knip en CI."
+  verify:
+    - { type: grep, pattern: "\"jscpd\"|\"knip\"", glob: package.json }
+
+- id: no-debug-leftovers
+  title: "Sin console.log, código comentado ni TODO sin referencia (shortcut: de Ponytail permitido)"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los restos de depuración ensucian la consola de producción y esconden trabajo pendiente."
+  how: "Regla no-console; cada TODO con referencia (#123, ABC-12 o URL); los comentarios shortcut: los recolecta Ponytail."
+  verify:
+    - { type: grep, pattern: "console\\.log\\(", glob: "{app,src,components,lib,hooks,services,utils}/**/*.{ts,tsx,js,jsx}", expect: absent }
+    - { type: grep, pattern: "\\b(TODO|FIXME|XXX)\\b(?!\\s*[(:]?\\s*(#\\d+|[A-Z][A-Z0-9]+-\\d+|https?://))", glob: "{app,src,components,lib,hooks,services,utils}/**/*.{ts,tsx,js,jsx}", expect: absent }
+
+- id: code-maps
+  title: "CODEMAP.md y REGISTRY.md existen y están al día"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "Claude (y cualquiera) encuentra las cosas en un paso y reutiliza en lugar de duplicar."
+  how: "mep codemap y mep registry; \"Para qué\" y \"No usar para\" en el comentario /** */ de cada export. Un export nuevo sin entrada bloquea."
+  verify:
+    - { type: maps, rule: codemap }
+    - { type: maps, rule: registry }
+
+- id: unit-tests
+  title: Lógica de negocio con tests unitarios
+  category: quality
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  effort: { size: M, hours: [3, 8], scales_with: entities }
+  why: "Cálculos, permisos y validaciones son donde un error cuesta dinero."
+  how: "Vitest (o el runner del stack) con tests de precios, permisos y validaciones; corre en CI."
+  verify:
+    - { type: file_exists, path: ["**/*.{test,spec}.{ts,tsx,js}"] }
+    - { type: command, run: "pnpm -s test", timeout: 600 }
+
+- id: test-coverage
+  title: Cobertura mínima en lógica de negocio (ej. 70%)
+  category: quality
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un piso de cobertura evita que la lógica crítica quede sin probar."
+  how: "Umbral de cobertura en la config de tests, solo sobre lógica de negocio."
+  verify:
+    - { type: grep, pattern: "thresholds|coverageThreshold", glob: "{vitest.config.{ts,mts,js},jest.config.{ts,js},package.json}" }
+
+- id: quality-review
+  title: Revisión de calidad antes de cerrar cada sub-etapa
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "Detecta duplicados, nombres confusos y oportunidades de reutilizar antes de que se acumulen."
+  how: "/ponytail-review al cerrar (sus \"must fix\" bloquean); sin Ponytail, la revisión propia de /mep:phase close."
+  verify:
+    - { type: manual, prompt: "Revisión de calidad hecha al cerrar la última sub-etapa" }
+
+- id: build-lint-typecheck
+  title: Build, lint y type-check pasan
+  category: deploy
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Si no compila, no se despliega; el CI lo comprueba en cada PR."
+  how: "Scripts build, lint y typecheck en package.json (typecheck: tsc --noEmit), corridos en CI."
+  verify:
+    - { type: json_key, file: package.json, key: scripts.build }
+    - { type: json_key, file: package.json, key: scripts.typecheck }
+    - { type: command, run: "pnpm -s typecheck", timeout: 300 }
+
+- id: separate-environments
+  title: "Entornos separados (producción / preview) con variables distintas"
+  category: deploy
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Probar en preview no debe tocar datos ni cobros reales."
+  how: "Variables por entorno en el hosting; base de datos y llaves de pago de prueba en preview."
+  verify:
+    - { type: manual, prompt: "Preview y producción usan bases de datos y llaves distintas" }
+
+- id: error-monitoring
+  title: Monitoreo de errores en producción
+  category: deploy
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin monitoreo, los errores los reporta el cliente (si es que los reporta)."
+  how: "Sentry (o equivalente) con source maps y alertas."
+  verify:
+    - { type: grep, pattern: "@sentry/|@highlight-run|@bugsnag|posthog.*captureException|@vercel/otel|@logtail", glob: "{package.json,**/*.{ts,tsx}}" }
+
+- id: migrations-backups
+  title: "Migraciones versionadas y backups con restauración probada"
+  category: deploy
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { signals: { has_db: true } }
+  effort: { size: M, hours: [2, 5] }
+  why: "Un backup que nunca se restauró es una esperanza, no un backup."
+  how: "Migraciones en el repo; backups automáticos (PITR si aplica) y una restauración de prueba documentada."
+  verify:
+    - { type: file_exists, path: ["{supabase/migrations,migrations,prisma/migrations,drizzle}/**/*"] }
+    - { type: manual, prompt: "Restauración de un backup probada y documentada" }
+
+- id: e2e-tests
+  title: Tests end-to-end en flujos críticos (login, checkout)
+  category: deploy
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: M, hours: [4, 10] }
+  why: "Prueban lo que el usuario realmente hace, en el navegador."
+  how: "Playwright en los flujos de registro, login y compra, en CI."
+  verify:
+    - { type: grep, pattern: "@playwright/test|cypress", glob: package.json }
+
+- id: ops-runbook
+  title: "Uptime monitoring, rollback documentado y navegadores soportados"
+  category: deploy
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 3] }
+  why: "Saber que el sitio cayó antes que el cliente, y cómo volver atrás."
+  how: "Monitor de uptime; sección de rollback y navegadores soportados (browserslist) en el README."
+  verify:
+    - { type: grep, pattern: "rollback|Rollback|revertir", glob: "{README.md,docs/**/*.md}" }
+
+- id: adr-log
+  title: "Registro de decisiones (ADR) en docs/decisions/"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Dentro de seis meses nadie recuerda por qué se eligió algo; el ADR sí."
+  how: "Un archivo por decisión (contexto, decisión, alternativas, consecuencias); las de stack las genera mep; cambiar una decisión = ADR nuevo que reemplaza."
+  verify:
+    - { type: file_exists, path: "docs/decisions/*.md" }
+
+- id: git-protected-main
+  title: "main protegida: sin push directo, PR con checks obligatorios (build, lint, tests, mep verify)"
+  category: git
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.2"
+  level_overrides:
+    - { when: { any: [ { context: client-project }, { signals: { team: team } } ] }, level: required }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Es la barrera real: el deploy a producción ocurre al hacer merge."
+  how: "Branch protection en GitHub con los checks del CI (incluido mep) como obligatorios."
+  verify:
+    - { type: file_exists, path: ".github/workflows/*.{yml,yaml}" }
+    - { type: manual, prompt: "main protegida con los checks obligatorios en GitHub" }
+
+- id: git-conventional-commits
+  title: Commits con formato consistente (Conventional Commits)
+  category: git
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.2"
+  level_overrides:
+    - { when: { any: [ { context: client-project }, { signals: { team: team } } ] }, level: required }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Historial legible y changelogs automáticos."
+  how: "commitlint con @commitlint/config-conventional en el hook commit-msg."
+  verify:
+    - { type: file_exists, path: ["commitlint.config.{js,mjs,ts,cjs}", ".commitlintrc", ".commitlintrc.json", ".commitlintrc.yml"] }
+
+- id: git-pr-template
+  title: Plantilla de PR que referencia los ítems del brief afectados
+  category: git
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.2"
+  level_overrides:
+    - { when: { any: [ { context: client-project }, { signals: { team: team } } ] }, level: required }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Cada PR dice qué requisitos toca: la revisión sabe qué comprobar."
+  how: ".github/pull_request_template.md con sección \"Ítems del brief\"."
+  verify:
+    - { type: grep, pattern: "BRIEF|brief|mep", glob: ".github/{pull_request_template.md,PULL_REQUEST_TEMPLATE.md,PULL_REQUEST_TEMPLATE/*.md}" }
+
+- id: git-tags-codeowners
+  title: Tags de versión y CODEOWNERS
+  category: git
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Saber qué versión está en producción y quién revisa cada parte."
+  how: "Tag por release; .github/CODEOWNERS."
+  verify:
+    - { type: file_exists, path: [".github/CODEOWNERS", "CODEOWNERS"] }
+
+- id: analytics-event-plan
+  title: Plan de eventos definido antes de lanzar (registro, activación, compra, cancelación)
+  category: analytics
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  level_overrides:
+    - { when: { any: [ { capabilities: { any: [analytics, payments] } }, { type: saas } ] }, level: required }
+  effort: { size: S, hours: [1, 3] }
+  why: "Sin eventos definidos, después de lanzar no se sabe qué funciona; y respeta la sección de cookies."
+  how: "docs/analytics.md con eventos, propiedades y dónde se disparan; implementación con consentimiento."
+  verify:
+    - { type: file_exists, path: ["docs/**/{analytics,eventos,events,tracking}*.md"] }
+
+- id: analytics-funnel
+  title: Embudo de conversión y panel con métricas clave
+  category: analytics
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { capabilities: [analytics] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Muestra dónde se cae la gente."
+  how: "Embudo y dashboard en la herramienta de analítica."
+  verify:
+    - { type: manual, prompt: "Embudo y panel de métricas clave configurados" }
+
+- id: cost-control
+  title: "Alertas de presupuesto y límites duros de gasto en hosting, DB, APIs pagadas y email"
+  category: costs
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: S, hours: [1, 2] }
+  why: "Un pico de tráfico o un bucle puede generar una factura de miles; mejor enterarse por una alerta."
+  how: "Spend management en Vercel, límites en Supabase y en APIs pagadas, alertas por email; costos recurrentes en el brief."
+  verify:
+    - { type: manual, prompt: "Alertas y límites de gasto configurados en cada servicio pagado" }
+
+- id: cost-review
+  title: Revisión mensual de costos
+  category: costs
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los costos crecen en silencio."
+  how: "Recordatorio mensual para revisar facturas contra lo estimado."
+  verify:
+    - { type: manual, prompt: "Revisión mensual de costos agendada" }
+
+- id: client-handover
+  title: "Entrega: dominio y cuentas a nombre del cliente, credenciales transferidas de forma segura, README de operación"
+  category: handover
+  level: required
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { context: client-project }
+  effort: { size: M, hours: [2, 5] }
+  why: "Si el dominio o el hosting están a tu nombre, el cliente no es dueño de su proyecto."
+  how: "Dominio, hosting, DB y pagos en cuentas del cliente; credenciales por gestor de contraseñas compartido, nunca por email; README con cómo operar, desplegar y a quién llamar."
+  verify:
+    - { type: grep, pattern: "^#+\\s*(Operaci[oó]n|Operations|Runbook)", glob: README.md, flags: i }
+    - { type: manual, prompt: "Dominio y cuentas a nombre del cliente; credenciales transferidas por canal seguro" }
+
+- id: client-manual
+  title: "Manual de uso para el cliente y acceso a analytics"
+  category: handover
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.2"
+  when: { context: client-project }
+  effort: { size: S, hours: [2, 4] }
+  why: "Menos llamadas de soporte y un cliente que ve el valor."
+  how: "docs/manual.md con las tareas comunes; invitación del cliente a la herramienta de analítica."
+  verify:
+    - { type: file_exists, path: ["docs/**/manual*.md", "docs/**/guia*.md"] }

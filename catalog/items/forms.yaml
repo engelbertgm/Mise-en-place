@@ -1,0 +1,120 @@
+# Formularios: 🔴 si hay cualquier formulario.
+
+- id: form-floating-label
+  title: "El label nunca desaparece (label flotante); nunca el placeholder como único label"
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Si el label desaparece al escribir, el usuario olvida qué campo está llenando."
+  how: "Label dentro del campo en reposo; al enfocar o tener valor se reduce y sube con transición. Componente del sistema."
+  verify:
+    - { type: grep, pattern: "<(input|Input|textarea|Textarea)\\b(?=[^>]*placeholder=)(?![^>]*(aria-label|id=))[^>]*>", glob: "**/*.{tsx,jsx,astro}", expect: absent }
+    - { type: manual, prompt: "Los campos usan el componente de label flotante del sistema" }
+
+- id: form-input-types
+  title: "Tipo de input e inputmode correctos"
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El teclado móvil correcto (numérico, email, teléfono) evita errores y frustración."
+  how: "type email, tel, url, number, date; inputMode=\"numeric\" en códigos."
+  verify:
+    - { type: grep, pattern: "type=[\"'](email|tel|url|number|date)[\"']|inputMode=", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+
+- id: form-autocomplete
+  title: Atributos autocomplete correctos
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Autocompletar y gestores de contraseñas ahorran tiempo y errores; sin autocomplete no funcionan."
+  how: "autoComplete email, given-name, family-name, tel, new-password, current-password, one-time-code."
+  verify:
+    - { type: grep, pattern: "autoComplete=|autocomplete=", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+
+- id: form-validation-timing
+  title: "Validación sin regaños prematuros"
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Marcar error mientras alguien escribe por primera vez se siente como regaño."
+  how: "No marcar al escribir por primera vez; validar en blur; ya con error, revalidar en cada tecla; al enviar, validar todo y llevar el foco al primer error."
+  verify:
+    - { type: grep, pattern: "mode:\\s*[\"']onTouched[\"']|reValidateMode:\\s*[\"']onChange[\"']|shouldFocusError|setFocus\\(", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: form-keep-input
+  title: Nunca borrar lo escrito si hay un error
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Volver a escribir todo por un error es la forma más rápida de perder al usuario."
+  how: "En errores del servidor, devolver los valores y mantenerlos en los campos (useActionState con defaultValue)."
+  verify:
+    - { type: manual, prompt: "Ningún error de envío borra lo escrito" }
+
+- id: form-required-marks
+  title: Campos obligatorios u opcionales marcados (se marca la minoría)
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario sabe qué puede saltarse sin enviar y fallar."
+  how: "Si casi todo es obligatorio, marcar \"(opcional)\"; si no, marcar los obligatorios."
+  verify:
+    - { type: grep, pattern: "opcional|optional|required|aria-required", glob: "**/*.{tsx,jsx,astro,vue,svelte,json}", flags: i }
+
+- id: form-password-ux
+  title: Contraseña con mostrar/ocultar; pegar siempre permitido
+  category: forms
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Mostrar evita errores; bloquear pegar impide usar gestores de contraseñas."
+  how: "Botón de mostrar/ocultar accesible; nunca onPaste con preventDefault."
+  verify:
+    - { type: grep, pattern: "onPaste=\\{[^}]*preventDefault", glob: "**/*.{tsx,jsx}", expect: absent }
+    - { type: grep, pattern: "showPassword|togglePassword|type=\\{[^}]*\\?\\s*[\"']text[\"']\\s*:\\s*[\"']password", glob: "**/*.{tsx,jsx}" }
+
+- id: form-character-counter
+  title: Contador de caracteres en campos con límite
+  category: forms
+  level: recommended
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario ve cuánto le queda antes de chocar con el límite."
+  how: "Contador \"120/280\" junto al campo con maxLength."
+  verify:
+    - { type: grep, pattern: "maxLength", glob: "**/*.{tsx,jsx}" }
+
+- id: form-input-masks
+  title: Máscaras de formato que no bloquean la escritura
+  category: forms
+  level: recommended
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Formatear teléfono o tarjeta ayuda, pero bloquear teclas frustra."
+  how: "Formatear al salir del campo o mientras se escribe sin impedir pegar ni borrar."
+  verify:
+    - { type: manual, prompt: "Las máscaras no impiden pegar, borrar ni escribir libremente" }

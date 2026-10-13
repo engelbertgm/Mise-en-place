@@ -1,0 +1,58 @@
+# México. Checklist orientativo, no sustituye asesoría legal.
+
+- id: mx-language
+  title: "Contenido en es-MX; MXN y fechas dd/mm/aaaa"
+  category: i18n
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { markets: { any: [MX] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El usuario mexicano espera su variante del español, pesos y fechas en su formato."
+  how: "Locale es-MX en la config de idiomas y en <html lang>; Intl con es-MX."
+  verify:
+    - { type: grep, pattern: "es-MX|[\"']es[\"']", glob: "{next.config.{js,mjs,ts},astro.config.{mjs,ts},middleware.{ts,js},src/middleware.{ts,js},{src/,}i18n/**/*.{ts,json},{src/,}app/layout.{tsx,jsx},{src/,}app/[locale]/layout.{tsx,jsx}}" }
+
+- id: mx-privacy-notice
+  title: "Aviso de privacidad (integral y simplificado) conforme a la LFPDPPP"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [MX] } }, { signals: { has_personal_data: true } } ] }
+  effort: { size: M, hours: [2, 5] }
+  why: "La Ley Federal de Protección de Datos Personales en Posesión de los Particulares (nueva ley publicada en el DOF el 20 de marzo de 2025) exige informar al titular antes de recabar sus datos."
+  how: "Aviso integral en /aviso-de-privacidad y versión simplificada junto a cada formulario: responsable y domicilio, datos, finalidades primarias y secundarias, transferencias, medios para ejercer derechos ARCO y para revocar el consentimiento."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/aviso-de-privacidad/page.{tsx,mdx,jsx}", "src/pages/aviso-de-privacidad.{astro,md,mdx}"] }
+    - { type: grep, pattern: "ARCO", glob: "**/*.{tsx,jsx,mdx,md,astro,json}" }
+  references: ["https://www.diputados.gob.mx/LeyesBiblio/ref/lfpdppp.htm"]
+
+- id: mx-consumer-ecommerce
+  title: "Comercio electrónico conforme a la LFPC: identidad del proveedor, precios totales y condiciones"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [MX] } }, { capabilities: [payments] } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "La Ley Federal de Protección al Consumidor (art. 76 bis) obliga a identificar al proveedor, mostrar el precio total en pesos y las condiciones de compra; PROFECO lo vigila."
+  how: "Razón social, domicilio físico y teléfono visibles; precios con IVA incluido en MXN; términos de compra, garantías, devoluciones y cancelación antes de pagar."
+  verify:
+    - { type: grep, pattern: "IVA incluido|incluye IVA|precio total", glob: "**/*.{tsx,jsx,json,mdx}", flags: i }
+    - { type: manual, prompt: "Razón social, domicilio físico y teléfono visibles en el sitio" }
+  references: ["https://www.diputados.gob.mx/LeyesBiblio/ref/lfpc.htm", "https://www.gob.mx/profeco"]
+
+- id: mx-cfdi
+  title: "Facturación CFDI 4.0 si facturas"
+  category: legal
+  level: recommended
+  phase: build.features
+  since: "2026.10.2"
+  when: { all: [ { markets: { any: [MX] } }, { capabilities: [payments] } ] }
+  effort: { size: L, hours: [8, 20] }
+  why: "Los clientes con RFC piden factura; emitirla es obligación fiscal y un PAC la timbra."
+  how: "Captura de datos fiscales (RFC, régimen, uso de CFDI, código postal) e integración con un PAC (Facturapi o similar)."
+  verify:
+    - { type: grep, pattern: "facturapi|cfdi|rfc|uso_cfdi|regimen_fiscal", glob: "**/*.{ts,tsx,sql}", flags: i }
+  references: ["https://www.sat.gob.mx/consultas/35025/formato-de-factura-electronica-(anexo-20)"]

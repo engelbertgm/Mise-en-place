@@ -1,0 +1,119 @@
+# Acciones destructivas, trabajo sin guardar y zonas horarias.
+
+- id: destructive-severity
+  title: "Acciones destructivas por severidad: deshacer, long press o diálogo, diálogo explícito, confirmación escrita"
+  category: behavior
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_destructive_actions: true } }
+  effort: { size: M, hours: [3, 6] }
+  why: "Un diálogo para todo se ignora; nada para borrar una cuenta es un desastre. La fricción va en proporción a lo que se pierde."
+  how: "Leve: directo + toast con Deshacer (5–10 s). Media: long press (~1 s con progreso) o diálogo breve. Alta: diálogo que dice qué se pierde, botón con verbo específico en color destructivo. Extrema: escribir el nombre + reautenticación + periodo de gracia."
+  verify:
+    - { type: grep, pattern: "Deshacer|Undo|undo\\(", glob: "**/*.{tsx,jsx,ts,json}" }
+    - { type: grep, pattern: "AlertDialog|confirm", glob: "**/*.{tsx,jsx}" }
+
+- id: soft-delete
+  title: Borrado lógico (soft delete) por defecto en datos de usuario
+  category: behavior
+  level: required
+  phase: build.data
+  since: "2026.10.2"
+  when: { all: [ { signals: { has_destructive_actions: true } }, { signals: { has_db: true } } ] }
+  effort: { size: S, hours: [1, 3], scales_with: entities }
+  why: "Permite deshacer, recuperar errores y cumplir periodos de gracia."
+  how: "Columna deleted_at; consultas y políticas RLS filtran los borrados; borrado definitivo por tarea programada."
+  verify:
+    - { type: grep, pattern: "deleted_at|deletedAt|soft.?delete", glob: "**/*.{sql,ts,prisma}" }
+
+- id: destructive-accessible
+  title: "Long press con alternativa por teclado; el botón destructivo nunca tiene el foco por defecto"
+  category: behavior
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_destructive_actions: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un Enter accidental no debe borrar nada; quien no puede mantener presionado debe tener otra vía."
+  how: "Foco inicial en Cancelar; long press accesible con teclado y lector; vibración leve en móvil donde se soporte."
+  verify:
+    - { type: grep, pattern: "variant=[\"']destructive[\"'][^>]*autoFocus", glob: "**/*.{tsx,jsx}", expect: absent }
+
+- id: unsaved-changes-warning
+  title: Aviso al salir con cambios sin guardar
+  category: behavior
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_long_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Perder 20 minutos de escritura por un clic es imperdonable."
+  how: "beforeunload al cerrar la pestaña y confirmación en navegación interna cuando el formulario está sucio."
+  verify:
+    - { type: grep, pattern: "beforeunload|useBeforeUnload|onbeforeunload", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: autosave-drafts
+  title: Autoguardado o borrador local en formularios largos
+  category: behavior
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_long_forms: true } }
+  effort: { size: M, hours: [2, 5] }
+  why: "Una pestaña cerrada o una batería muerta no deben borrar el trabajo."
+  how: "Guardado con debounce al servidor o a localStorage, con indicador \"Guardado\"."
+  verify:
+    - { type: grep, pattern: "autosave|autoSave|draft|localStorage\\.setItem", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: session-expiry-warning
+  title: "Aviso antes de que expire la sesión; al volver a entrar se conserva lo escrito"
+  category: behavior
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { all: [ { signals: { has_long_forms: true } }, { capabilities: [auth] } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Enviar un formulario largo y descubrir que la sesión expiró pierde todo."
+  how: "Refresco de sesión en segundo plano o aviso con opción de extender; borrador que sobrevive al re-login."
+  verify:
+    - { type: manual, prompt: "Una sesión expirada no pierde lo escrito en formularios largos" }
+
+- id: timezone-utc-storage
+  title: Fechas guardadas en UTC (timestamptz)
+  category: behavior
+  level: required
+  phase: build.data
+  since: "2026.10.2"
+  when: { signals: { has_dates: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin zona en la base, una cita a las 10:00 cambia de hora según quién la mire."
+  how: "Columnas timestamptz en PostgreSQL; nunca timestamp sin zona para momentos."
+  verify:
+    - { type: grep, pattern: "\\btimestamp\\b(?!tz)(?!\\s+with\\s+time\\s+zone)(?!\\s*\\()", glob: "**/*.sql", flags: i, expect: absent }
+
+- id: timezone-display
+  title: "Fechas en la zona del usuario, zona indicada cuando hay ambigüedad, relativas con fecha exacta"
+  category: behavior
+  level: required
+  phase: build.ux
+  since: "2026.10.2"
+  when: { signals: { has_dates: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "\"Mañana a las 10\" debe ser 10 en la hora del usuario; en citas y fechas límite hay que decir en qué zona."
+  how: "Intl.DateTimeFormat con timeZone del usuario; zona visible en citas y eventos; \"hace 2 h\" con la fecha exacta en title o al tocar."
+  verify:
+    - { type: grep, pattern: "Intl\\.DateTimeFormat|timeZone|@date-fns/tz|date-fns-tz|dayjs/plugin/timezone|Temporal\\.", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: timezone-scheduling
+  title: "Tareas programadas en la zona del usuario, cuidando el horario de verano"
+  category: behavior
+  level: required
+  phase: build.features
+  since: "2026.10.2"
+  when: { signals: { has_dates: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "USA, CA, EU y UK cambian de horario; México (salvo la franja fronteriza) ya no: un recordatorio fijo en UTC llega una hora tarde medio año."
+  how: "Guardar la zona IANA del usuario y calcular la próxima ejecución en esa zona."
+  verify:
+    - { type: manual, prompt: "Recordatorios y tareas programadas se calculan en la zona IANA del usuario" }
