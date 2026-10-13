@@ -33,7 +33,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [BR] } }, { capabilities: [payments] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [BR] } }, { capabilities: { any: [payments, payment-links] } } ] }
   effort: { size: S, hours: [1, 3] }
   why: "El Decreto 7.962/2013 exige identificar al proveedor (razón social, CNPJ, dirección) y el art. 49 del CDC da 7 días para arrepentirse de compras a distancia."
   how: "Razón social, CNPJ y dirección visibles; resumen del contrato antes de pagar; derecho de arrepentimiento informado y operable."

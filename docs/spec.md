@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.10.3, 329 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.10.4, 330 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -79,7 +79,7 @@ Definidas en `catalog/dimensions.yaml`. Solo se aceptan valores de ahí.
 | Dimensión | Valores iniciales |
 |---|---|
 | `type` | landing, corporate, local-business, blog, portfolio, ecommerce, saas, marketplace, internal-app, directory, booking |
-| `capabilities` | auth, payments, subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration |
+| `capabilities` | auth, payments (checkout integrado), payment-links (enlaces del proveedor, sin backend), subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration |
 | `markets` | MX, USA, CA, EU, UK, BR, IN (CN: reservado para fase futura) |
 | `audience` | b2b, b2c, minors, sensitive-data-health, sensitive-data-finance |
 | `context` | client-project, own-product |
@@ -111,6 +111,7 @@ Muchos bloques no dependen de una capacidad, sino de un hecho del proyecto ("hay
 | `team` (`solo` / `team`) | Nivel de los ítems de Git |
 
 - `/mep:scope` infiere las señales a partir de la descripción y las capacidades (ej. `auth` implica `has_forms`, `has_db` y `has_personal_data`), y pregunta solo las dudosas.
+- `has_db` solo cuando hay algo propio que guardar (cuentas, pedidos, reservas, contenido): lo implican `auth`, `subscriptions`, `ugc` y `admin-panel`. Pagos, uploads o un formulario de contacto no crean una base de datos por sí solos.
 - `/mep:audit` y `verify` las **detectan en el código** (ej. un `<iframe>` activa `has_embeds`). Si el código muestra una señal que el perfil no tiene, el plugin avisa y propone actualizar el perfil.
 
 ### Archivo de estado del proyecto

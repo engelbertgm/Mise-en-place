@@ -180,7 +180,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { capabilities: { any: [auth, payments, ugc] } }
+  updated: "2026.10.4"
+  when: { capabilities: { any: [auth, payments, payment-links, ugc] } }
   effort: { size: M, hours: [2, 5] }
   why: "Definen el contrato con el usuario: uso aceptable, pagos, responsabilidad y terminación."
   how: "Página /terminos con fecha de actualización, enlazada en el footer y en el registro o checkout."
@@ -193,7 +194,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { all: [ { capabilities: [payments] }, { type: { any: [ecommerce, saas, marketplace, booking] } } ] }
+  updated: "2026.10.4"
+  when: { capabilities: { any: [payments, payment-links] } }
   depends_on: [terms-of-service]
   effort: { size: S, hours: [1, 3], scales_with: languages }
   why: "Requerida por procesadores de pago y por ley de consumo en varios mercados."

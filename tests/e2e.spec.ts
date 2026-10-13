@@ -40,7 +40,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     const { profile, evidence } = JSON.parse(r.out)
     assert.equal(profile.type, 'saas')
     for (const c of ['auth', 'payments', 'subscriptions', 'email']) assert.ok(profile.capabilities.includes(c), c)
-    assert.equal(evidence['capabilities.payments'], 'stripe')
+    assert.equal(evidence['capabilities.payments'], 'lib/billing.ts')
     assert.equal(existsSync(join(root, '.mep')), false)
   })
 

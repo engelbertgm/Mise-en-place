@@ -1,4 +1,4 @@
 type: ecommerce
 capabilities: [payments, email, search, uploads, admin-panel]
-signals: { has_dates: true }
+signals: { has_dates: true, has_db: true }
 counts: { pages: 10, entities: 6, languages: 1, integrations: 3 }

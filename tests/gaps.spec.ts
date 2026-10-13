@@ -8,6 +8,8 @@ import { loadCatalog } from '../engine/src/catalog.ts'
 import { prToMain } from '../engine/src/deploy.ts'
 import { checkDesign, fontFamilies, fontWeights } from '../engine/src/design.ts'
 import { prReviewGate } from '../engine/src/gate.ts'
+import { evaluate, stack } from '../engine/src/evaluate.ts'
+import { inferProfile } from '../engine/src/audit.ts'
 import { marketLocales } from '../engine/src/profile.ts'
 import { checkThresholds } from '../engine/src/quality.ts'
 import { formatClient, quote } from '../engine/src/quote.ts'
@@ -145,5 +147,45 @@ describe('7. review before a PR into main', () => {
     const hook = spawnSync('node', [CLI, 'hook', 'pre-bash'], { cwd: root, encoding: 'utf8', input: JSON.stringify({ cwd: root, tool_input: { command: 'gh pr create --fill' } }) })
     assert.equal(hook.stdout, '')
     assert.ok(existsSync(join(root, '.mep/.gitignore')))
+  })
+})
+
+describe('8. no database by default; payment links are not an integrated checkout', () => {
+  const ids = (p: ReturnType<typeof profile>) => new Set(evaluate(p, real).map(e => e.item.id))
+
+  test('a landing that sells with a payment link: no database, no checkout security, but the consumer rules', () => {
+    const p = profile(real, { type: 'landing', capabilities: ['payment-links', 'analytics'], markets: ['MX'], signals: { has_forms: true, has_personal_data: true } })
+    assert.equal(p.signals.has_db, false)
+    const items = ids(p)
+    for (const id of ['payment-links-setup', 'refund-policy', 'terms-of-service', 'mx-consumer-ecommerce']) assert.ok(items.has(id), id)
+    for (const id of ['webhook-signature', 'webhook-idempotency', 'server-side-prices', 'hosted-checkout', 'rls-all-tables', 'no-sql-injection', 'data-view-states', 'migrations-backups']) assert.ok(!items.has(id), id)
+    const db = stack(p, real).find(d => d.key === 'db')
+    assert.equal(db?.value, 'none')
+    assert.equal(stack(p, real).find(d => d.key === 'payments')?.value, 'stripe-payment-links')
+  })
+
+  test('integrated payments no longer imply a database; storing orders is explicit', () => {
+    const p = profile(real, { type: 'landing', capabilities: ['payments'] })
+    assert.equal(p.signals.has_db, false)
+    assert.equal(stack(p, real).find(d => d.key === 'db')?.value, 'none')
+    assert.ok(ids(p).has('webhook-signature'))
+    const withOrders = profile(real, { type: 'ecommerce', capabilities: ['payments'], signals: { has_db: true } })
+    assert.equal(stack(withOrders, real).find(d => d.key === 'db')?.value, 'postgresql')
+    assert.equal(profile(real, { capabilities: ['uploads', 'realtime'] }).signals.has_db, false)
+    assert.equal(profile(real, { capabilities: ['auth'] }).signals.has_db, true)
+    assert.equal(profile(real, { ...real.presets.ecommerce }).signals.has_db, true)
+  })
+
+  test('/mep:audit: the stripe dependency alone is not payments; a buy link is payment-links', () => {
+    const links = makeRepo({
+      'package.json': JSON.stringify({ dependencies: { next: '15', stripe: '17' } }),
+      'app/page.tsx': '<a href="https://buy.stripe.com/test_123">Comprar</a>',
+    })
+    const caps = inferProfile(links, real).profile.capabilities
+    assert.ok(caps.includes('payment-links'))
+    assert.ok(!caps.includes('payments'))
+    assert.equal(inferProfile(links, real).profile.signals.has_db, false)
+    const checkout = makeRepo({ 'package.json': '{"dependencies":{"stripe":"17"}}', 'app/api/checkout/route.ts': 'await stripe.checkout.sessions.create({ mode: "payment" })' })
+    assert.ok(inferProfile(checkout, real).profile.capabilities.includes('payments'))
   })
 })

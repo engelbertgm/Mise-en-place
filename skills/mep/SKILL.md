@@ -25,6 +25,8 @@ Presets de partida: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace` (
 
 1. Elige `type` y preset por lo que el producto *es*, no por cómo se construye.
 2. Capacidades: solo las que el scope pide o implica claramente ("cobrar mensualidad" → `subscriptions`; "subir fotos" → `uploads`).
+   - Cobrar: `payment-links` si el pago ocurre en la página del proveedor (Stripe Payment Links, botón de compra, Mercado Pago, Gumroad): sin backend ni base de datos. `payments` solo si el sitio crea el pago en su servidor, recibe webhooks o guarda pedidos. Una landing que vende con un enlace es `payment-links`.
+   - Base de datos (`has_db`): solo si hay que guardar algo propio (cuentas, pedidos, reservas, contenido de usuarios). Un formulario de contacto que manda email, un newsletter en el proveedor o pagos por enlace **no** necesitan base de datos. `auth`, `subscriptions`, `ugc` y `admin-panel` ya la implican.
 3. Señales: infiere de verbos y objetos ("reservas con fecha" → `has_dates`; "listado de clientes" → `has_tables`; "borrar proyectos" → `has_destructive_actions`; Supabase con consultas desde el navegador → `db_client_access`).
 4. Pregunta **solo** lo que cambia ítems 🔴 o los `counts`: mercados, si hay menores o datos sensibles, cliente vs. producto propio, número aproximado de páginas, entidades, idiomas e integraciones. Agrupa las preguntas (AskUserQuestion, máximo 4).
 

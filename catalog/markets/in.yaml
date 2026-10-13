@@ -46,7 +46,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [IN] } }, { any: [ { capabilities: [payments] }, { signals: { has_personal_data: true } } ] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [IN] } }, { any: [ { capabilities: { any: [payments, payment-links] } }, { signals: { has_personal_data: true } } ] } ] }
   effort: { size: XS, hours: [0.5, 1] }
   why: "Las reglas de TI y de comercio electrónico de India exigen un oficial de quejas con datos publicados y plazos de respuesta."
   how: "Nombre, cargo y contacto del grievance officer en el sitio; acuse en 48 h y resolución en el plazo que fije la norma."

@@ -48,7 +48,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [EU] } }, { capabilities: [payments] }, { audience: [b2c] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: { any: [payments, payment-links] } }, { audience: [b2c] } ] }
   effort: { size: S, hours: [1, 3] }
   why: "La Directiva de derechos de los consumidores da 14 días para desistir de compras a distancia; si no se informa, el plazo se extiende hasta 12 meses."
   how: "Información del derecho y sus excepciones antes de comprar, formulario modelo de desistimiento y, en contenido digital o servicios, el consentimiento expreso para empezar antes del plazo."
@@ -90,7 +91,8 @@
   level: required
   phase: build.features
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [EU] } }, { capabilities: [payments] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [EU] } }, { capabilities: { any: [payments, payment-links] } } ] }
   effort: { size: M, hours: [2, 5] }
   why: "En ventas B2C de servicios digitales y a distancia se cobra el IVA del país del cliente; los precios al consumidor se muestran con IVA."
   how: "Stripe Tax (o cálculo propio) con el país del cliente; registro en OSS; precios finales con IVA."

@@ -27,17 +27,17 @@
     - { hosting: netlify, when: "si el cliente ya opera ahí" }
 
 - id: db-relational
-  when: { any: [ { capabilities: { any: [auth, payments, subscriptions, ugc, admin-panel] } }, { signals: { has_db: true } } ] }
+  when: { any: [ { capabilities: { any: [auth, subscriptions, ugc, admin-panel] } }, { signals: { has_db: true } } ] }
   recommend: { db: postgresql, db_provider: supabase }
-  why: "Datos relacionales, transacciones y consistencia para usuarios y pagos. Supabase da PostgreSQL gestionado con auth, storage y RLS."
+  why: "Hay datos que guardar (usuarios, pedidos, contenido): relaciones, transacciones y consistencia. Supabase da PostgreSQL gestionado con auth, storage y RLS."
   alternatives:
     - { db: sqlite, when: "internal-app de bajo volumen" }
     - { db_provider: neon, when: "solo base de datos, sin auth ni storage gestionados" }
 
 - id: db-none
-  when: { not: { any: [ { capabilities: { any: [auth, payments, subscriptions, ugc, admin-panel, cms, notifications, realtime] } }, { signals: { has_db: true } } ] } }
+  when: { not: { any: [ { capabilities: { any: [auth, subscriptions, ugc, admin-panel, notifications] } }, { signals: { has_db: true } } ] } }
   recommend: { db: none }
-  why: "Sin datos de usuario no hace falta base de datos: más rápido, barato y sin superficie de ataque."
+  why: "Nada que guardar: formularios por email, pagos en la página del proveedor, contenido en archivos o en un CMS gestionado. Sin base de datos es más rápido, barato y sin superficie de ataque."
 
 - id: auth-supabase
   when: { capabilities: [auth] }
@@ -45,6 +45,13 @@
   why: "Integrada con la base de datos y RLS: el usuario autenticado es el que filtran las políticas."
   alternatives:
     - { auth: auth-js, when: "si la base de datos no es Supabase" }
+
+- id: payment-links
+  when: { all: [ { capabilities: [payment-links] }, { not: { capabilities: [payments] } } ] }
+  recommend: { payments: stripe-payment-links }
+  why: "Venta sin backend: el pago ocurre en la página del proveedor (Payment Links, botón de compra o tabla de precios). Sin datos de tarjeta, webhooks ni base de datos."
+  alternatives:
+    - { payments: mercadopago-links, when: "mercado MX/LatAm con OXXO o SPEI" }
 
 - id: payments-stripe
   when: { capabilities: [payments] }

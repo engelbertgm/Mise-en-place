@@ -2,6 +2,13 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.4
+
+- **Base de datos solo cuando hay algo que guardar.** `payments`, `uploads` y `realtime` ya no implican `has_db`; la implican `auth`, `subscriptions`, `ugc` y `admin-panel`, o el perfil explícitamente. La regla de stack recomienda `db: none` a una landing aunque venda.
+- **Nueva capacidad `payment-links`**: el pago ocurre en la página del proveedor (Stripe Payment Links, botón de compra, Mercado Pago, Gumroad…). Activa los ítems de consumo y legales (términos, reembolsos, LFPC, desistimiento, IVA, CFDI…) y el nuevo `payment-links-setup`, pero no los de checkout integrado (webhooks, idempotencia, precios en servidor) ni base de datos.
+- `/mep:audit`: `payments` solo si el servidor crea pagos o recibe webhooks; un enlace de compra se detecta como `payment-links`. Tener la dependencia `stripe` ya no basta.
+- Preset `ecommerce`: `has_db` explícito (guarda pedidos y productos).
+
 ## 2026.10.3
 
 - Los mercados activan sus idiomas (`market_languages` en dimensions.yaml); más de un idioma activa i18n sin indicarlo a mano.

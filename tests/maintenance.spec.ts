@@ -76,7 +76,7 @@ describe('/mep:audit', () => {
     assert.equal(p.counts.entities, 2)
     assert.equal(p.counts.languages, 2)
     assert.equal(p.stack.decided.db_provider, 'supabase')
-    assert.equal(evidence['capabilities.payments'], 'stripe')
+    assert.equal(evidence['capabilities.payments'], 'lib/billing.ts')
   })
 
   test('the gap report changes nothing in the repo', () => {

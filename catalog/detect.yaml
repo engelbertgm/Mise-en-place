@@ -3,8 +3,12 @@
 auth:
   - { dependency: [next-auth, "@auth/core", better-auth, "@clerk/nextjs", "@clerk/clerk-react", lucia, "@kinde-oss/kinde-auth-nextjs", "@workos-inc/authkit-nextjs"] }
   - { grep: "auth\\.(signInWithPassword|signUp|signInWithOAuth|getUser)\\(", glob: "**/*.{ts,tsx,js,jsx}" }
+# payments: solo si el servidor crea pagos o recibe webhooks (tener la dependencia no basta).
 payments:
-  - { dependency: [stripe, "@stripe/stripe-js", "@stripe/react-stripe-js", mercadopago, "@lemonsqueezy/lemonsqueezy.js", "@paddle/paddle-js", "@polar-sh/sdk"] }
+  - { grep: "checkout\\.sessions\\.create|paymentIntents\\.create|setupIntents\\.create|subscriptions\\.create|billingPortal\\.sessions\\.create|webhooks\\.constructEvent|constructEventAsync|preferences?\\.create|createCheckout\\(|orders\\.create\\(", glob: "**/*.{ts,tsx,js,jsx,mjs}" }
+# payment-links: el pago ocurre en la página del proveedor.
+payment-links:
+  - { grep: "buy\\.stripe\\.com|stripe-buy-button|stripe-pricing-table|mpago\\.la|link\\.mercadopago|mercadopago\\.com(\\.\\w+)*/checkout|lemonsqueezy\\.com/(buy|checkout)|gumroad\\.com/l/|paypal\\.me/|checkout\\.square\\.site|square\\.link|polar\\.sh/checkout", glob: "**/*.{tsx,jsx,ts,js,astro,html,md,mdx,json}" }
 subscriptions:
   - { grep: "subscriptions\\.(create|update|cancel)|mode:\\s*[\"']subscription[\"']|billingPortal", glob: "**/*.{ts,tsx,js,jsx}" }
 email:

@@ -34,7 +34,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [MX] } }, { capabilities: [payments] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [MX] } }, { capabilities: { any: [payments, payment-links] } } ] }
   effort: { size: S, hours: [1, 3] }
   why: "La Ley Federal de Protección al Consumidor (art. 76 bis) obliga a identificar al proveedor, mostrar el precio total en pesos y las condiciones de compra; PROFECO lo vigila."
   how: "Razón social, domicilio físico y teléfono visibles; precios con IVA incluido en MXN; términos de compra, garantías, devoluciones y cancelación antes de pagar."
@@ -49,7 +50,8 @@
   level: recommended
   phase: build.features
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [MX] } }, { capabilities: [payments] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [MX] } }, { capabilities: { any: [payments, payment-links] } } ] }
   effort: { size: L, hours: [8, 20] }
   why: "Los clientes con RFC piden factura; emitirla es obligación fiscal y un PAC la timbra."
   how: "Captura de datos fiscales (RFC, régimen, uso de CFDI, código postal) e integración con un PAC (Facturapi o similar)."

@@ -9005,7 +9005,8 @@ function inferProfile(root, catalog) {
   if (framework !== "static") stack2.framework = framework;
   if (deps.has("@supabase/supabase-js")) Object.assign(stack2, { db: "postgresql", db_provider: "supabase" });
   else if (deps.has("pg") || deps.has("postgres") || deps.has("@neondatabase/serverless")) stack2.db = "postgresql";
-  if (deps.has("stripe")) stack2.payments = "stripe";
+  if (capSet.has("payments") && deps.has("stripe")) stack2.payments = "stripe";
+  else if (capSet.has("payment-links")) stack2.payments = "payment-links";
   if (files.some((f) => f === "vercel.json" || f.startsWith(".vercel/"))) stack2.hosting = "vercel";
   const raw = {
     project: (readText(root, "package.json") ?? "").match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? "proyecto",

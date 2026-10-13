@@ -62,7 +62,8 @@ export function inferProfile(root: string, catalog: Catalog): Inference {
   if (framework !== 'static') stack.framework = framework
   if (deps.has('@supabase/supabase-js')) Object.assign(stack, { db: 'postgresql', db_provider: 'supabase' })
   else if (deps.has('pg') || deps.has('postgres') || deps.has('@neondatabase/serverless')) stack.db = 'postgresql'
-  if (deps.has('stripe')) stack.payments = 'stripe'
+  if (capSet.has('payments') && deps.has('stripe')) stack.payments = 'stripe'
+  else if (capSet.has('payment-links')) stack.payments = 'payment-links'
   if (files.some(f => f === 'vercel.json' || f.startsWith('.vercel/'))) stack.hosting = 'vercel'
   const raw: Partial<Profile> = {
     project: (readText(root, 'package.json') ?? '').match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? 'proyecto',

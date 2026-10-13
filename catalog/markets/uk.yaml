@@ -47,7 +47,8 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
-  when: { all: [ { markets: { any: [UK] } }, { capabilities: [payments] }, { audience: [b2c] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { markets: { any: [UK] } }, { capabilities: { any: [payments, payment-links] } }, { audience: [b2c] } ] }
   effort: { size: S, hours: [1, 3] }
   why: "Las compras a distancia en el UK tienen 14 días de cancelación e información obligatoria antes de comprar."
   how: "Identidad y dirección, precio total, condiciones de cancelación y formulario modelo antes del pago."

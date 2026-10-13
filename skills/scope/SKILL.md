@@ -13,7 +13,7 @@ Sigue el skill `mep` para interpretar el scope. Motor: `node "${CLAUDE_PLUGIN_RO
 
 1. Si ya existe `.mep/profile.yaml`, detente y sugiere `/mep:add`.
 2. Lee `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml` (valores válidos) y, si se indicó `--preset` o hay uno cercano, `${CLAUDE_PLUGIN_ROOT}/catalog/presets/<preset>.yaml`.
-3. Propón el perfil (tipo, capacidades, mercados, audiencia, contexto, señales, counts) en una tabla corta. Pregunta **solo** lo que cambia 🔴 o los counts (ver skill `mep`).
+3. Propón el perfil (tipo, capacidades, mercados, audiencia, contexto, señales, counts) en una tabla corta. Pregunta **solo** lo que cambia 🔴 o los counts (ver skill `mep`). Si el scope cobra algo y no queda claro, pregunta si el pago es con enlace del proveedor (`payment-links`) o con checkout propio (`payments`); no marques `has_db` sin algo que guardar.
 4. Las features del scope que no están en el catálogo (ej. "agenda por instructor") van en `custom_work` con su talla: `[{ title, size: XS|S|M|L|XL, phase }]`. Escribe la propuesta en `.mep/draft.yaml` (incluye `project` y `preset` si aplica) y corre `evaluate --from .mep/draft.yaml`. Si el motor rechaza un valor, corrígelo; no inventes valores.
 5. Muestra el resultado agrupado (🔴, 🟡, ⚪ por categoría) y las recomendaciones de stack con su porqué. Pide al usuario que elija los ⚪ que quiere y confirme.
 6. Con la confirmación:

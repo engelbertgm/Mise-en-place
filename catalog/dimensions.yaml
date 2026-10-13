@@ -1,6 +1,6 @@
 # Valores válidos de cada dimensión. Solo se aceptan valores de aquí.
 type: [landing, corporate, local-business, blog, portfolio, ecommerce, saas, marketplace, internal-app, directory, booking]
-capabilities: [auth, payments, subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration]
+capabilities: [auth, payments, payment-links, subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration]
 markets: [MX, USA, CA, EU, UK, BR, IN]   # CN: reservado para una fase futura
 market_sublevels:
   USA: [USA:AL, USA:AK, USA:AZ, USA:AR, USA:CA, USA:CO, USA:CT, USA:DE, USA:FL, USA:GA, USA:HI, USA:ID, USA:IL, USA:IN, USA:IA, USA:KS, USA:KY, USA:LA, USA:ME, USA:MD, USA:MA, USA:MI, USA:MN, USA:MS, USA:MO, USA:MT, USA:NE, USA:NV, USA:NH, USA:NJ, USA:NM, USA:NY, USA:NC, USA:ND, USA:OH, USA:OK, USA:OR, USA:PA, USA:RI, USA:SC, USA:SD, USA:TN, USA:TX, USA:UT, USA:VT, USA:VA, USA:WA, USA:WV, USA:WI, USA:WY, USA:DC]
@@ -29,10 +29,12 @@ phases: [foundation.setup, foundation.design, build.data, build.features, build.
 # Lo que una capacidad implica. Solo enciende señales; nunca las apaga.
 implies:
   auth: { signals: { has_forms: true, has_db: true, has_personal_data: true } }
-  payments: { signals: { has_forms: true, has_db: true, has_personal_data: true } }
-  subscriptions: { capabilities: [payments] }
+  # payments = checkout integrado (el servidor crea el pago y recibe webhooks). No implica base de datos:
+  # si guarda pedidos o clientes, has_db se marca explícitamente. payment-links = enlaces o botones del
+  # proveedor (Stripe Payment Links, Mercado Pago, etc.): sin backend ni base de datos.
+  payments: { signals: { has_personal_data: true } }
+  subscriptions: { capabilities: [payments], signals: { has_db: true } }
   ugc: { signals: { has_forms: true, has_db: true, has_destructive_actions: true } }
-  uploads: { signals: { has_db: true } }
   newsletter: { signals: { has_forms: true, has_personal_data: true } }
   email: { signals: { has_personal_data: true } }
   admin-panel: { capabilities: [auth], signals: { has_tables: true, has_destructive_actions: true } }
@@ -40,7 +42,6 @@ implies:
   analytics: { signals: { has_personal_data: true } }
   maps: { signals: { has_embeds: true } }
   notifications: { signals: { has_db: true } }
-  realtime: { signals: { has_db: true } }
 
 # Idiomas que exige cada mercado. Elegir mercados activa idiomas y formatos; más de un idioma activa i18n.
 # El sub-nivel más específico gana (CA:QC agrega fr-CA a CA). EU sin país no fija idioma: elige los países.

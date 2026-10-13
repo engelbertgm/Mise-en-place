@@ -96,6 +96,22 @@
   verify:
     - { type: grep, pattern: "automatic_tax|tax_behavior|taxRates|tax_rates|impuesto|IVA", glob: "**/*.{ts,tsx,js,jsx}" }
 
+# ── Enlaces de pago del proveedor (sin checkout propio) ──
+- id: payment-links-setup
+  title: "Enlaces de pago del proveedor: precios iguales a los del sitio, impuestos y recibos en el proveedor, página de gracias propia"
+  category: payments
+  level: required
+  phase: build.features
+  since: "2026.10.4"
+  when: { all: [ { capabilities: [payment-links] }, { not: { capabilities: [payments] } } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Sin backend, el proveedor cobra, calcula impuestos y manda el recibo; el sitio solo debe enlazar bien y mostrar lo mismo que se cobra."
+  how: "Payment Links o botón de compra del proveedor; precio, moneda e impuestos configurados ahí y coincidentes con el sitio; redirección de éxito a una página de gracias; nunca campos de tarjeta en el sitio."
+  verify:
+    - { type: grep, pattern: "buy\\.stripe\\.com|stripe-buy-button|stripe-pricing-table|mpago\\.la|link\\.mercadopago|mercadopago\\.com(\\.\\w+)*/checkout|lemonsqueezy\\.com/(buy|checkout)|gumroad\\.com/l/|paypal\\.me/|checkout\\.square\\.site|square\\.link|polar\\.sh/checkout", glob: "**/*.{tsx,jsx,ts,js,astro,html,md,mdx,json}" }
+    - { type: grep, pattern: "(name|autocomplete|autoComplete)=[\"'](cardnumber|card-number|cc-number|cc-csc|cvc|cvv)[\"']", glob: "**/*.{tsx,jsx,html,astro,vue,svelte}", flags: i, expect: absent }
+    - { type: manual, prompt: "Precios, moneda e impuestos del proveedor coinciden con el sitio; la redirección de éxito lleva a la página de gracias" }
+
 # ── Contenido de usuarios ──
 - id: ugc-report
   title: Reportar contenido

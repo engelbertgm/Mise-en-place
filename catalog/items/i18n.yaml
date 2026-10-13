@@ -46,7 +46,8 @@
   level: required
   phase: build.features
   since: "2026.10.2"
-  when: { all: [ { capabilities: [i18n] }, { capabilities: [payments] } ] }
+  updated: "2026.10.4"
+  when: { all: [ { capabilities: [i18n] }, { capabilities: { any: [payments, payment-links] } } ] }
   effort: { size: M, hours: [2, 6], scales_with: markets }
   why: "Pagar en moneda extranjera genera desconfianza y comisiones de conversión."
   how: "Precios por moneda (Prices de Stripe con currency_options) según el mercado del usuario."
