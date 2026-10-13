@@ -12,6 +12,8 @@ You describe the project. mep knows what to ask and what to require.
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
+**English** · [Español](README.es.md)
+
 </div>
 
 ---

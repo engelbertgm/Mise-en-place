@@ -35,6 +35,6 @@ Thanks for helping improve mise en place.
 
 - Engine and mods: TypeScript, small pure functions, names that explain; comments only for the why.
 - The engine decides; skills, mods and hooks only call it. One source of truth.
-- Skills, agents and catalog text are written in Spanish, short and imperative. README and these files are in English.
+- Skills, agents and catalog text are written in Spanish, short and imperative. README.md and these files are in English; README.es.md is the Spanish README. Keep both READMEs in sync.
 
 By contributing, you agree your contributions are licensed under [Apache-2.0](LICENSE) and that you follow the [Code of Conduct](CODE_OF_CONDUCT.md).
