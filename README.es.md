@@ -189,6 +189,83 @@ En un `client-project` el repo se entrega al cliente, así que nada interno de t
 
 </details>
 
+## Estructura de carpetas
+
+### Este repositorio
+
+```
+Mise-en-place/
+├── .claude-plugin/
+│   ├── plugin.json            # manifiesto del plugin
+│   └── marketplace.json       # hace el repo instalable con /plugin
+├── skills/                    # cada carpeta es un comando /mep:<nombre>
+│   ├── mep/                   # guía: interpretar un scope, usar el catálogo, respetar el brief
+│   ├── scope/  add/  check/  phase/  skip/  override/
+│   ├── audit/  update/
+│   └── quote/  export/  log-time/
+├── agents/
+│   ├── mep-locator.md         # Haiku, solo lectura: encuentra código con los mapas
+│   └── mep-security.md        # Opus: implementa y audita los ítems de seguridad
+├── hooks/
+│   └── hooks.json             # módulo de mods + hooks de respaldo (SessionStart, Stop, PreToolUse, PostToolUse)
+├── mods/
+│   ├── register.ts            # gate, comandos instantáneos y línea de estado, dentro de Claude Code
+│   └── register.test.ts       # tests de los mods (claude plugin test .)
+├── engine/
+│   ├── src/                   # motor determinista en TypeScript, sin LLM
+│   │   ├── evaluate.ts        # perfil + catálogo → ítems que aplican, diff, stack
+│   │   ├── verify.ts          # corre las verificaciones de cada ítem (html.ts, sql.ts, maps.ts)
+│   │   ├── gate.ts            # reglas de bloqueo y cierre de fases
+│   │   ├── render.ts          # BRIEF.md, ADRs, bloque de CLAUDE.md
+│   │   ├── audit.ts           # infiere el perfil de un repo existente
+│   │   ├── update.ts          # ítems nuevos del catálogo, periodo de gracia
+│   │   ├── quote.ts           # cotización, horas reales, calibración
+│   │   ├── export.ts docs.ts  # brief para el cliente → .docx y .pdf
+│   │   └── cli.ts             # el comando `mep` que llaman skills, mods, hooks y CI
+│   └── dist/mep.mjs           # bundle sin dependencias en ejecución (versionado)
+├── catalog/
+│   ├── dimensions.yaml        # valores válidos: tipos, capacidades, mercados, señales, fases
+│   ├── items/                 # un archivo por categoría (base, seo, security, ux, legal…)
+│   ├── markets/               # un archivo por mercado (mx, usa, ca, eu, uk, br, in)
+│   ├── presets/               # landing, corporate, ecommerce, saas, marketplace
+│   ├── stack-rules.yaml       # recomendaciones de stack con su porqué
+│   ├── signals.yaml detect.yaml  # lo que revela el código (señales, capacidades)
+│   ├── costs.yaml codemap.yaml sensitive.yaml
+│   ├── VERSION
+│   └── CHANGELOG.md
+├── templates/
+│   ├── claude-md.md           # bloque que se agrega al CLAUDE.md del proyecto
+│   ├── ci/mep.yml             # workflow de CI que se instala en cada proyecto
+│   └── client-brief/          # plantilla del brief para el cliente (es, en)
+├── examples/estudio-saas/     # proyecto de prueba que usa tests/e2e.spec.ts
+├── tests/                     # tests del motor, la CLI y de punta a punta (node:test)
+└── docs/spec.md               # especificación completa
+```
+
+### Lo que mep agrega a tu proyecto
+
+```
+tu-proyecto/
+├── .mep/
+│   ├── profile.yaml           # fuente de verdad: tipo, capacidades, mercados, señales, fase
+│   ├── log                    # overrides, bypass y cambios de fase
+│   ├── security/<id>.json     # reportes de auditoría de mep-security
+│   └── exports.yaml           # versiones del brief para el cliente
+├── BRIEF.md                   # brief generado: perfil, stack, checklist por sub-etapa
+├── CLAUDE.md                  # + el bloque de mep (se conserva lo que había)
+├── CODEMAP.md                 # dónde está qué
+├── REGISTRY.md                # piezas reutilizables
+├── docs/
+│   ├── decisions/             # ADRs, empezando por las decisiones de stack
+│   └── client/brief-vN.*      # brief para el cliente (.md, .docx, .pdf)
+└── .github/workflows/mep.yml  # mep verify --prod como check obligatorio
+
+~/.config/mep-check/           # fuera del repo: nunca se entrega al cliente
+├── rates.yaml                 # tus tarifas
+├── quotes/<proyecto>/         # cotizaciones internas
+└── actuals/<proyecto>.yaml    # horas reales para calibrar
+```
+
 ## Por dentro
 
 - **Motor** ([`engine/src`](engine/src)): TypeScript, sin LLM. Mismo perfil, mismos ítems, mismo resultado. Se empaqueta en [`engine/dist/mep.mjs`](engine/dist/mep.mjs) sin dependencias en tiempo de ejecución y se publica como `@engelbertgm/mep` para el CI.

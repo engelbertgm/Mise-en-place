@@ -189,6 +189,83 @@ In a `client-project` the repo is handed to the client, so nothing internal to y
 
 </details>
 
+## Folder structure
+
+### This repository
+
+```
+Mise-en-place/
+├── .claude-plugin/
+│   ├── plugin.json            # plugin manifest
+│   └── marketplace.json       # makes the repo installable with /plugin
+├── skills/                    # each folder is a /mep:<name> command
+│   ├── mep/                   # guide: read a scope, use the catalog, respect the brief
+│   ├── scope/  add/  check/  phase/  skip/  override/
+│   ├── audit/  update/
+│   └── quote/  export/  log-time/
+├── agents/
+│   ├── mep-locator.md         # Haiku, read-only: finds code through the maps
+│   └── mep-security.md        # Opus: implements and audits security items
+├── hooks/
+│   └── hooks.json             # mods module + fallback hooks (SessionStart, Stop, PreToolUse, PostToolUse)
+├── mods/
+│   ├── register.ts            # gate, instant commands and status line, inside Claude Code
+│   └── register.test.ts       # mod tests (claude plugin test .)
+├── engine/
+│   ├── src/                   # deterministic engine in TypeScript, no LLM
+│   │   ├── evaluate.ts        # profile + catalog → items that apply, diff, stack
+│   │   ├── verify.ts          # runs each item's checks (html.ts, sql.ts, maps.ts)
+│   │   ├── gate.ts            # blocking rules and phase close
+│   │   ├── render.ts          # BRIEF.md, ADRs, CLAUDE.md block
+│   │   ├── audit.ts           # infers a profile from an existing repo
+│   │   ├── update.ts          # new catalog items, grace period
+│   │   ├── quote.ts           # quote, log-time, calibration
+│   │   ├── export.ts docs.ts  # client brief → .docx and .pdf
+│   │   └── cli.ts             # the `mep` command that skills, mods, hooks and CI call
+│   └── dist/mep.mjs           # bundle with no runtime dependencies (committed)
+├── catalog/
+│   ├── dimensions.yaml        # valid values: types, capabilities, markets, signals, phases
+│   ├── items/                 # one file per category (base, seo, security, ux, legal…)
+│   ├── markets/               # one file per market (mx, usa, ca, eu, uk, br, in)
+│   ├── presets/               # landing, corporate, ecommerce, saas, marketplace
+│   ├── stack-rules.yaml       # stack recommendations with their reason
+│   ├── signals.yaml detect.yaml  # what the code reveals (signals, capabilities)
+│   ├── costs.yaml codemap.yaml sensitive.yaml
+│   ├── VERSION
+│   └── CHANGELOG.md
+├── templates/
+│   ├── claude-md.md           # block added to the project's CLAUDE.md
+│   ├── ci/mep.yml             # CI workflow installed in each project
+│   └── client-brief/          # client brief template (es, en)
+├── examples/estudio-saas/     # test project used by tests/e2e.spec.ts
+├── tests/                     # engine, CLI and end-to-end tests (node:test)
+└── docs/spec.md               # full specification (Spanish)
+```
+
+### What mep adds to your project
+
+```
+your-project/
+├── .mep/
+│   ├── profile.yaml           # source of truth: type, capabilities, markets, signals, phase
+│   ├── log                    # overrides, bypasses, phase changes
+│   ├── security/<id>.json     # mep-security audit reports
+│   └── exports.yaml           # client brief versions
+├── BRIEF.md                   # generated brief: profile, stack, checklist by sub-phase
+├── CLAUDE.md                  # + the mep block (what was there is kept)
+├── CODEMAP.md                 # where things are
+├── REGISTRY.md                # reusable pieces
+├── docs/
+│   ├── decisions/             # ADRs, starting with the stack decisions
+│   └── client/brief-vN.*      # client brief (.md, .docx, .pdf)
+└── .github/workflows/mep.yml  # mep verify --prod as a required check
+
+~/.config/mep-check/           # outside the repo: never handed to the client
+├── rates.yaml                 # your rates
+├── quotes/<project>/          # internal quotes
+└── actuals/<project>.yaml     # real hours for calibration
+```
+
 ## Under the hood
 
 - **Engine** ([`engine/src`](engine/src)): TypeScript, no LLM. Same profile, same items, same result. Bundled to [`engine/dist/mep.mjs`](engine/dist/mep.mjs) with no runtime dependencies, and published as `@engelbertgm/mep` for CI.
