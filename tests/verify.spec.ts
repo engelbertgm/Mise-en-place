@@ -28,6 +28,7 @@ describe('file_exists', () => {
     const root = makeRepo({ 'public/favicon.ico': '' })
     assert.equal(run(root, { type: 'file_exists', path: ['app/favicon.ico', 'public/favicon.ico'] }).ok, true)
     assert.equal(run(root, { type: 'file_exists', path: 'public/*.ico' }).ok, true)
+    assert.equal(run(root, { type: 'file_exists', path: 'public/favicon.{svg,ico}' }).ok, true)
     assert.equal(run(root, { type: 'file_exists', path: 'README.md' }).ok, false)
   })
 })

@@ -7,7 +7,7 @@ You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-informational.svg)](.claude-plugin/plugin.json)
-[![Catalog](https://img.shields.io/badge/catalog-2026.10.1-informational.svg)](catalog/CHANGELOG.md)
+[![Catalog](https://img.shields.io/badge/catalog-2026.10.2-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Works with batuta](https://img.shields.io/badge/works_with-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
@@ -98,6 +98,13 @@ Then, in a new or existing project folder:
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` runs the security audit and quality review, then closes it |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |
 | `/mep:override <id> <reason>` | Turns off a 🔴 item after confirmation; rejects 🔒 items |
+| `/mep:audit` | For an existing repo: infers the profile from the code, confirms it with you and reports the gap by sub-phase. Changes nothing until you adopt the brief |
+| `/mep:update` | Brings new catalog items that apply to your profile. Items that land in a closed sub-phase get a grace period |
+| `/mep:quote [--client]` | Quote from the brief. Internal view (hours, rate, margins) or client view (price per phase, extras, recurring costs, maintenance plans) |
+| `/mep:export [--lang es]` | Client brief as .docx and .pdf, in the client's language, versioned, with what changed since the last version |
+| `/mep:log-time <id> <hours>` | Logs real hours per item outside the repo; with enough data, mep suggests new ranges |
+
+The quote runs by itself only when the scope is defined (`/mep:scope`) or changes (`/mep:add`, which shows the impact in hours and price before you accept). Rates, real hours and internal quotes live in `~/.config/mep-check/`, never in the repo.
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
 
@@ -188,6 +195,13 @@ In a `client-project` the repo is handed to the client, so nothing internal to y
 - **Mods** ([`mods/register.ts`](mods/register.ts)): run inside Claude Code. `/mep:check` and `/mep:phase` answer instantly, without a Claude turn; deploys wait for the engine's gate; the status line shows the active sub-phase and pending 🔴/🟡.
 - **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse and PostToolUse, as the fallback where mods are not available.
 - **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): installed by `/mep:scope`. Runs gitleaks, `pnpm audit`, the build and `mep verify --prod`.
+- **Maps**: `mep codemap` and `mep registry` generate `CODEMAP.md` and `REGISTRY.md` from the code. "What for" and "Do not use for" are written in each export's doc comment; an export without an entry blocks once its sub-phase is closed.
+- **Export**: a small Markdown subset becomes .docx and .pdf with no dependencies, so it works on any machine.
+- **Catalog** ([`catalog/`](catalog)): 329 items across accessibility, design system, UX, content, forms, data, responsive, security, privacy, legal, performance, i18n, code quality, deploy, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source.
+
+### Test project
+
+[`examples/estudio-saas`](examples/estudio-saas) is a fictitious SaaS (auth and payments, MX + USA:CA + EU:DE). [`tests/e2e.spec.ts`](tests/e2e.spec.ts) runs the whole flow on it: audit, scope, closing a sub-phase with the security audit, regressions, a secret in the code, the production gate, a scope change with its quote impact, the client export and a catalog update.
 
 ## Limitations
 
@@ -196,7 +210,8 @@ In a `client-project` the repo is handed to the client, so nothing internal to y
 
 - The CI check only blocks merges once you mark it as **required** in the repo's branch protection settings.
 - HTML checks need a build output (`out/`, `.next/server/app`, `dist/`). Without one, those items stay pending instead of passing.
-- Catalog `2026.10.1` covers base, SEO and security. Accessibility, design system, UX, content, legal, markets, `/mep:audit`, `/mep:update`, quoting and export are planned.
+- Many UX, legal and design items are `manual`: the engine tracks them, but a person (or `mep-security`, for security) confirms them.
+- Prices in `catalog/costs.yaml` and effort ranges are estimates; check current prices and calibrate with `/mep:log-time`.
 
 The full design is in [docs/spec.md](docs/spec.md) (Spanish).
 

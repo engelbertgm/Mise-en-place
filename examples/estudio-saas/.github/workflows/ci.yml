@@ -1,0 +1,18 @@
+name: ci
+on: [pull_request]
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level critical --prod
+      - run: pnpm lint && pnpm typecheck && pnpm test
+  codeql:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/analyze@v3

@@ -1,6 +1,8 @@
 # Mise en place (`mep`) — Especificación para construir el plugin
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
+>
+> **Estado:** fases 1–10 implementadas (catálogo 2026.10.2, 329 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql` y `maps`; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -377,7 +379,7 @@ Genera la cotización desde el brief (ver sección 12).
 Toggle: la cotización corre **solo** al definir el scope (`/mep:scope`) y en cambios de scope (`/mep:add`). No corre en `/mep:check`, cierres de fase ni hooks.
 
 ### `/mep:export [--format docx|pdf] [--lang en|es|…]`
-Genera el documento del brief para el cliente (ver sección 14).
+Genera el documento del brief para el cliente (ver sección 14). Claude escribe `docs/client/brief-vN.md` en el idioma del cliente desde `templates/client-brief/` y los datos de `mep export-data`; el motor lo convierte a .docx y .pdf y registra la versión en `.mep/exports.yaml`.
 
 ### `/mep:log-time <id> <horas>`
 Registra horas reales por ítem en `~/.config/mep-check/actuals/<proyecto>.yaml` (fuera del repo) para calibrar estimaciones futuras.

@@ -7,7 +7,7 @@ Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
 [![Versión](https://img.shields.io/badge/versión-0.1.0-informational.svg)](.claude-plugin/plugin.json)
-[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.1-informational.svg)](catalog/CHANGELOG.md)
+[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.2-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Funciona con batuta](https://img.shields.io/badge/funciona_con-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
@@ -98,6 +98,13 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
 | `/mep:override <id> <razón>` | Desactiva un ítem 🔴 tras confirmar; rechaza ítems 🔒 |
+| `/mep:audit` | Para un repo existente: infiere el perfil desde el código, lo confirma contigo y reporta la brecha por sub-etapa. No cambia nada hasta que adoptes el brief |
+| `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil. Los que caen en una sub-etapa cerrada tienen periodo de gracia |
+| `/mep:quote [--client]` | Cotización desde el brief. Vista interna (horas, tarifa, márgenes) o vista cliente (precio por fase, extras, costos recurrentes, planes de mantenimiento) |
+| `/mep:export [--lang es]` | Brief para el cliente en .docx y .pdf, en su idioma, con versión y cambios respecto a la anterior |
+| `/mep:log-time <id> <horas>` | Registra horas reales por ítem fuera del repo; con datos suficientes, mep sugiere nuevos rangos |
+
+La cotización corre sola solo al definir el scope (`/mep:scope`) y cuando cambia (`/mep:add`, que muestra el impacto en horas y precio antes de aceptar). Tarifas, horas reales y cotizaciones internas viven en `~/.config/mep-check/`, nunca en el repo.
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
 
@@ -188,6 +195,13 @@ En un `client-project` el repo se entrega al cliente, así que nada interno de t
 - **Mods** ([`mods/register.ts`](mods/register.ts)): corren dentro de Claude Code. `/mep:check` y `/mep:phase` responden al instante, sin turno de Claude; los deploys esperan al gate del motor; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes.
 - **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse y PostToolUse, como respaldo donde no hay mods.
 - **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod`.
+- **Mapas**: `mep codemap` y `mep registry` generan `CODEMAP.md` y `REGISTRY.md` desde el código. "Para qué" y "No usar para" se escriben en el comentario de cada export; un export sin entrada bloquea cuando su sub-etapa está cerrada.
+- **Export**: un subconjunto simple de Markdown se convierte en .docx y .pdf sin dependencias, así funciona en cualquier máquina.
+- **Catálogo** ([`catalog/`](catalog)): 329 ítems de accesibilidad, sistema de diseño, UX, contenido, formularios, datos, responsive, seguridad, privacidad, legal, performance, i18n, calidad de código, despliegue y los mercados MX, USA, CA, EU, UK, BR e IN, cada ítem legal con su fuente oficial.
+
+### Proyecto de prueba
+
+[`examples/estudio-saas`](examples/estudio-saas) es un SaaS ficticio (auth y pagos, MX + USA:CA + EU:DE). [`tests/e2e.spec.ts`](tests/e2e.spec.ts) recorre todo el flujo sobre él: audit, scope, cierre de una sub-etapa con la auditoría de seguridad, regresiones, un secreto en el código, el gate de producción, un cambio de scope con su impacto en la cotización, el export para el cliente y una actualización del catálogo.
 
 ## Limitaciones
 
@@ -196,7 +210,8 @@ En un `client-project` el repo se entrega al cliente, así que nada interno de t
 
 - El check de CI solo bloquea merges cuando lo marcas como **obligatorio** en la protección de ramas del repo.
 - Las verificaciones de HTML necesitan una salida de build (`out/`, `.next/server/app`, `dist/`). Sin ella, esos ítems quedan pendientes en lugar de pasar.
-- El catálogo `2026.10.1` cubre base, SEO y seguridad. Accesibilidad, sistema de diseño, UX, contenido, legal, mercados, `/mep:audit`, `/mep:update`, cotizador y export están planeados.
+- Muchos ítems de UX, legal y diseño son `manual`: el motor los lleva, pero los confirma una persona (o `mep-security`, en seguridad).
+- Los precios de `catalog/costs.yaml` y los rangos de esfuerzo son estimaciones; verifica precios actuales y calibra con `/mep:log-time`.
 
 El diseño completo está en [docs/spec.md](docs/spec.md).
 

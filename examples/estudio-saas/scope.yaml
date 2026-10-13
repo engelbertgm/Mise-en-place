@@ -1,0 +1,10 @@
+project: Estudio
+type: saas
+capabilities: [auth, payments, subscriptions, email]
+markets: [MX, "USA:CA", "EU:DE"]
+audience: [b2c]
+context: client-project
+counts: { pages: 10, entities: 5, languages: 3, integrations: 3 }
+signals: { db_client_access: true, has_dates: true, has_tables: true }
+custom_work:
+  - { title: "Agenda de clases por instructor", size: L, phase: build.features }

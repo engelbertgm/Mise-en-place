@@ -8410,7 +8410,7 @@ function runCheck(root, check, profile, itemId, mode) {
   switch (check.type) {
     case "file_exists": {
       const paths = Array.isArray(check.path) ? check.path : [check.path];
-      const found = paths.find((p) => p.includes("*") ? matchFiles(root, p).length > 0 : exists(root, p));
+      const found = paths.find((p) => /[*{]/.test(p) ? matchFiles(root, p).length > 0 : exists(root, p));
       return found ? { ok: true, detail: found } : { ok: false, detail: `falta ${paths.join(" o ")}` };
     }
     case "route_exists":

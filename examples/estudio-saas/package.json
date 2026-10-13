@@ -1,0 +1,28 @@
+{
+  "name": "estudio",
+  "private": true,
+  "description": "Proyecto de prueba de mep: SaaS ficticio de reservas para estudios de danza (MX, USA:CA, EU:DE).",
+  "scripts": {
+    "build": "node scripts/check.mjs build",
+    "lint": "node scripts/check.mjs lint",
+    "typecheck": "node scripts/check.mjs typecheck",
+    "test": "node scripts/check.mjs test"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.5.2",
+    "@supabase/supabase-js": "2.45.4",
+    "next": "15.0.3",
+    "next-intl": "3.25.1",
+    "react": "19.0.0",
+    "resend": "4.0.1",
+    "stripe": "17.3.1",
+    "zod": "3.23.8"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "4.10.1",
+    "jscpd": "4.0.5",
+    "knip": "5.36.7",
+    "prettier": "3.3.3",
+    "typescript": "5.6.3"
+  }
+}
