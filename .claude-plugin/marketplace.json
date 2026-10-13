@@ -1,8 +1,17 @@
 {
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
   "name": "mise-en-place",
-  "owner": { "name": "Engelbert Mandujano" },
-  "description": "Mise en place (mep): brief, checklist y verificación para websites y webapps.",
+  "description": "Scope → brief → verified checklist for websites and webapps.",
+  "owner": {
+    "name": "Engel",
+    "url": "https://github.com/engelbertgm"
+  },
   "plugins": [
-    { "name": "mep", "source": ".", "description": "Scope → perfil → brief + checklist verificable, con hooks que bloquean cerrar o desplegar si faltan obligatorios." }
+    {
+      "name": "mep",
+      "description": "Turns a plain-language scope into a brief with a justified stack and a verified checklist, and blocks closing or deploying while required items are missing.",
+      "source": "./",
+      "category": "development"
+    }
   ]
 }
