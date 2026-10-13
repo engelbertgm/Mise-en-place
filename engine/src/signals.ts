@@ -7,8 +7,8 @@ import type { Catalog, Profile } from './types.ts'
 
 type Detector = { grep: string; glob: string } | { dependency: string[] } | { file: string }
 
-export function loadDetectors(catalog: Catalog): Record<string, Detector[]> {
-  const file = join(catalog.dir, 'signals.yaml')
+export function loadDetectors(catalog: Catalog, name = 'signals.yaml'): Record<string, Detector[]> {
+  const file = join(catalog.dir, name)
   return existsSync(file) ? (parse(readFileSync(file, 'utf8')) as Record<string, Detector[]>) : {}
 }
 
@@ -21,9 +21,18 @@ function fires(root: string, d: Detector, deps: Set<string>): string | undefined
 
 /** Signals the code shows. Each value is the evidence (a file or a dependency). */
 export function detectSignals(root: string, catalog: Catalog): Record<string, string> {
+  return detect(root, loadDetectors(catalog))
+}
+
+/** Capabilities the code shows (catalog/detect.yaml), for /mep:audit. */
+export function detectCapabilities(root: string, catalog: Catalog): Record<string, string> {
+  return detect(root, loadDetectors(catalog, 'detect.yaml'))
+}
+
+function detect(root: string, table: Record<string, Detector[]>): Record<string, string> {
   const deps = dependencies(root)
   const out: Record<string, string> = {}
-  for (const [signal, detectors] of Object.entries(loadDetectors(catalog))) {
+  for (const [signal, detectors] of Object.entries(table)) {
     for (const d of detectors) {
       const evidence = fires(root, d, deps)
       if (evidence) {

@@ -1,7 +1,7 @@
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
-import { parse } from 'yaml'
+import { basename, dirname, join, resolve } from 'node:path'
+import { parse, stringify } from 'yaml'
 import { loadCatalog, validateProfile } from './catalog.ts'
 import { deployKind, mayDeploy } from './deploy.ts'
 import { diff, evaluate, warnings } from './evaluate.ts'
@@ -14,6 +14,14 @@ import { recordReport, reportState } from './security.ts'
 import { missingSignals } from './signals.ts'
 import { globToRegExp } from './files.ts'
 import { verifyItems } from './verify.ts'
+import { gapReport, inferProfile } from './audit.ts'
+import { parseMarkdown, toDocx, toPdf } from './docs.ts'
+import { exportData, recordExport } from './export.ts'
+import { checkCodemap, checkRegistry, writeCodemap, writeRegistry } from './maps.ts'
+import { calibrate, formatClient, formatInternal, loadRates, logTime, quote, saveQuote } from './quote.ts'
+import type { Range } from './quote.ts'
+import { applyUpdate, catalogUpdates } from './update.ts'
+import { LEVEL_ICON } from './types.ts'
 import type { Catalog, Profile } from './types.ts'
 
 type Args = { _: string[]; flags: Record<string, string | true> }
@@ -101,6 +109,32 @@ function json(value: unknown): void {
   print(JSON.stringify(value))
 }
 
+const fmtRange = (r: Range, unit: string) => `${r[0].toLocaleString('en-US')}–${r[1].toLocaleString('en-US')} ${unit}`
+const signed = (r: Range, unit: string) => `${r[0] >= 0 ? '+' : ''}${r[0].toLocaleString('en-US')} a ${r[1] >= 0 ? '+' : ''}${r[1].toLocaleString('en-US')} ${unit}`
+
+/**
+ * The quote toggle: it runs by itself only when the scope is defined (init) or changes (add --apply).
+ * Never on check, phase close or hooks. The internal quote is saved outside the repo.
+ */
+function quoteOnScopeChange(profile: Profile, catalog: Catalog): string {
+  const { rates, created, configured } = loadRates()
+  const q = quote(profile, catalog, rates)
+  if (!configured) return `Esfuerzo estimado: ${fmtRange(q.total, 'h')}.${created ? ' Se creó ~/.config/mep-check/rates.yaml:' : ''} Define hourly_rate en ~/.config/mep-check/rates.yaml para ver precios.`
+  saveQuote(profile, q, rates)
+  return `Cotización: ${fmtRange(q.total, 'h')} · ${fmtRange(q.price, q.currency)} (interna guardada fuera del repo; /mep:quote para el detalle).`
+}
+
+/** Closes, in order, every sub-phase whose required items already pass (adopting mep in an existing repo). */
+function closePassingPhases(root: string, catalog: Catalog): string[] {
+  const closed: string[] = []
+  for (const sub of catalog.dimensions.phases) {
+    const r = closePhase(root, catalog, sub)
+    if (!r.closed) break
+    closed.push(sub)
+  }
+  return closed
+}
+
 /** Classic hooks: the backup where mods are not available. They never act on a repo without .mep/. */
 function runHook(event: string, root: string, catalog: Catalog): void {
   const input = hookInput()
@@ -182,7 +216,17 @@ function main(): void {
         writeFileSync(ci, readFileSync(join(pluginRoot(catalog), 'templates', 'ci', 'mep.yml'), 'utf8'))
       }
       log(root, 'init', `${profile.type} (${profile.capabilities.join(',')})`)
-      return print(`✅ .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? 'enlazado' : 'ya estaba enlazado'}. CI: .github/workflows/mep.yml.`)
+      const closed = args.flags['close-passing'] ? closePassingPhases(root, catalog) : []
+      if (closed.length) regenerate(root, loadProfile(root, catalog), catalog)
+      return print(
+        [
+          `✅ .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? 'enlazado' : 'ya estaba enlazado'}. CI: .github/workflows/mep.yml.`,
+          closed.length ? `Sub-etapas ya cumplidas y cerradas: ${closed.join(', ')}.` : '',
+          quoteOnScopeChange(loadProfile(root, catalog), catalog),
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
     }
     case 'render': {
       const profile = requireProfile(root, catalog)
@@ -202,14 +246,19 @@ function main(): void {
         ? changes.map(c => `${labels[c.change]}  ${c.id} — ${c.title}${c.from ? ` (${c.from}${c.to ? ` → ${c.to}` : ''})` : c.to ? ` (${c.to})` : ''}`).join('\n')
         : 'Sin cambios en el checklist.'
       if (args.flags.json) return json(changes)
+      // Impact of the change in hours and price, shown before accepting.
+      const { rates, configured } = loadRates()
+      const qa = quote(before, catalog, rates)
+      const qb = quote(after, catalog, rates)
+      const impact = `Impacto: ${signed([qb.total[0] - qa.total[0], qb.total[1] - qa.total[1]], 'h')}${configured ? ` · ${signed([qb.price[0] - qa.price[0], qb.price[1] - qa.price[1]], qb.currency)}` : ''}`
       if (args.flags.apply) {
         saveProfile(root, after)
         regenerate(root, after, catalog)
         writeStackAdrs(root, after, catalog)
         log(root, 'add', changes.map(c => `${c.change}:${c.id}`).join(','))
-        return print(`${text}\n\n✅ Perfil actualizado y BRIEF.md regenerado.`)
+        return print(`${text}\n${impact}\n\n✅ Perfil actualizado y BRIEF.md regenerado.\n${quoteOnScopeChange(after, catalog)}`)
       }
-      return print(text)
+      return print(`${text}\n${impact}`)
     }
     case 'check': {
       const profile = requireProfile(root, catalog)
@@ -321,6 +370,118 @@ function main(): void {
       const ids = evaluate(profile, catalog).filter(e => e.state === 'active' && e.item.category === 'security').map(e => e.item.id)
       return print(ids.map(id => `${reportState(root, id).valid ? '✅' : '❌'} ${id} — ${reportState(root, id).detail}`).join('\n'))
     }
+    case 'audit': {
+      // Step 1: infer the profile. Step 3 (with --from): gap report against the confirmed profile. Writes nothing.
+      if (!args.flags.from) {
+        const { profile, evidence } = inferProfile(root, catalog)
+        if (args.flags.json) return json({ profile, evidence })
+        const { phase, selections, version, catalog_version, ...shown } = profile
+        return print(`${stringify(shown, { lineWidth: 0 }).trim()}\n\nEvidencia:\n${Object.entries(evidence).map(([k, v]) => `  ${k}: ${v}`).join('\n')}`)
+      }
+      const profile = proposedProfile(args, catalog)
+      const results = gapReport(root, profile, catalog)
+      const c = counts(results)
+      if (args.flags.json) return json({ counts: c, results: results.map(r => ({ id: r.item.id, level: r.level, phase: r.item.phase, status: r.status })) })
+      const passing = catalog.dimensions.phases.filter(p => results.every(r => r.item.phase !== p || r.level !== 'required' || r.status === 'pass'))
+      return print(
+        [
+          `Reporte de brecha (nada se bloquea hasta adoptar el brief)`,
+          formatCheck(results, profile, catalog),
+          `\nPendientes: 🔴 ${c.required} · 🟡 ${c.recommended}`,
+          passing.length ? `Sub-etapas que ya cumplen sus 🔴: ${passing.join(', ')}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      )
+    }
+    case 'update': {
+      const profile = requireProfile(root, catalog)
+      const updates = catalogUpdates(profile, catalog)
+      if (args.flags.json) return json(updates.map(u => ({ id: u.item.id, change: u.change, level: u.level, phase: u.item.phase, inClosedPhase: u.inClosedPhase })))
+      if (!updates.length && profile.catalog_version === catalog.version) return print(`Catálogo al día (${catalog.version}).`)
+      const list = updates.map(u => `${u.change === 'new' ? '＋' : '✎'} ${LEVEL_ICON[u.level]} ${u.item.id} (${u.item.phase}${u.inClosedPhase ? ', sub-etapa cerrada' : ''}) — ${u.item.title}`)
+      const head = `Catálogo ${profile.catalog_version} → ${catalog.version}: ${updates.length} ítem(s) nuevos o modificados que aplican a este perfil.`
+      if (!args.flags.apply) return print([head, ...list].join('\n'))
+      const { profile: next, graced } = applyUpdate(profile, catalog)
+      saveProfile(root, next)
+      regenerate(root, next, catalog)
+      log(root, 'update', `${profile.catalog_version}->${catalog.version} grace:${graced.join(',')}`)
+      return print([head, ...list, '', `✅ Perfil en catálogo ${catalog.version}.`, graced.length ? `Periodo de gracia (no bloquean hasta el siguiente cierre o el deploy a producción): ${graced.join(', ')}` : ''].filter(Boolean).join('\n'))
+    }
+    case 'registry': {
+      if (args.flags.check) {
+        const errors = checkRegistry(root)
+        print(errors.length ? `❌ REGISTRY.md desactualizado:\n${errors.map(e => `  - ${e}`).join('\n')}` : '✅ REGISTRY.md al día')
+        process.exitCode = errors.length ? 1 : 0
+        return
+      }
+      const r = writeRegistry(root)
+      return print(`REGISTRY.md: ${r.entries} piezas${r.undocumented ? `, ${r.undocumented} sin "Para qué" (escríbelo en su comentario /** */)` : ''}.`)
+    }
+    case 'codemap': {
+      if (args.flags.check) {
+        const errors = checkCodemap(root)
+        print(errors.length ? `❌ ${errors.join('\n')}` : '✅ CODEMAP.md al día')
+        process.exitCode = errors.length ? 1 : 0
+        return
+      }
+      writeCodemap(root, catalog)
+      return print('CODEMAP.md regenerado (las notas manuales se conservan).')
+    }
+    case 'quote': {
+      const profile = requireProfile(root, catalog)
+      const { rates, created, configured } = loadRates()
+      const q = quote(profile, catalog, rates)
+      if (args.flags.json) return json(args.flags.client ? { byPhase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance, currency: q.currency } : q)
+      if (args.flags.save && configured) saveQuote(profile, q, rates)
+      const warn = configured ? '' : `\n\n⚠️ hourly_rate es 0${created ? ' (se creó la plantilla)' : ''}: define tu tarifa en ~/.config/mep-check/rates.yaml.`
+      return print((args.flags.client ? formatClient(q) : formatInternal(q, rates, catalog.dimensions.phases)) + warn)
+    }
+    case 'log-time': {
+      const [id, hoursText] = rest
+      const hours = Number(hoursText)
+      if (!id || !(hours > 0)) fail('Uso: mep log-time <id> <horas>')
+      const profile = requireProfile(root, catalog)
+      if (!catalog.items.some(i => i.id === id) && !id.startsWith('custom:')) fail(`${id} no es un ítem del catálogo (para trabajo a la medida usa custom:<nombre>)`)
+      logTime(profile, id, hours)
+      const item = catalog.items.find(i => i.id === id)
+      return print(`⏱️ ${id}: ${hours} h registradas fuera del repo.${item ? ` Rango del catálogo: ${item.effort.hours[0]}–${item.effort.hours[1]} h.` : ''}`)
+    }
+    case 'calibrate': {
+      const suggestions = calibrate(catalog)
+      if (args.flags.json) return json(suggestions)
+      return print(
+        suggestions.length
+          ? ['Sugerencias de ajuste (mediana fuera del rango, 3+ mediciones):', ...suggestions.map(s => `  ${s.id}: ${s.current[0]}–${s.current[1]} h → ${s.suggested[0]}–${s.suggested[1]} h (mediana ${s.median} h, ${s.samples} mediciones)`)].join('\n')
+          : 'Sin sugerencias: faltan mediciones o los rangos ya coinciden con las horas reales.',
+      )
+    }
+    case 'export-data': {
+      const profile = requireProfile(root, catalog)
+      const { rates, configured } = loadRates()
+      return json(exportData(root, profile, catalog, String(args.flags.lang ?? 'es'), configured ? quote(profile, catalog, rates) : undefined))
+    }
+    case 'export': {
+      const profile = requireProfile(root, catalog)
+      const input = args.flags.in as string | undefined
+      if (!input || !existsSync(join(root, input))) fail('Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]')
+      const format = String(args.flags.format ?? 'both')
+      const blocks = parseMarkdown(readFileSync(join(root, input), 'utf8'))
+      const base = join(root, dirname(input), basename(input).replace(/\.md$/, ''))
+      const files: string[] = []
+      if (format === 'docx' || format === 'both') {
+        writeFileSync(`${base}.docx`, toDocx(blocks))
+        files.push(`${base}.docx`.slice(root.length + 1))
+      }
+      if (format === 'pdf' || format === 'both') {
+        writeFileSync(`${base}.pdf`, toPdf(blocks))
+        files.push(`${base}.pdf`.slice(root.length + 1))
+      }
+      const { rates, configured } = loadRates()
+      const fromName = basename(input).match(/-v(\d+)\.md$/)?.[1]
+      const record = recordExport(root, profile, catalog, String(args.flags.lang ?? 'es'), files, configured ? quote(profile, catalog, rates).price : undefined, fromName ? Number(fromName) : undefined)
+      return print(`📄 Brief v${record.version} para el cliente: ${files.join(', ')}`)
+    }
     case 'signals': {
       const profile = requireProfile(root, catalog)
       return json(missingSignals(root, profile, catalog))
@@ -343,6 +504,11 @@ function main(): void {
           '  phase [close <sub-etapa>]',
           '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> --by <nombre>',
           '  security [record --id --result --files --notes]',
+          '  audit [--from perfil.yaml]                            infiere el perfil / reporte de brecha (no escribe nada)',
+          '  update [--apply]                                      ítems nuevos del catálogo que aplican',
+          '  registry [--check] · codemap [--check]                mapas de referencia',
+          '  quote [--client] [--save] · log-time <id> <horas> · calibrate',
+          '  export-data [--lang es] · export --in <md> [--format docx|pdf|both]',
           '  render · status · signals · presets · version',
           '  hook <session-start|stop|pre-bash|post-edit>          hooks clásicos (stdin JSON)',
         ].join('\n'),

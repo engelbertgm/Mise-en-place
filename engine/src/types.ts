@@ -29,6 +29,7 @@ export type Check =
   | { type: 'command'; run: string; timeout?: number }
   | { type: 'html'; rule: HtmlRule; name?: string; property?: string; rel?: string }
   | { type: 'sql'; rule: 'rls_enabled' | 'policies_per_operation'; glob?: string }
+  | { type: 'maps'; rule: 'registry' | 'codemap' }
   | { type: 'manual'; prompt: string }
 
 export type HtmlRule =
@@ -56,6 +57,8 @@ export type Item = {
   locked?: boolean
   conflicts_with?: string[]
   since: string
+  /** Catalog version of the last meaningful change (shown by /mep:update). */
+  updated?: string
   effort: { size: Size; hours: [number, number]; scales_with?: ScaleDim }
   when?: Condition
   level_overrides?: { when: Condition; level: Level }[]
@@ -114,8 +117,12 @@ export type Profile = {
     recommended_skipped: { id: string; reason: string; date: string }[]
     overrides: { id: string; reason: string; date: string }[]
     manual_confirmed: { id: string; by: string; date: string }[]
+    /** Items from /mep:update that landed in a closed sub-phase: they do not block until the next close or a production deploy. */
+    grace: string[]
   }
   stack: { decided: Record<string, string> }
+  /** Features of the scope that are not in the catalog; Claude sizes them and they show as "estimación a revisar". */
+  custom_work?: { title: string; size: Size; phase?: string }[]
 }
 
 export type ItemState = 'active' | 'skipped' | 'overridden' | 'offered'

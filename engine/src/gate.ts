@@ -40,8 +40,11 @@ export function gate(root: string, catalog: Catalog, kind: GateKind, env = proce
 
   const locked = results.filter(r => r.item.locked && r.violation)
   const required = results.filter(r => r.level === 'required')
+  const grace = new Set(profile.selections.grace)
   const regressions =
-    kind === 'prod' ? required.filter(r => r.status !== 'pass') : required.filter(r => closed.has(r.item.phase) && r.status === 'fail')
+    kind === 'prod'
+      ? required.filter(r => r.status !== 'pass')
+      : required.filter(r => closed.has(r.item.phase) && r.status === 'fail' && !grace.has(r.item.id))
   const blockers = uniq([...locked, ...regressions])
   const info = kind === 'prod' ? [] : required.filter(r => r.item.phase === profile.phase.active && r.status !== 'pass' && !blockers.includes(r))
 
@@ -73,12 +76,17 @@ export function closePhase(root: string, catalog: Catalog, sub: string): PhaseCl
   if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya está cerrada`, pending: [], profile }
 
   const results = verifyItems(root, profile, evaluate(profile, catalog), 'full')
-  const pending = results.filter(r => r.state === 'active' && r.level === 'required' && r.item.phase === sub && r.status !== 'pass')
+  // Items still in their grace period (from /mep:update) must be met at the next close.
+  const grace = new Set(profile.selections.grace)
+  const pending = results.filter(
+    r => r.state === 'active' && r.level === 'required' && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass',
+  )
   if (pending.length) {
     return { closed: false, message: `No se puede cerrar ${sub}: ${pending.length} 🔴 sin cumplir.\n${formatItems(pending)}`, pending, profile }
   }
   profile.phase.closed = phases.filter(p => p === sub || profile.phase.closed.includes(p))
   profile.phase.active = phases.find(p => !profile.phase.closed.includes(p)) ?? sub
+  profile.selections.grace = []
   saveProfile(root, profile)
   log(root, 'phase-close', sub)
   return { closed: true, message: `✅ ${sub} cerrada. Sus 🔴 quedan protegidos contra regresiones. Sub-etapa activa: ${profile.phase.active}.`, pending: [], profile }

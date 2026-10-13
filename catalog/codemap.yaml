@@ -1,0 +1,41 @@
+# Descripción por defecto de carpetas conocidas para CODEMAP.md. Lo que no está aquí sale como "—" y se explica en Notas manuales.
+folders:
+  app: { contains: "Rutas (páginas, layouts, route handlers) del App Router", notHere: "Componentes reutilizables, lógica de negocio" }
+  src/app: { contains: "Rutas (páginas, layouts, route handlers) del App Router", notHere: "Componentes reutilizables, lógica de negocio" }
+  pages: { contains: "Rutas del framework (una por archivo)", notHere: "Componentes reutilizables" }
+  routes: { contains: "Rutas basadas en archivos", notHere: "Componentes reutilizables" }
+  components: { contains: "Componentes reutilizables; ui/ = sistema de diseño (shadcn)", notHere: "Fetch de datos, lógica de negocio, páginas" }
+  hooks: { contains: "Hooks de React reutilizables", notHere: "Componentes" }
+  lib: { contains: "Utilidades y clientes (supabase, stripe, fetchers)", notHere: "Componentes de UI" }
+  utils: { contains: "Funciones puras pequeñas", notHere: "Código con efectos o de UI" }
+  services: { contains: "Lógica de negocio y acceso a datos del servidor", notHere: "Componentes de UI" }
+  types: { contains: "Tipos compartidos", notHere: "Código que se ejecuta" }
+  styles: { contains: "CSS global y tokens de diseño", notHere: "Estilos de un solo componente" }
+  public: { contains: "Archivos estáticos servidos tal cual (íconos, imágenes, robots)", notHere: "Imágenes que se optimizan en build, secretos" }
+  supabase: { contains: "Config de Supabase, migraciones SQL y funciones", notHere: "Código de la app" }
+  migrations: { contains: "Migraciones versionadas de la base de datos", notHere: "Seeds con datos reales" }
+  prisma: { contains: "Esquema y migraciones de Prisma", notHere: "Lógica de la app" }
+  emails: { contains: "Plantillas de email como componentes", notHere: "Lógica de envío" }
+  content: { contains: "Contenido (MDX, JSON) del sitio", notHere: "Código" }
+  messages: { contains: "Textos por idioma (archivos de traducción)", notHere: "Textos dentro del código" }
+  locales: { contains: "Textos por idioma (archivos de traducción)", notHere: "Textos dentro del código" }
+  tests: { contains: "Tests de integración y end-to-end", notHere: "Código de producción" }
+  e2e: { contains: "Tests end-to-end (Playwright)", notHere: "Tests unitarios" }
+  scripts: { contains: "Scripts de desarrollo y mantenimiento", notHere: "Código que corre en producción" }
+  docs: { contains: "Documentación; decisions/ = ADRs", notHere: "Código" }
+  .github: { contains: "Workflows de CI y plantillas", notHere: "Código de la app" }
+conventions:
+  nextjs:
+    - "Ruta nueva: app/<segmento>/page.tsx (carpetas en kebab-case; grupos entre paréntesis no cambian la URL)."
+    - "API: app/api/<recurso>/route.ts; preferir Server Actions para mutaciones de formularios."
+    - "Componente nuevo: primero REGISTRY.md; si no existe, components/ (ui/ solo para piezas del sistema de diseño)."
+    - "Migración nueva: supabase/migrations/<timestamp>_<descripcion>.sql, siempre con RLS."
+    - "Test: junto al archivo (*.test.ts) o en tests/ para flujos completos."
+  astro:
+    - "Ruta nueva: src/pages/<segmento>.astro (o .md/.mdx)."
+    - "Componente nuevo: primero REGISTRY.md; si no existe, src/components/."
+  vite-react:
+    - "Ruta nueva: agregarla al router (src/routes o la definición de rutas)."
+    - "Componente nuevo: primero REGISTRY.md; si no existe, src/components/."
+  static:
+    - "Página nueva: un archivo .html por ruta."

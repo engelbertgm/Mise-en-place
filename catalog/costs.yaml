@@ -1,0 +1,11 @@
+# Costos recurrentes estimados (USD/mes) por decisión de stack. Orientativos: verifica precios actuales antes de cotizar.
+always:
+  domain: { label: "Dominio", monthly: [1, 2], note: "~12–25 USD al año según la extensión" }
+stack:
+  hosting.vercel: { label: "Hosting (Vercel)", monthly: [0, 20], note: "Hobby es gratis pero solo para uso no comercial; Pro desde 20 USD por usuario" }
+  hosting.netlify: { label: "Hosting (Netlify)", monthly: [0, 19], note: "Pro desde 19 USD por usuario" }
+  db_provider.supabase: { label: "Base de datos y auth (Supabase)", monthly: [0, 25], note: "Free pausa proyectos inactivos; Pro desde 25 USD" }
+  db_provider.neon: { label: "Base de datos (Neon)", monthly: [0, 19] }
+  email.resend: { label: "Email (Resend)", monthly: [0, 20], note: "Free hasta 3,000 emails al mes" }
+  payments.stripe: { label: "Pagos (Stripe)", monthly: [0, 0], note: "Sin cuota fija; comisión por transacción según país" }
+  payments.mercadopago: { label: "Pagos (Mercado Pago)", monthly: [0, 0], note: "Sin cuota fija; comisión por transacción" }

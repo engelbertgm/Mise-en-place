@@ -93,6 +93,7 @@ describe('evaluate', () => {
           { id: 'lock', reason: 'r', date: '2026-10-13' },
         ],
         manual_confirmed: [],
+        grace: [],
       },
     })
     const state = Object.fromEntries(evaluate(q, c).map(e => [e.item.id, e.state]))

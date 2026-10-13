@@ -1,0 +1,49 @@
+# Detectores de capacidades para /mep:audit (infiere el perfil desde el código).
+# Mismo formato que signals.yaml: el primero que encuentra evidencia gana.
+auth:
+  - { dependency: [next-auth, "@auth/core", better-auth, "@clerk/nextjs", "@clerk/clerk-react", lucia, "@kinde-oss/kinde-auth-nextjs", "@workos-inc/authkit-nextjs"] }
+  - { grep: "auth\\.(signInWithPassword|signUp|signInWithOAuth|getUser)\\(", glob: "**/*.{ts,tsx,js,jsx}" }
+payments:
+  - { dependency: [stripe, "@stripe/stripe-js", "@stripe/react-stripe-js", mercadopago, "@lemonsqueezy/lemonsqueezy.js", "@paddle/paddle-js", "@polar-sh/sdk"] }
+subscriptions:
+  - { grep: "subscriptions\\.(create|update|cancel)|mode:\\s*[\"']subscription[\"']|billingPortal", glob: "**/*.{ts,tsx,js,jsx}" }
+email:
+  - { dependency: [resend, nodemailer, "@sendgrid/mail", postmark, "@react-email/components", mailgun.js, "@aws-sdk/client-ses"] }
+newsletter:
+  - { grep: "newsletter|audiences\\.|contacts\\.create|mailchimp|convertkit|buttondown", glob: "**/*.{ts,tsx,js,jsx}" }
+i18n:
+  - { dependency: [next-intl, i18next, react-i18next, next-i18next, "@lingui/core", "@formatjs/intl", "astro-i18next", paraglide-js, "@inlang/paraglide-js"] }
+  - { file: "{app,src/app}/[locale]/**/*" }
+search:
+  - { dependency: [algoliasearch, meilisearch, "@orama/orama", typesense, fuse.js, "minisearch", "@upstash/search"] }
+  - { grep: "to_tsvector|textSearch\\(", glob: "**/*.{ts,tsx,js,jsx,sql}" }
+uploads:
+  - { dependency: [uploadthing, "@uploadthing/react", "@vercel/blob", "@aws-sdk/client-s3", react-dropzone, cloudinary, "@uploadcare/react-widget"] }
+  - { grep: "storage\\.from\\(|type=[\"']file[\"']", glob: "**/*.{ts,tsx,js,jsx}" }
+notifications:
+  - { dependency: [web-push, "@novu/node", "@knocklabs/node", "firebase-admin", onesignal-node] }
+  - { grep: "Notification\\.requestPermission|pushManager\\.subscribe", glob: "**/*.{ts,tsx,js,jsx}" }
+realtime:
+  - { dependency: [pusher, pusher-js, ably, socket.io, socket.io-client, "@liveblocks/client", partykit, "@supabase/realtime-js"] }
+  - { grep: "\\.channel\\(|postgres_changes", glob: "**/*.{ts,tsx,js,jsx}" }
+admin-panel:
+  - { file: "{app,src/app,pages,src/pages}/**/admin/**/*" }
+api-public:
+  - { file: "{app,src/app,pages,src/pages}/api/v*/**/*" }
+analytics:
+  - { dependency: ["@vercel/analytics", posthog-js, "@plausible/analytics", plausible-tracker, mixpanel-browser, "@segment/analytics-next", react-ga4, "@next/third-parties"] }
+maps:
+  - { dependency: [mapbox-gl, react-map-gl, leaflet, react-leaflet, "@react-google-maps/api", "@vis.gl/react-google-maps", maplibre-gl] }
+ai-features:
+  - { dependency: [openai, "@anthropic-ai/sdk", ai, "@ai-sdk/openai", "@ai-sdk/anthropic", "@google/generative-ai", langchain, "@langchain/core"] }
+pwa:
+  - { dependency: [next-pwa, "@ducanh2912/next-pwa", serwist, "@serwist/next", vite-plugin-pwa, workbox-window] }
+offline:
+  - { dependency: [dexie, idb, localforage, "@tanstack/query-async-storage-persister", rxdb, "@electric-sql/pglite"] }
+cms:
+  - { dependency: [sanity, next-sanity, "@sanity/client", contentful, "@payloadcms/next", payload, "@strapi/strapi", "@tinacms/cli", tinacms, "@keystatic/core", "@builder.io/react", "@storyblok/react"] }
+media:
+  - { dependency: ["@mux/mux-player-react", "@mux/mux-node", video.js, plyr, react-player, "@vidstack/react", hls.js] }
+  - { grep: "<video\\b|<audio\\b", glob: "**/*.{tsx,jsx,astro,html}" }
+ugc:
+  - { grep: "comments|reviews|posts", glob: "{supabase/migrations,migrations,prisma}/**/*.{sql,prisma}" }

@@ -25,6 +25,8 @@ function describeCheck(c: Check): string {
       return `HTML del build: ${c.rule}${c.name ?? c.property ?? c.rel ? ` ${c.name ?? c.property ?? c.rel}` : ''}`
     case 'sql':
       return `migraciones SQL: ${c.rule}`
+    case 'maps':
+      return c.rule === 'registry' ? 'REGISTRY.md al día (mep registry --check)' : 'CODEMAP.md al día'
     case 'manual':
       return `manual: ${c.prompt}`
   }

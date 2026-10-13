@@ -144,7 +144,7 @@ describe('manual', () => {
   test('pending until a person confirms it', () => {
     const root = makeRepo()
     assert.equal(run(root, { type: 'manual', prompt: '¿revisado?' }).ok, null)
-    const confirmed = profile(c, { selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [{ id: 'x', by: 'Engel', date: '2026-10-13' }] } })
+    const confirmed = profile(c, { selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [{ id: 'x', by: 'Engel', date: '2026-10-13' }], grace: [] } })
     assert.equal(run(root, { type: 'manual', prompt: '¿revisado?' }, 'full', confirmed).ok, true)
   })
 })

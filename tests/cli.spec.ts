@@ -4,10 +4,12 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
-import { CLI, makeRepo } from './helpers.ts'
+import { CLI, makeRepo, tempDir } from './helpers.ts'
+
+const CONFIG = tempDir('mep-config-')
 
 function mep(root: string, args: string[], input?: string) {
-  const r = spawnSync('node', [CLI, ...args], { cwd: root, input, encoding: 'utf8', env: { ...process.env, MEP_BYPASS: '' } })
+  const r = spawnSync('node', [CLI, ...args], { cwd: root, input, encoding: 'utf8', env: { ...process.env, MEP_BYPASS: '', MEP_CONFIG_DIR: CONFIG } })
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
 

@@ -14,7 +14,7 @@ function repo(on: On, opts: { profile?: boolean; branch?: string; verifyExit?: n
     calls.push([...e.argv])
     if (e.argv[0] === 'git') return { value: { exitCode: 0, stdout: `${opts.branch ?? 'feature'}\n`, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
     const cmd = e.argv[2]
-    const stdout = cmd === 'verify' ? (opts.verifyExit ? PENDING : '') : cmd === 'check' ? 'foundation.setup  🔴 3/9 ← activa' : cmd === 'phase' ? 'Sub-etapa activa: foundation.setup' : 'mep · foundation.setup · 🔴 6 · 🟡 2'
+    const stdout = cmd === 'verify' ? (opts.verifyExit ? PENDING : '') : cmd === 'check' ? 'foundation.setup  🔴 3/9 ← activa' : cmd === 'phase' ? 'Sub-etapa activa: foundation.setup' : cmd === 'quote' ? 'Cotización interna (USD, tarifa 40/h)' : 'mep · foundation.setup · 🔴 6 · 🟡 2'
     return { value: { exitCode: cmd === 'verify' ? (opts.verifyExit ?? 0) : 0, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', () => ({ result: 'ran' }))
@@ -67,5 +67,11 @@ describe('commands', () => {
     repo(on)
     expect((await $.command.run(cmd('mep:phase'))).text).toContain('Sub-etapa activa')
     expect((await $.command.run(cmd('mep:phase', 'close foundation.setup'))).text).toBe('skill')
+  })
+
+  test('/mep:quote answers from the engine only when asked', async ($, on) => {
+    const calls = repo(on)
+    expect((await $.command.run(cmd('mep:quote'))).text).toContain('Cotización interna')
+    expect(calls.filter(a => a.includes('quote')).length).toBe(1)
   })
 })

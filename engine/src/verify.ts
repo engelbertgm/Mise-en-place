@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 import { parseJsonc, exists, matchFiles, readText } from './files.ts'
 import { routeExists } from './framework.ts'
 import { checkHtml } from './html.ts'
+import { checkCodemap, checkRegistry } from './maps.ts'
 import { checkSql } from './sql.ts'
 import { reportState } from './security.ts'
 import type { Check, CheckResult, Evaluated, ItemResult, ItemStatus, Profile } from './types.ts'
@@ -75,6 +76,10 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkHtml(root, check)
     case 'sql':
       return checkSql(root, check)
+    case 'maps': {
+      const errors = check.rule === 'registry' ? checkRegistry(root) : checkCodemap(root)
+      return errors.length ? { ok: false, detail: errors.slice(0, 5).join('; ') + (errors.length > 5 ? ` (+${errors.length - 5})` : '') } : { ok: true, detail: `${check.rule} al día` }
+    }
     case 'manual': {
       const confirmed = profile.selections.manual_confirmed.find(c => c.id === itemId)
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` }

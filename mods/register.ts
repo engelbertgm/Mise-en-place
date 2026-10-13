@@ -61,6 +61,13 @@ export const register: Register = on => {
     return { text: (r.stdout || r.stderr).trim() }
   })
 
+  // Manual quote: instant, but never automatic (the toggle lives in init and add --apply).
+  on('command.run', { command: 'mep:quote' }, async ($, e, next) => {
+    if (!(await hasProfile($))) return next(e)
+    const r = await runEngine($, ['quote', ...(e.args ?? '').split(/\s+/).filter(Boolean)])
+    return { text: (r.stdout || r.stderr).trim() }
+  })
+
   // ── status: active sub-phase and pending 🔴/🟡, always visible ──
   on('session.start', async ($, e, next) => {
     const result = await next(e)

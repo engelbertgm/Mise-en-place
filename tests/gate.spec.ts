@@ -73,7 +73,7 @@ describe('gate', () => {
 
   test('overridden required items do not block', () => {
     const root = makeRepo({ 'setup-a.txt': '', 'data-a.txt': '' })
-    withProfile(root, catalog, { selections: { optional_added: [], recommended_skipped: [], overrides: [{ id: 'launch-a', reason: 'r', date: '2026-10-13' }], manual_confirmed: [] } })
+    withProfile(root, catalog, { selections: { optional_added: [], recommended_skipped: [], overrides: [{ id: 'launch-a', reason: 'r', date: '2026-10-13' }], manual_confirmed: [], grace: [] } })
     assert.equal(gate(root, catalog, 'prod').block, false)
   })
 })

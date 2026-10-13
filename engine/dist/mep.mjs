@@ -303,13 +303,13 @@ var require_directives = __commonJS({
        * @param onError - May be called even if the action was successful
        * @returns `true` on success
        */
-      add(line2, onError) {
+      add(line3, onError) {
         if (this.atNextDocument) {
           this.yaml = { explicit: _Directives.defaultYaml.explicit, version: "1.1" };
           this.tags = Object.assign({}, _Directives.defaultTags);
           this.atNextDocument = false;
         }
-        const parts = line2.trim().split(/[ \t]+/);
+        const parts = line3.trim().split(/[ \t]+/);
         const name = parts.shift();
         switch (name) {
           case "%TAG": {
@@ -1506,7 +1506,7 @@ var require_stringify = __commonJS({
         props.push(doc.directives.tagString(tag));
       return props.join(" ");
     }
-    function stringify2(item, ctx, onComment, onChompKeep) {
+    function stringify5(item, ctx, onComment, onChompKeep) {
       if (identity.isPair(item))
         return item.toString(ctx, onComment, onChompKeep);
       if (identity.isAlias(item)) {
@@ -1535,7 +1535,7 @@ var require_stringify = __commonJS({
 ${ctx.indent}${str}`;
     }
     exports.createStringifyContext = createStringifyContext;
-    exports.stringify = stringify2;
+    exports.stringify = stringify5;
   }
 });
 
@@ -1545,7 +1545,7 @@ var require_stringifyPair = __commonJS({
     "use strict";
     var identity = require_identity();
     var Scalar = require_Scalar();
-    var stringify2 = require_stringify();
+    var stringify5 = require_stringify();
     var stringifyComment = require_stringifyComment();
     function stringifyPair({ key, value }, ctx, onComment, onChompKeep) {
       const { allNullValues, doc, indent, indentStep, options: { commentString, indentSeq, simpleKeys } } = ctx;
@@ -1567,7 +1567,7 @@ var require_stringifyPair = __commonJS({
       });
       let keyCommentDone = false;
       let chompKeep = false;
-      let str = stringify2.stringify(key, ctx, () => keyCommentDone = true, () => chompKeep = true);
+      let str = stringify5.stringify(key, ctx, () => keyCommentDone = true, () => chompKeep = true);
       if (!explicitKey && !ctx.inFlow && str.length > 1024) {
         if (simpleKeys)
           throw new Error("With simple keys, single line scalar must not span more than 1024 characters");
@@ -1619,7 +1619,7 @@ ${indent}:`;
         ctx.indent = ctx.indent.substring(2);
       }
       let valueCommentDone = false;
-      const valueStr = stringify2.stringify(value, ctx, () => valueCommentDone = true, () => chompKeep = true);
+      const valueStr = stringify5.stringify(value, ctx, () => valueCommentDone = true, () => chompKeep = true);
       let ws = " ";
       if (keyComment || vsb || vcb) {
         ws = vsb ? "\n" : "";
@@ -1760,7 +1760,7 @@ var require_addPairToJSMap = __commonJS({
     "use strict";
     var log2 = require_log();
     var merge = require_merge();
-    var stringify2 = require_stringify();
+    var stringify5 = require_stringify();
     var identity = require_identity();
     var toJS = require_toJS();
     function addPairToJSMap(ctx, map, { key, value }) {
@@ -1796,7 +1796,7 @@ var require_addPairToJSMap = __commonJS({
       if (typeof jsKey !== "object")
         return String(jsKey);
       if (identity.isNode(key) && ctx?.doc) {
-        const strCtx = stringify2.createStringifyContext(ctx.doc, {});
+        const strCtx = stringify5.createStringifyContext(ctx.doc, {});
         strCtx.anchors = /* @__PURE__ */ new Set();
         for (const node of ctx.anchors.keys())
           strCtx.anchors.add(node.anchor);
@@ -1863,12 +1863,12 @@ var require_stringifyCollection = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/stringify/stringifyCollection.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var stringify2 = require_stringify();
+    var stringify5 = require_stringify();
     var stringifyComment = require_stringifyComment();
     function stringifyCollection(collection, ctx, options) {
       const flow = ctx.inFlow ?? collection.flow;
-      const stringify3 = flow ? stringifyFlowCollection : stringifyBlockCollection;
-      return stringify3(collection, ctx, options);
+      const stringify6 = flow ? stringifyFlowCollection : stringifyBlockCollection;
+      return stringify6(collection, ctx, options);
     }
     function stringifyBlockCollection({ comment, items }, ctx, { blockItemPrefix, flowChars, itemIndent, onChompKeep, onComment }) {
       const { indent, options: { commentString } } = ctx;
@@ -1893,7 +1893,7 @@ var require_stringifyCollection = __commonJS({
           }
         }
         chompKeep = false;
-        let str2 = stringify2.stringify(item, itemCtx, () => comment2 = null, () => chompKeep = true);
+        let str2 = stringify5.stringify(item, itemCtx, () => comment2 = null, () => chompKeep = true);
         if (comment2)
           str2 += stringifyComment.lineComment(str2, itemIndent, commentString(comment2));
         if (chompKeep && comment2)
@@ -1906,9 +1906,9 @@ var require_stringifyCollection = __commonJS({
       } else {
         str = lines[0];
         for (let i = 1; i < lines.length; ++i) {
-          const line2 = lines[i];
-          str += line2 ? `
-${indent}${line2}` : "\n";
+          const line3 = lines[i];
+          str += line3 ? `
+${indent}${line3}` : "\n";
         }
       }
       if (comment) {
@@ -1960,13 +1960,13 @@ ${indent}${line2}` : "\n";
         }
         if (comment)
           reqNewline = true;
-        let str = stringify2.stringify(item, itemCtx, () => comment = null);
+        let str = stringify5.stringify(item, itemCtx, () => comment = null);
         reqNewline || (reqNewline = lines.length > linesAtValue || str.includes("\n"));
         if (i < items.length - 1) {
           str += ",";
         } else if (ctx.options.trailingComma) {
           if (ctx.options.lineWidth > 0) {
-            reqNewline || (reqNewline = lines.reduce((sum, line2) => sum + line2.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
+            reqNewline || (reqNewline = lines.reduce((sum, line3) => sum + line3.length + 2, 2) + (str.length + 2) > ctx.options.lineWidth);
           }
           if (reqNewline) {
             str += ",";
@@ -1982,14 +1982,14 @@ ${indent}${line2}` : "\n";
         return start + end;
       } else {
         if (!reqNewline) {
-          const len = lines.reduce((sum, line2) => sum + line2.length + 2, 2);
+          const len = lines.reduce((sum, line3) => sum + line3.length + 2, 2);
           reqNewline = ctx.options.lineWidth > 0 && len > ctx.options.lineWidth;
         }
         if (reqNewline) {
           let str = start;
-          for (const line2 of lines)
-            str += line2 ? `
-${indentStep}${indent}${line2}` : "\n";
+          for (const line3 of lines)
+            str += line3 ? `
+${indentStep}${indent}${line3}` : "\n";
           return `${str}
 ${indent}${end}`;
         } else {
@@ -2046,7 +2046,7 @@ var require_YAMLMap = __commonJS({
       static from(schema, obj, ctx) {
         const { keepUndefined, replacer } = ctx;
         const map = new this(schema);
-        const add = (key, value) => {
+        const add2 = (key, value) => {
           if (typeof replacer === "function")
             value = replacer.call(obj, key, value);
           else if (Array.isArray(replacer) && !replacer.includes(key))
@@ -2056,10 +2056,10 @@ var require_YAMLMap = __commonJS({
         };
         if (obj instanceof Map) {
           for (const [key, value] of obj)
-            add(key, value);
+            add2(key, value);
         } else if (obj && typeof obj === "object") {
           for (const key of Object.keys(obj))
-            add(key, obj[key]);
+            add2(key, obj[key]);
         }
         if (typeof schema.sortMapEntries === "function") {
           map.items.sort(schema.sortMapEntries);
@@ -3321,7 +3321,7 @@ var require_stringifyDocument = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/stringify/stringifyDocument.js"(exports) {
     "use strict";
     var identity = require_identity();
-    var stringify2 = require_stringify();
+    var stringify5 = require_stringify();
     var stringifyComment = require_stringifyComment();
     function stringifyDocument(doc, options) {
       const lines = [];
@@ -3336,7 +3336,7 @@ var require_stringifyDocument = __commonJS({
       }
       if (hasDirectives)
         lines.push("---");
-      const ctx = stringify2.createStringifyContext(doc, options);
+      const ctx = stringify5.createStringifyContext(doc, options);
       const { commentString } = ctx.options;
       if (doc.commentBefore) {
         if (lines.length !== 1)
@@ -3358,7 +3358,7 @@ var require_stringifyDocument = __commonJS({
           contentComment = doc.contents.comment;
         }
         const onChompKeep = contentComment ? void 0 : () => chompKeep = true;
-        let body = stringify2.stringify(doc.contents, ctx, () => contentComment = null, onChompKeep);
+        let body = stringify5.stringify(doc.contents, ctx, () => contentComment = null, onChompKeep);
         if (contentComment)
           body += stringifyComment.lineComment(body, "", commentString(contentComment));
         if ((body[0] === "|" || body[0] === ">") && lines[lines.length - 1] === "---") {
@@ -3366,7 +3366,7 @@ var require_stringifyDocument = __commonJS({
         } else
           lines.push(body);
       } else {
-        lines.push(stringify2.stringify(doc.contents, ctx));
+        lines.push(stringify5.stringify(doc.contents, ctx));
       }
       if (doc.directives?.docEnd) {
         if (doc.comment) {
@@ -3732,10 +3732,10 @@ var require_errors = __commonJS({
       if (error.pos[0] === -1)
         return;
       error.linePos = error.pos.map((pos) => lc.linePos(pos));
-      const { line: line2, col } = error.linePos[0];
-      error.message += ` at line ${line2}, column ${col}`;
+      const { line: line3, col } = error.linePos[0];
+      error.message += ` at line ${line3}, column ${col}`;
       let ci = col - 1;
-      let lineStr = src.substring(lc.lineStarts[line2 - 1], lc.lineStarts[line2]).replace(/[\n\r]+$/, "");
+      let lineStr = src.substring(lc.lineStarts[line3 - 1], lc.lineStarts[line3]).replace(/[\n\r]+$/, "");
       if (ci >= 60 && lineStr.length > 80) {
         const trimStart = Math.min(ci - 39, lineStr.length - 79);
         lineStr = "\u2026" + lineStr.substring(trimStart);
@@ -3743,8 +3743,8 @@ var require_errors = __commonJS({
       }
       if (lineStr.length > 80)
         lineStr = lineStr.substring(0, 79) + "\u2026";
-      if (line2 > 1 && /^ *$/.test(lineStr.substring(0, ci))) {
-        let prev = src.substring(lc.lineStarts[line2 - 2], lc.lineStarts[line2 - 1]);
+      if (line3 > 1 && /^ *$/.test(lineStr.substring(0, ci))) {
+        let prev = src.substring(lc.lineStarts[line3 - 2], lc.lineStarts[line3 - 1]);
         if (prev.length > 80)
           prev = prev.substring(0, 79) + "\u2026\n";
         lineStr = prev + lineStr;
@@ -3752,7 +3752,7 @@ var require_errors = __commonJS({
       if (/[^ ]/.test(lineStr)) {
         let count = 1;
         const end = error.linePos[1];
-        if (end?.line === line2 && end.col > col) {
+        if (end?.line === line3 && end.col > col) {
           count = Math.max(1, Math.min(end.col - col, 80 - ci));
         }
         const pointer = " ".repeat(ci) + "^".repeat(count);
@@ -4701,8 +4701,8 @@ var require_resolve_flow_scalar = __commonJS({
       return unfoldLines(source.slice(1, -1)).replace(/''/g, "'");
     }
     function unfoldLines(source) {
-      const line2 = /(.*?)\r?\n/sy;
-      let match = line2.exec(source);
+      const line3 = /(.*?)\r?\n/sy;
+      let match = line3.exec(source);
       if (!match)
         return source;
       let trimEnd, trimBoth;
@@ -4715,8 +4715,8 @@ var require_resolve_flow_scalar = __commonJS({
       }
       let res = match[1].replace(trimEnd, "");
       let sep2 = " ";
-      let pos = line2.lastIndex;
-      while (match = line2.exec(source)) {
+      let pos = line3.lastIndex;
+      while (match = line3.exec(source)) {
         const lm = match[1].replace(trimBoth, "");
         if (lm === "") {
           if (sep2 === "\n")
@@ -4727,7 +4727,7 @@ var require_resolve_flow_scalar = __commonJS({
           res += sep2 + lm;
           sep2 = " ";
         }
-        pos = line2.lastIndex;
+        pos = line3.lastIndex;
       }
       const last = /[ \t]*(.*)/sy;
       last.lastIndex = pos;
@@ -5502,7 +5502,7 @@ var require_cst_scalar = __commonJS({
 var require_cst_stringify = __commonJS({
   "node_modules/.pnpm/yaml@2.9.1/node_modules/yaml/dist/parse/cst-stringify.js"(exports) {
     "use strict";
-    var stringify2 = (cst) => "type" in cst ? stringifyToken(cst) : stringifyItem(cst);
+    var stringify5 = (cst) => "type" in cst ? stringifyToken(cst) : stringifyItem(cst);
     function stringifyToken(token) {
       switch (token.type) {
         case "block-scalar": {
@@ -5555,7 +5555,7 @@ var require_cst_stringify = __commonJS({
         res += stringifyToken(value);
       return res;
     }
-    exports.stringify = stringify2;
+    exports.stringify = stringify5;
   }
 });
 
@@ -5857,40 +5857,40 @@ var require_lexer = __commonJS({
         }
       }
       *parseStream() {
-        let line2 = this.getLine();
-        if (line2 === null)
+        let line3 = this.getLine();
+        if (line3 === null)
           return this.setNext("stream");
-        if (line2[0] === cst.BOM) {
+        if (line3[0] === cst.BOM) {
           yield* this.pushCount(1);
-          line2 = line2.substring(1);
+          line3 = line3.substring(1);
         }
-        if (line2[0] === "%") {
-          let dirEnd = line2.length;
-          let cs = line2.indexOf("#");
+        if (line3[0] === "%") {
+          let dirEnd = line3.length;
+          let cs = line3.indexOf("#");
           while (cs !== -1) {
-            const ch = line2[cs - 1];
+            const ch = line3[cs - 1];
             if (ch === " " || ch === "	") {
               dirEnd = cs - 1;
               break;
             } else {
-              cs = line2.indexOf("#", cs + 1);
+              cs = line3.indexOf("#", cs + 1);
             }
           }
           while (true) {
-            const ch = line2[dirEnd - 1];
+            const ch = line3[dirEnd - 1];
             if (ch === " " || ch === "	")
               dirEnd -= 1;
             else
               break;
           }
           const n = (yield* this.pushCount(dirEnd)) + (yield* this.pushSpaces(true));
-          yield* this.pushCount(line2.length - n);
+          yield* this.pushCount(line3.length - n);
           this.pushNewline();
           return "stream";
         }
         if (this.atLineEnd()) {
           const sp = yield* this.pushSpaces(true);
-          yield* this.pushCount(line2.length - sp);
+          yield* this.pushCount(line3.length - sp);
           yield* this.pushNewline();
           return "stream";
         }
@@ -5931,13 +5931,13 @@ var require_lexer = __commonJS({
       }
       *parseDocument() {
         yield* this.pushSpaces(true);
-        const line2 = this.getLine();
-        if (line2 === null)
+        const line3 = this.getLine();
+        if (line3 === null)
           return this.setNext("doc");
         let n = yield* this.pushIndicators();
-        switch (line2[n]) {
+        switch (line3[n]) {
           case "#":
-            yield* this.pushCount(line2.length - n);
+            yield* this.pushCount(line3.length - n);
           // fallthrough
           case void 0:
             yield* this.pushNewline();
@@ -5962,7 +5962,7 @@ var require_lexer = __commonJS({
           case ">":
             n += yield* this.parseBlockScalarHeader();
             n += yield* this.pushSpaces(true);
-            yield* this.pushCount(line2.length - n);
+            yield* this.pushCount(line3.length - n);
             yield* this.pushNewline();
             return yield* this.parseBlockScalar();
           default:
@@ -5982,11 +5982,11 @@ var require_lexer = __commonJS({
           }
           sp += yield* this.pushSpaces(true);
         } while (nl + sp > 0);
-        const line2 = this.getLine();
-        if (line2 === null)
+        const line3 = this.getLine();
+        if (line3 === null)
           return this.setNext("flow");
-        if (indent !== -1 && indent < this.indentNext && line2[0] !== "#" || indent === 0 && (line2.startsWith("---") || line2.startsWith("...")) && isEmpty(line2[3])) {
-          const atFlowEndMarker = indent === this.indentNext - 1 && this.flowLevel === 1 && (line2[0] === "]" || line2[0] === "}");
+        if (indent !== -1 && indent < this.indentNext && line3[0] !== "#" || indent === 0 && (line3.startsWith("---") || line3.startsWith("...")) && isEmpty(line3[3])) {
+          const atFlowEndMarker = indent === this.indentNext - 1 && this.flowLevel === 1 && (line3[0] === "]" || line3[0] === "}");
           if (!atFlowEndMarker) {
             this.flowLevel = 0;
             yield cst.FLOW_END;
@@ -5994,17 +5994,17 @@ var require_lexer = __commonJS({
           }
         }
         let n = 0;
-        while (line2[n] === ",") {
+        while (line3[n] === ",") {
           n += yield* this.pushCount(1);
           n += yield* this.pushSpaces(true);
           this.flowKey = false;
         }
         n += yield* this.pushIndicators();
-        switch (line2[n]) {
+        switch (line3[n]) {
           case void 0:
             return "flow";
           case "#":
-            yield* this.pushCount(line2.length - n);
+            yield* this.pushCount(line3.length - n);
             return "flow";
           case "{":
           case "[":
@@ -6041,9 +6041,9 @@ var require_lexer = __commonJS({
         }
       }
       *parseQuotedScalar() {
-        const quote = this.charAt(0);
-        let end = this.buffer.indexOf(quote, this.pos + 1);
-        if (quote === "'") {
+        const quote2 = this.charAt(0);
+        let end = this.buffer.indexOf(quote2, this.pos + 1);
+        if (quote2 === "'") {
           while (end !== -1 && this.buffer[end + 1] === "'")
             end = this.buffer.indexOf("'", end + 2);
         } else {
@@ -7266,7 +7266,7 @@ var require_public_api = __commonJS({
       }
       return doc;
     }
-    function parse5(src, reviver, options) {
+    function parse8(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
@@ -7285,7 +7285,7 @@ var require_public_api = __commonJS({
       }
       return doc.toJS(Object.assign({ reviver: _reviver }, options));
     }
-    function stringify2(value, replacer, options) {
+    function stringify5(value, replacer, options) {
       let _replacer = null;
       if (typeof replacer === "function" || Array.isArray(replacer)) {
         _replacer = replacer;
@@ -7307,10 +7307,10 @@ var require_public_api = __commonJS({
         return value.toString(options);
       return new Document.Document(value, _replacer, options).toString(options);
     }
-    exports.parse = parse5;
+    exports.parse = parse8;
     exports.parseAllDocuments = parseAllDocuments;
     exports.parseDocument = parseDocument;
-    exports.stringify = stringify2;
+    exports.stringify = stringify5;
   }
 });
 
@@ -7367,10 +7367,10 @@ var require_dist = __commonJS({
 });
 
 // engine/src/cli.ts
-var import_yaml4 = __toESM(require_dist(), 1);
+var import_yaml7 = __toESM(require_dist(), 1);
 import { execSync as execSync3 } from "node:child_process";
-import { existsSync as existsSync8, mkdirSync as mkdirSync5, readFileSync as readFileSync7, writeFileSync as writeFileSync5 } from "node:fs";
-import { dirname as dirname2, join as join9, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync11, mkdirSync as mkdirSync7, readFileSync as readFileSync10, writeFileSync as writeFileSync8 } from "node:fs";
+import { basename, dirname as dirname3, join as join12, resolve as resolve2 } from "node:path";
 
 // engine/src/catalog.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7380,7 +7380,7 @@ import { fileURLToPath } from "node:url";
 var LEVELS = ["required", "recommended", "optional"];
 var SIZES = ["XS", "S", "M", "L", "XL"];
 var SCALES = ["pages", "entities", "languages", "markets", "integrations"];
-var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "manual"];
+var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "manual"];
 function defaultCatalogDir() {
   if (process.env.MEP_CATALOG) return resolve(process.env.MEP_CATALOG);
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -7463,6 +7463,7 @@ function validateCheck(check, where) {
     command: ["run"],
     html: ["rule"],
     sql: ["rule"],
+    maps: ["rule"],
     manual: ["prompt"]
   };
   const errors = required[check.type].filter((f) => check[f] === void 0).map((f) => `${where}: verify ${check.type} needs "${f}"`);
@@ -7812,8 +7813,8 @@ function parseJsonc(text) {
 // engine/src/gate.ts
 import { execSync as execSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join6 } from "node:path";
+import { existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join7 } from "node:path";
 
 // engine/src/profile.ts
 var import_yaml2 = __toESM(require_dist(), 1);
@@ -7839,7 +7840,7 @@ function emptyProfile(catalog) {
     context: "own-product",
     counts: {},
     signals,
-    selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [] },
+    selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [] },
     stack: { decided: {} }
   };
 }
@@ -7858,7 +7859,7 @@ function normalizeProfile(raw, catalog) {
     audience: [...raw.audience ?? []]
   };
   profile.phase.closed = [...profile.phase.closed ?? []];
-  for (const key of ["optional_added", "recommended_skipped", "overrides", "manual_confirmed"]) {
+  for (const key of ["optional_added", "recommended_skipped", "overrides", "manual_confirmed", "grace"]) {
     profile.selections[key] = [...profile.selections[key] ?? []];
   }
   return applyImplications(profile, catalog);
@@ -8092,6 +8093,194 @@ function checkHtml(root, check) {
   return { ok: false, detail: failures.slice(0, 5).map((f) => `${f.file}: ${f.error}`).join("; ") + (failures.length > 5 ? ` (+${failures.length - 5})` : "") };
 }
 
+// engine/src/maps.ts
+var import_yaml3 = __toESM(require_dist(), 1);
+import { existsSync as existsSync5, readdirSync as readdirSync3, readFileSync as readFileSync4, statSync as statSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join5 } from "node:path";
+var REGISTRY_FILE = "REGISTRY.md";
+var CODEMAP_FILE = "CODEMAP.md";
+var REGISTRY_GLOB = "{src/,}{components,hooks,lib,utils,services,types,emails}/**/*.{ts,tsx,js,jsx}";
+var REGISTRY_EXCLUDE = "**/*.{test,spec,stories,d}.{ts,tsx,js,jsx}";
+var KIND_ORDER = ["Componentes", "Hooks", "Servicios", "Utilidades", "Tipos"];
+function kindOf(path, name, keyword) {
+  if (keyword === "type" || keyword === "interface" || keyword === "enum") return "Tipos";
+  if (/^use[A-Z]/.test(name) || /(^|\/)hooks\//.test(path)) return "Hooks";
+  if (/(^|\/)services\//.test(path)) return "Servicios";
+  if (/(^|\/)(components|emails)\//.test(path) && /^[A-Z]/.test(name)) return "Componentes";
+  return "Utilidades";
+}
+function parseDoc(doc) {
+  const lines = doc.replace(/^\/\*\*|\*\/$/g, "").split("\n").map((l) => l.replace(/^\s*\*\s?/, ""));
+  const out = {};
+  const free = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line3 = lines[i].trim();
+    const field = line3.match(/^(Para qué|No usar para|Variantes):\s*(.*)$/i);
+    if (field) {
+      const key = { "para qu\xE9": "purpose", "no usar para": "notFor", variantes: "variants" }[field[1].toLowerCase()];
+      out[key] = field[2];
+    } else if (line3.startsWith("@example")) {
+      const rest = [line3.slice(8).trim(), ...lines.slice(i + 1).filter((l) => !l.trim().startsWith("@"))].filter(Boolean);
+      out.example = rest.join(" ").replace(/\s+/g, " ").trim();
+      break;
+    } else if (line3.startsWith("@")) break;
+    else if (line3) free.push(line3);
+  }
+  if (!out.purpose && free.length) out.purpose = free.join(" ");
+  return out;
+}
+var EXPORT_RE = /^export\s+(?:default\s+)?(?:declare\s+)?(?:async\s+)?(function\*?|const|let|class|type|interface|enum|abstract\s+class)\s+([A-Za-z_$][\w$]*)/;
+function scanExports(root) {
+  const entries = [];
+  for (const path of matchFiles(root, REGISTRY_GLOB, REGISTRY_EXCLUDE)) {
+    const lines = (readText(root, path) ?? "").split("\n");
+    lines.forEach((line3, i) => {
+      const m = line3.match(EXPORT_RE);
+      if (!m) return;
+      const [, keyword, name] = m;
+      let doc = "";
+      let j = i - 1;
+      if (j >= 0 && lines[j].trim().endsWith("*/")) {
+        const end = j;
+        while (j >= 0 && !lines[j].trim().startsWith("/**")) j--;
+        if (j >= 0) doc = lines.slice(j, end + 1).join("\n");
+      }
+      const signature = line3.replace(/\s*[{=]\s*$/, "").replace(/\s*\{$/, "").trim().slice(0, 140);
+      entries.push({ name, path, kind: kindOf(path, name, keyword.replace("abstract ", "")), signature, ...parseDoc(doc) });
+    });
+  }
+  return entries.sort((a, b) => a.name.localeCompare(b.name) || a.path.localeCompare(b.path));
+}
+function renderRegistry(entries) {
+  const out = [
+    '<!-- Generado por mep (registry). No editar a mano: "Para qu\xE9", "No usar para", "Variantes" y @example se escriben en el comentario /** */ de cada export. -->',
+    "# Registro de piezas reutilizables",
+    "",
+    "Antes de crear algo, busca aqu\xED. Cada entrada apunta al c\xF3digo; nunca lo copia."
+  ];
+  for (const kind of KIND_ORDER) {
+    const group = entries.filter((e) => e.kind === kind);
+    if (!group.length) continue;
+    out.push("", `## ${kind}`);
+    for (const e of group) {
+      out.push("", `### ${e.name}`, `- Ruta: ${e.path}`, `- Para qu\xE9: ${e.purpose ?? "\u26A0\uFE0F sin descripci\xF3n"}`, `- Firma: \`${e.signature}\``);
+      if (e.variants) out.push(`- Variantes: ${e.variants}`);
+      if (e.example) out.push(`- Ejemplo: \`${e.example}\``);
+      if (e.notFor) out.push(`- No usar para: ${e.notFor}`);
+    }
+  }
+  return out.join("\n") + "\n";
+}
+function listedEntries(text) {
+  const out = /* @__PURE__ */ new Set();
+  let name;
+  for (const line3 of text.split("\n")) {
+    const h = line3.match(/^###\s+(.+?)\s*$/);
+    if (h) name = h[1];
+    const r = line3.match(/^- Ruta:\s*(\S+)/);
+    if (r && name) out.add(`${r[1]}#${name}`);
+  }
+  return out;
+}
+function checkRegistry(root) {
+  const entries = scanExports(root);
+  if (!entries.length) return [];
+  const text = readText(root, REGISTRY_FILE);
+  if (text === void 0) return [`falta ${REGISTRY_FILE} (corre: mep registry)`];
+  const listed = listedEntries(text);
+  const actual = new Set(entries.map((e) => `${e.path}#${e.name}`));
+  const errors = [];
+  for (const e of entries) {
+    if (!listed.has(`${e.path}#${e.name}`)) errors.push(`${e.name} (${e.path}) no est\xE1 en ${REGISTRY_FILE}`);
+    if (!e.purpose) errors.push(`${e.name} (${e.path}) sin "Para qu\xE9" en su comentario`);
+  }
+  for (const key of listed) {
+    if (!actual.has(key)) errors.push(`${REGISTRY_FILE} apunta a ${key.replace("#", " \u2192 ")}, que ya no existe`);
+  }
+  return errors;
+}
+function writeRegistry(root) {
+  const entries = scanExports(root);
+  writeFileSync2(join5(root, REGISTRY_FILE), renderRegistry(entries));
+  return { entries: entries.length, undocumented: entries.filter((e) => !e.purpose).length };
+}
+function codemapData(catalog) {
+  const file = join5(catalog.dir, "codemap.yaml");
+  return existsSync5(file) ? (0, import_yaml3.parse)(readFileSync4(file, "utf8")) : { folders: {}, conventions: {} };
+}
+var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", ".mep"]);
+function folders(root) {
+  const dirs = (dir) => existsSync5(join5(root, dir)) ? readdirSync3(join5(root, dir)).filter((d) => !SKIP_DIRS.has(d) && !d.startsWith(".") && statSync2(join5(root, dir, d)).isDirectory()) : [];
+  const top = dirs(".").sort();
+  const nested = ["src", "src/app", "app"].flatMap((parent) => top.includes(parent.split("/")[0]) ? dirs(parent).map((d) => `${parent}/${d}`) : []);
+  return [...top, ...nested.sort()];
+}
+var MANUAL_START = "<!-- mep:manual -->";
+var MANUAL_END = "<!-- /mep:manual -->";
+function describe(folder, table) {
+  const last = folder.split("/").pop();
+  return table[folder] ?? table[last] ?? { contains: "\u2014", notHere: "\u2014" };
+}
+function renderCodemap(root, catalog) {
+  const previous = readText(root, CODEMAP_FILE) ?? "";
+  const manual = previous.includes(MANUAL_START) ? previous.slice(previous.indexOf(MANUAL_START) + MANUAL_START.length, previous.indexOf(MANUAL_END)).trim() : "_Lo que el generador no puede inferir: decisiones, atajos, d\xF3nde vive algo poco obvio._";
+  const { folders: table, conventions: byFramework } = codemapData(catalog);
+  const framework = detectFramework(root);
+  const allRoutes = routes(root, framework);
+  const pages = allRoutes.filter((r) => !r.startsWith("/api") && !/\.(txt|xml|webmanifest)$/.test(r));
+  const api = allRoutes.filter((r) => r.startsWith("/api"));
+  const find = (glob) => matchFiles(root, glob);
+  const entryPoints = [
+    ["Rutas", pages],
+    ["API", api],
+    ["Middleware", find("{src/,}middleware.{ts,js}")],
+    ["Configuraci\xF3n", find("{next.config,astro.config,vite.config,tailwind.config,postcss.config,drizzle.config}.{js,mjs,ts,cjs}").concat(find("{tsconfig.json,vercel.json,components.json}"))],
+    ["Tokens de dise\xF1o", find("**/{tokens,theme}.{ts,js,css,json}").concat(find("**/globals.css"))],
+    ["Migraciones", find("{supabase/migrations,migrations,prisma,drizzle}/**/*").slice(0, 1).map((f) => f.split("/").slice(0, -1).join("/") + "/")],
+    ["Jobs / tareas programadas", find("{src/,}{app/api/cron,jobs,trigger,inngest}/**/*.{ts,js}").slice(0, 10)]
+  ];
+  const conventions = byFramework[framework] ?? [];
+  const out = [
+    `<!-- Generado por mep (codemap). Edita solo la secci\xF3n "Notas manuales"; el resto se regenera. -->`,
+    "# Mapa del c\xF3digo",
+    "",
+    `Framework: ${framework}. Para piezas reutilizables, ver ${REGISTRY_FILE}.`,
+    "",
+    "## Carpetas",
+    "",
+    "| Carpeta | Contiene | No va aqu\xED |",
+    "| --- | --- | --- |",
+    ...folders(root).map((f) => {
+      const info = describe(f, table);
+      return `| \`${f}/\` | ${info.contains} | ${info.notHere} |`;
+    }),
+    "",
+    "## Puntos de entrada",
+    "",
+    ...entryPoints.filter(([, v]) => v.length).map(([k, v]) => `- **${k}:** ${v.slice(0, 40).map((x) => `\`${x}\``).join(", ")}${v.length > 40 ? ` \u2026 (+${v.length - 40})` : ""}`),
+    "",
+    "## Convenciones",
+    "",
+    ...conventions.length ? conventions.map((c) => `- ${c}`) : ["- \u2014"],
+    "",
+    "## Notas manuales",
+    "",
+    MANUAL_START,
+    manual,
+    MANUAL_END,
+    ""
+  ];
+  return out.join("\n");
+}
+function writeCodemap(root, catalog) {
+  writeFileSync2(join5(root, CODEMAP_FILE), renderCodemap(root, catalog));
+}
+function checkCodemap(root) {
+  const text = readText(root, CODEMAP_FILE);
+  if (text === void 0) return [`falta ${CODEMAP_FILE} (corre: mep codemap)`];
+  return folders(root).filter((f) => !text.includes(`\`${f}/\``)).map((f) => `${CODEMAP_FILE} no lista la carpeta ${f}/ (corre: mep codemap)`);
+}
+
 // engine/src/sql.ts
 var DEFAULT_GLOB = "{supabase/migrations,migrations,db/migrations,prisma/migrations,drizzle}/**/*.sql";
 var SYSTEM_SCHEMAS = /* @__PURE__ */ new Set(["auth", "storage", "extensions", "realtime", "supabase_functions", "graphql", "vault"]);
@@ -8142,9 +8331,9 @@ function checkSql(root, check) {
 
 // engine/src/security.ts
 import { createHash } from "node:crypto";
-import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync2 } from "node:fs";
-import { join as join5 } from "node:path";
-var SECURITY_DIR = join5(MEP_DIR, "security");
+import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join6 } from "node:path";
+var SECURITY_DIR = join6(MEP_DIR, "security");
 function hashFiles(root, files) {
   const h = createHash("sha256");
   for (const f of [...files].sort()) {
@@ -8153,7 +8342,7 @@ function hashFiles(root, files) {
   return h.digest("hex");
 }
 function readReport(root, id) {
-  const text = readText(root, join5(SECURITY_DIR, `${id}.json`));
+  const text = readText(root, join6(SECURITY_DIR, `${id}.json`));
   if (!text) return void 0;
   try {
     return JSON.parse(text);
@@ -8170,8 +8359,8 @@ function reportState(root, id) {
 }
 function recordReport(root, input) {
   const report = { ...input, hash: hashFiles(root, input.files), date: today(), by: "mep-security" };
-  mkdirSync2(join5(root, SECURITY_DIR), { recursive: true });
-  writeFileSync2(join5(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
+  mkdirSync2(join6(root, SECURITY_DIR), { recursive: true });
+  writeFileSync3(join6(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
   return report;
 }
 
@@ -8184,8 +8373,8 @@ function grep(root, check) {
   const hits = [];
   for (const file of matchFiles(root, check.glob, check.exclude)) {
     const lines = (readText(root, file) ?? "").split("\n");
-    lines.forEach((line2, i) => {
-      if (re.test(line2)) hits.push(`${file}:${i + 1}`);
+    lines.forEach((line3, i) => {
+      if (re.test(line3)) hits.push(`${file}:${i + 1}`);
     });
     if (hits.length >= 20) break;
   }
@@ -8235,6 +8424,10 @@ function runCheck(root, check, profile, itemId, mode) {
       return checkHtml(root, check);
     case "sql":
       return checkSql(root, check);
+    case "maps": {
+      const errors = check.rule === "registry" ? checkRegistry(root) : checkCodemap(root);
+      return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : "") } : { ok: true, detail: `${check.rule} al d\xEDa` };
+    }
     case "manual": {
       const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
@@ -8284,7 +8477,8 @@ function gate(root, catalog, kind, env = process.env) {
   const closed = new Set(profile.phase.closed);
   const locked = results.filter((r) => r.item.locked && r.violation);
   const required = results.filter((r) => r.level === "required");
-  const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail");
+  const grace = new Set(profile.selections.grace);
+  const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail" && !grace.has(r.item.id));
   const blockers = uniq([...locked, ...regressions]);
   const info = kind === "prod" ? [] : required.filter((r) => r.item.phase === profile.phase.active && r.status !== "pass" && !blockers.includes(r));
   const bypassed = env.MEP_BYPASS === "1" && blockers.length > 0 && locked.length === 0;
@@ -8310,13 +8504,17 @@ function closePhase(root, catalog, sub) {
   if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. V\xE1lidas: ${phases.join(", ")}`, pending: [], profile };
   if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya est\xE1 cerrada`, pending: [], profile };
   const results = verifyItems(root, profile, evaluate(profile, catalog), "full");
-  const pending = results.filter((r) => r.state === "active" && r.level === "required" && r.item.phase === sub && r.status !== "pass");
+  const grace = new Set(profile.selections.grace);
+  const pending = results.filter(
+    (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass"
+  );
   if (pending.length) {
     return { closed: false, message: `No se puede cerrar ${sub}: ${pending.length} \u{1F534} sin cumplir.
 ${formatItems(pending)}`, pending, profile };
   }
   profile.phase.closed = phases.filter((p) => p === sub || profile.phase.closed.includes(p));
   profile.phase.active = phases.find((p) => !profile.phase.closed.includes(p)) ?? sub;
+  profile.selections.grace = [];
   saveProfile(root, profile);
   log(root, "phase-close", sub);
   return { closed: true, message: `\u2705 ${sub} cerrada. Sus \u{1F534} quedan protegidos contra regresiones. Sub-etapa activa: ${profile.phase.active}.`, pending: [], profile };
@@ -8331,23 +8529,23 @@ function gitState(root) {
 }
 function cachedGate(root, catalog, kind, env = process.env) {
   if (!hasProfile(root)) return PASS;
-  const key = createHash2("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync4(join6(root, MEP_DIR, "profile.yaml"), "utf8")}`).digest("hex");
-  const dir = join6(root, MEP_DIR, ".cache");
-  const file = join6(dir, `gate-${kind}.json`);
-  if (existsSync5(file)) {
-    const cached = JSON.parse(readFileSync4(file, "utf8"));
+  const key = createHash2("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync5(join7(root, MEP_DIR, "profile.yaml"), "utf8")}`).digest("hex");
+  const dir = join7(root, MEP_DIR, ".cache");
+  const file = join7(dir, `gate-${kind}.json`);
+  if (existsSync6(file)) {
+    const cached = JSON.parse(readFileSync5(file, "utf8"));
     if (cached.key === key && Date.now() - cached.time < CACHE_TTL_MS) return cached;
   }
   const { block, message } = gate(root, catalog, kind, env);
   mkdirSync3(dir, { recursive: true });
-  writeFileSync3(join6(root, MEP_DIR, ".gitignore"), ".cache/\n");
-  writeFileSync3(file, JSON.stringify({ key, time: Date.now(), block, message }));
+  writeFileSync4(join7(root, MEP_DIR, ".gitignore"), ".cache/\n");
+  writeFileSync4(file, JSON.stringify({ key, time: Date.now(), block, message }));
   return { block, message };
 }
 
 // engine/src/render.ts
-import { existsSync as existsSync6, mkdirSync as mkdirSync4, readdirSync as readdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join7 } from "node:path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync4, readdirSync as readdirSync4, readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join8 } from "node:path";
 var BRIEF_FILE = "BRIEF.md";
 var ADR_DIR = "docs/decisions";
 var LEGAL_NOTE = "> Checklist orientativo, no sustituye asesor\xEDa legal.";
@@ -8367,6 +8565,8 @@ function describeCheck(c) {
       return `HTML del build: ${c.rule}${c.name ?? c.property ?? c.rel ? ` ${c.name ?? c.property ?? c.rel}` : ""}`;
     case "sql":
       return `migraciones SQL: ${c.rule}`;
+    case "maps":
+      return c.rule === "registry" ? "REGISTRY.md al d\xEDa (mep registry --check)" : "CODEMAP.md al d\xEDa";
     case "manual":
       return `manual: ${c.prompt}`;
   }
@@ -8439,27 +8639,27 @@ function renderBrief(profile, evaluated, catalog, results) {
   return out.join("\n") + "\n";
 }
 function writeBrief(root, content) {
-  writeFileSync4(join7(root, BRIEF_FILE), content);
+  writeFileSync5(join8(root, BRIEF_FILE), content);
 }
 function slug(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 function writeStackAdrs(root, profile, catalog) {
-  const dir = join7(root, ADR_DIR);
+  const dir = join8(root, ADR_DIR);
   mkdirSync4(dir, { recursive: true });
-  const existing = readdirSync3(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
+  const existing = readdirSync4(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
   const written = [];
   let next = existing.length ? Number(existing[existing.length - 1].slice(0, 4)) + 1 : 1;
   for (const g of stackGroups(stack(profile, catalog))) {
     const decision = g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ");
     const base = `stack-${slug(g.rule)}`;
     const previous = existing.filter((f) => f.slice(5).startsWith(base)).pop();
-    if (previous && readFileSync5(join7(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
+    if (previous && readFileSync6(join8(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
 `)) continue;
     const file = `${String(next++).padStart(4, "0")}-${base}.md`;
     const alternatives = catalog.stackRules.find((r) => r.id === g.rule)?.alternatives ?? [];
-    writeFileSync4(
-      join7(dir, file),
+    writeFileSync5(
+      join8(dir, file),
       [
         `# Stack: ${decision}`,
         "",
@@ -8488,14 +8688,14 @@ function writeStackAdrs(root, profile, catalog) {
 }
 var CLAUDE_MARKER = "<!-- mep -->";
 function linkClaudeMd(root, template) {
-  const file = join7(root, "CLAUDE.md");
-  const current = existsSync6(file) ? readFileSync5(file, "utf8") : "";
+  const file = join8(root, "CLAUDE.md");
+  const current = existsSync7(file) ? readFileSync6(file, "utf8") : "";
   if (current.includes(CLAUDE_MARKER)) return false;
   const block = `${CLAUDE_MARKER}
 ${template.trim()}
 ${CLAUDE_MARKER}
 `;
-  writeFileSync4(file, current ? `${current.trimEnd()}
+  writeFileSync5(file, current ? `${current.trimEnd()}
 
 ${block}` : block);
   return true;
@@ -8554,12 +8754,12 @@ function counts(results) {
 }
 
 // engine/src/signals.ts
-var import_yaml3 = __toESM(require_dist(), 1);
-import { existsSync as existsSync7, readFileSync as readFileSync6 } from "node:fs";
-import { join as join8 } from "node:path";
-function loadDetectors(catalog) {
-  const file = join8(catalog.dir, "signals.yaml");
-  return existsSync7(file) ? (0, import_yaml3.parse)(readFileSync6(file, "utf8")) : {};
+var import_yaml4 = __toESM(require_dist(), 1);
+import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
+import { join as join9 } from "node:path";
+function loadDetectors(catalog, name = "signals.yaml") {
+  const file = join9(catalog.dir, name);
+  return existsSync8(file) ? (0, import_yaml4.parse)(readFileSync7(file, "utf8")) : {};
 }
 function fires(root, d, deps) {
   if ("dependency" in d) return d.dependency.find((dep) => deps.has(dep));
@@ -8568,9 +8768,15 @@ function fires(root, d, deps) {
   return matchFiles(root, d.glob).find((f) => re.test(readText(root, f) ?? ""));
 }
 function detectSignals(root, catalog) {
+  return detect(root, loadDetectors(catalog));
+}
+function detectCapabilities(root, catalog) {
+  return detect(root, loadDetectors(catalog, "detect.yaml"));
+}
+function detect(root, table) {
   const deps = dependencies(root);
   const out = {};
-  for (const [signal, detectors] of Object.entries(loadDetectors(catalog))) {
+  for (const [signal, detectors] of Object.entries(table)) {
     for (const d of detectors) {
       const evidence = fires(root, d, deps);
       if (evidence) {
@@ -8583,6 +8789,682 @@ function detectSignals(root, catalog) {
 }
 function missingSignals(root, profile, catalog) {
   return Object.entries(detectSignals(root, catalog)).filter(([signal]) => profile.signals[signal] !== true).map(([signal, evidence]) => ({ signal, evidence }));
+}
+
+// engine/src/audit.ts
+var INTEGRATION_DEPS = /^(stripe|@stripe\/|resend|@sendgrid|postmark|@supabase\/|@clerk\/|algoliasearch|meilisearch|@vercel\/(blob|analytics|kv)|posthog|mixpanel|@sentry\/|openai|@anthropic-ai\/|uploadthing|pusher|ably|mapbox|@react-google-maps|twilio|@upstash\/|sanity|contentful|@mux\/)/;
+function countEntities(root) {
+  const tables = /* @__PURE__ */ new Set();
+  for (const f of matchFiles(root, "**/*.sql")) {
+    for (const m of (readText(root, f) ?? "").matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:"?public"?\.)?"?(\w+)"?/gi)) tables.add(m[1].toLowerCase());
+  }
+  for (const f of matchFiles(root, "**/*.prisma")) {
+    for (const m of (readText(root, f) ?? "").matchAll(/^model\s+(\w+)/gm)) tables.add(m[1].toLowerCase());
+  }
+  return tables.size;
+}
+function countLanguages(root) {
+  const locales = /* @__PURE__ */ new Set();
+  for (const f of listFiles(root)) {
+    const m = f.match(/(?:^|\/)(?:locales|messages|i18n|lang)\/([a-z]{2}(?:[-_][A-Z]{2})?)(?:\.json|\/)/);
+    if (m) locales.add(m[1].slice(0, 2));
+  }
+  return Math.max(1, locales.size);
+}
+function guessType(caps, pages, files) {
+  if (caps.has("payments") && caps.has("ugc")) return "marketplace";
+  if (caps.has("subscriptions") || caps.has("auth") && caps.has("payments")) return "saas";
+  if (caps.has("payments")) return "ecommerce";
+  if (files.some((f) => /(^|\/)(booking|bookings|reservas|appointments|citas)(\/|\.)/.test(f))) return "booking";
+  if (caps.has("auth")) return "internal-app";
+  if (files.some((f) => /(^|\/)(blog|posts)\//.test(f))) return "blog";
+  return pages <= 2 ? "landing" : "corporate";
+}
+function inferProfile(root, catalog) {
+  const evidence = {};
+  const caps = detectCapabilities(root, catalog);
+  for (const [k, v] of Object.entries(caps)) evidence[`capabilities.${k}`] = v;
+  const signals = detectSignals(root, catalog);
+  for (const [k, v] of Object.entries(signals)) evidence[`signals.${k}`] = v;
+  const framework = detectFramework(root);
+  evidence.framework = framework;
+  const pageRoutes = routes(root, framework).filter((r) => !/\.(txt|xml|webmanifest)$/.test(r) && !["/404", "/500"].includes(r) && !r.startsWith("/api"));
+  const files = listFiles(root);
+  const capSet = new Set(Object.keys(caps));
+  const type = guessType(capSet, pageRoutes.length, files);
+  evidence.type = `${capSet.size} capacidades, ${pageRoutes.length} p\xE1ginas`;
+  const integrations = [...dependencies(root)].filter((d) => INTEGRATION_DEPS.test(d));
+  const deps = dependencies(root);
+  const stack2 = {};
+  if (framework !== "static") stack2.framework = framework;
+  if (deps.has("@supabase/supabase-js")) Object.assign(stack2, { db: "postgresql", db_provider: "supabase" });
+  else if (deps.has("pg") || deps.has("postgres") || deps.has("@neondatabase/serverless")) stack2.db = "postgresql";
+  if (deps.has("stripe")) stack2.payments = "stripe";
+  if (files.some((f) => f === "vercel.json" || f.startsWith(".vercel/"))) stack2.hosting = "vercel";
+  const raw = {
+    project: (readText(root, "package.json") ?? "").match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? "proyecto",
+    type,
+    capabilities: [...capSet].filter((c) => catalog.dimensions.capabilities.includes(c)).sort(),
+    signals: Object.fromEntries(Object.keys(signals).map((k) => [k, true])),
+    counts: { pages: Math.max(1, pageRoutes.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
+    stack: { decided: stack2 }
+  };
+  return { profile: normalizeProfile(raw, catalog), evidence };
+}
+function gapReport(root, profile, catalog) {
+  return verifyItems(root, profile, evaluate(profile, catalog), "full").filter((r) => r.state === "active");
+}
+
+// engine/src/docs.ts
+import { deflateSync } from "node:zlib";
+function inline(text) {
+  const out = [];
+  const parts = text.replace(/`([^`]*)`/g, "$1").split(/(\*\*[^*]+\*\*)/);
+  for (const p of parts) {
+    if (!p) continue;
+    const bold = p.startsWith("**") && p.endsWith("**");
+    out.push({ text: bold ? p.slice(2, -2) : p, bold });
+  }
+  return out;
+}
+function parseMarkdown(md) {
+  const lines = md.replace(/<!--[\s\S]*?-->/g, "").split("\n");
+  const blocks = [];
+  let para = [];
+  const flush = () => {
+    if (para.length) blocks.push({ kind: "paragraph", text: inline(para.join(" ")) });
+    para = [];
+  };
+  for (let i = 0; i < lines.length; i++) {
+    const line3 = lines[i].trimEnd();
+    const h = line3.match(/^(#{1,3})\s+(.*)$/);
+    const li = line3.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/);
+    if (!line3.trim()) flush();
+    else if (h) {
+      flush();
+      blocks.push({ kind: "heading", level: h[1].length, text: inline(h[2]) });
+    } else if (/^-{3,}$/.test(line3.trim())) {
+      flush();
+      blocks.push({ kind: "pagebreak" });
+    } else if (line3.startsWith("|")) {
+      flush();
+      const rows = [];
+      while (i < lines.length && lines[i].trim().startsWith("|")) {
+        const cells = lines[i].trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+        if (!cells.every((c) => /^:?-{2,}:?$/.test(c))) rows.push(cells.map(inline));
+        i++;
+      }
+      i--;
+      blocks.push({ kind: "table", rows });
+    } else if (li) {
+      flush();
+      const ordered = li[1] !== void 0;
+      const items = [];
+      while (i < lines.length) {
+        const m = lines[i].match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/);
+        if (!m || m[1] !== void 0 !== ordered) break;
+        items.push(inline(m[2]));
+        i++;
+      }
+      i--;
+      blocks.push({ kind: "list", ordered, items });
+    } else if (line3.startsWith(">")) {
+      flush();
+      blocks.push({ kind: "quote", text: inline(line3.replace(/^>\s?/, "")) });
+    } else para.push(line3.trim());
+  }
+  flush();
+  return blocks;
+}
+var xml = (s) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+function runs(text) {
+  return text.map((t) => `<w:r>${t.bold ? "<w:rPr><w:b/></w:rPr>" : ""}<w:t xml:space="preserve">${xml(t.text)}</w:t></w:r>`).join("");
+}
+function docxBlock(b) {
+  switch (b.kind) {
+    case "heading":
+      return `<w:p><w:pPr><w:pStyle w:val="${b.level === 1 ? "Title" : `Heading${b.level - 1}`}"/></w:pPr>${runs(b.text)}</w:p>`;
+    case "paragraph":
+      return `<w:p>${runs(b.text)}</w:p>`;
+    case "quote":
+      return `<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>${runs(b.text)}</w:p>`;
+    case "list":
+      return b.items.map((item, n) => `<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:ind w:left="360" w:hanging="360"/></w:pPr><w:r><w:t xml:space="preserve">${b.ordered ? `${n + 1}.` : "\u2022"}	</w:t></w:r>${runs(item)}</w:p>`).join("");
+    case "table": {
+      const border = '<w:top w:val="single" w:sz="4" w:color="BFBFBF"/><w:left w:val="single" w:sz="4" w:color="BFBFBF"/><w:bottom w:val="single" w:sz="4" w:color="BFBFBF"/><w:right w:val="single" w:sz="4" w:color="BFBFBF"/><w:insideH w:val="single" w:sz="4" w:color="BFBFBF"/><w:insideV w:val="single" w:sz="4" w:color="BFBFBF"/>';
+      const rows = b.rows.map((row, r) => `<w:tr>${row.map((cell) => `<w:tc><w:p>${runs(r === 0 ? cell.map((c) => ({ ...c, bold: true })) : cell)}</w:p></w:tc>`).join("")}</w:tr>`).join("");
+      return `<w:tbl><w:tblPr><w:tblW w:w="5000" w:type="pct"/><w:tblBorders>${border}</w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/></w:tblCellMar></w:tblPr>${rows}</w:tbl><w:p/>`;
+    }
+    case "pagebreak":
+      return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+  }
+}
+var STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/><w:sz w:val="22"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>
+<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+<w:style w:type="paragraph" w:styleId="Title"><w:name w:val="Title"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="240"/></w:pPr><w:rPr><w:b/><w:sz w:val="40"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading1"><w:name w:val="heading 1"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="320" w:after="120"/><w:outlineLvl w:val="0"/></w:pPr><w:rPr><w:b/><w:sz w:val="30"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Heading2"><w:name w:val="heading 2"/><w:basedOn w:val="Normal"/><w:pPr><w:keepNext/><w:spacing w:before="200" w:after="80"/><w:outlineLvl w:val="1"/></w:pPr><w:rPr><w:b/><w:sz w:val="24"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="Quote"><w:name w:val="Quote"/><w:basedOn w:val="Normal"/><w:pPr><w:ind w:left="360"/></w:pPr><w:rPr><w:i/><w:color w:val="555555"/></w:rPr></w:style>
+<w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="60"/></w:pPr></w:style>
+</w:styles>`;
+function toDocx(blocks) {
+  const body = blocks.map(docxBlock).join("");
+  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  return zip([
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
+    ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`],
+    ["word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["word/document.xml", document],
+    ["word/styles.xml", STYLES]
+  ]);
+}
+var CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) c = c & 1 ? 3988292384 ^ c >>> 1 : c >>> 1;
+  return c >>> 0;
+});
+function crc32(buf) {
+  let c = 4294967295;
+  for (const b of buf) c = CRC_TABLE[(c ^ b) & 255] ^ c >>> 8;
+  return (c ^ 4294967295) >>> 0;
+}
+function zip(files) {
+  const locals = [];
+  const centrals = [];
+  let offset = 0;
+  for (const [name, content] of files) {
+    const data = Buffer.from(content, "utf8");
+    const nameBuf = Buffer.from(name, "utf8");
+    const crc = crc32(data);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(67324752, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(2048, 6);
+    local.writeUInt32LE(crc, 14);
+    local.writeUInt32LE(data.length, 18);
+    local.writeUInt32LE(data.length, 22);
+    local.writeUInt16LE(nameBuf.length, 26);
+    const central = Buffer.alloc(46);
+    central.writeUInt32LE(33639248, 0);
+    central.writeUInt16LE(20, 4);
+    central.writeUInt16LE(20, 6);
+    central.writeUInt16LE(2048, 8);
+    central.writeUInt32LE(crc, 16);
+    central.writeUInt32LE(data.length, 20);
+    central.writeUInt32LE(data.length, 24);
+    central.writeUInt16LE(nameBuf.length, 28);
+    central.writeUInt32LE(offset, 42);
+    locals.push(local, nameBuf, data);
+    centrals.push(central, nameBuf);
+    offset += local.length + nameBuf.length + data.length;
+  }
+  const centralBuf = Buffer.concat(centrals);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(101010256, 0);
+  end.writeUInt16LE(files.length, 8);
+  end.writeUInt16LE(files.length, 10);
+  end.writeUInt32LE(centralBuf.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, centralBuf, end]);
+}
+var HELVETICA = [278, 278, 355, 556, 556, 889, 667, 191, 333, 333, 389, 584, 278, 333, 278, 278, 556, 556, 556, 556, 556, 556, 556, 556, 556, 556, 278, 278, 584, 584, 584, 556, 1015, 667, 667, 722, 722, 667, 611, 778, 722, 278, 500, 667, 556, 833, 722, 778, 667, 778, 722, 667, 611, 722, 667, 944, 667, 667, 611, 278, 278, 278, 469, 556, 333, 556, 556, 500, 556, 556, 278, 556, 556, 222, 222, 500, 222, 833, 556, 556, 556, 556, 333, 500, 278, 556, 500, 722, 500, 500, 500, 334, 260, 334, 584];
+var WIN_ANSI = { "\u20AC": 128, "\u2026": 133, "\u2018": 145, "\u2019": 146, "\u201C": 147, "\u201D": 148, "\u2022": 149, "\u2013": 150, "\u2014": 151, "\u2122": 153 };
+function ansi(text) {
+  const out = [];
+  for (const ch of text.normalize("NFC")) {
+    const code = ch.codePointAt(0);
+    if (WIN_ANSI[ch]) out.push(WIN_ANSI[ch]);
+    else if (ch === "\u2192") out.push(...[45, 62]);
+    else if (code >= 32 && code <= 255 && !(code >= 127 && code < 160)) out.push(code);
+  }
+  return out;
+}
+function baseChar(code) {
+  const accents = "\xC0\xC1\xC2\xC3\xC4\xC5\xE0\xE1\xE2\xE3\xE4\xE5\xC8\xC9\xCA\xCB\xE8\xE9\xEA\xEB\xCC\xCD\xCE\xCF\xEC\xED\xEE\xEF\xD2\xD3\xD4\xD5\xD6\xF2\xF3\xF4\xF5\xF6\xD9\xDA\xDB\xDC\xF9\xFA\xFB\xFC\xD1\xF1\xC7\xE7\xDD\xFD\xFF";
+  const bases = "AAAAAAaaaaaaEEEEeeeeIIIIiiiiOOOOOoooooUUUUuuuuNnCcYyy";
+  const i = accents.indexOf(String.fromCharCode(code));
+  return i >= 0 ? bases.charCodeAt(i) : code;
+}
+var EXTRA_WIDTHS = { 128: 556, 133: 1e3, 145: 222, 146: 222, 147: 333, 148: 333, 149: 350, 150: 556, 151: 1e3, 153: 1e3, 161: 333, 191: 611, 183: 278, 171: 556, 187: 556 };
+function widthOf(codes, size, bold) {
+  let w = 0;
+  for (const c of codes) {
+    const b = baseChar(c);
+    w += b >= 32 && b <= 126 ? HELVETICA[b - 32] : EXTRA_WIDTHS[c] ?? 556;
+  }
+  return w / 1e3 * size * (bold ? 1.12 : 1);
+}
+function words(text) {
+  return text.flatMap((t) => t.text.split(/\s+/).filter(Boolean).map((w) => ({ codes: ansi(w), bold: t.bold })));
+}
+function wrap(text, size, maxWidth) {
+  const lines = [];
+  let line3 = [];
+  let width = 0;
+  const space = widthOf([32], size, false);
+  for (const w of words(text)) {
+    const ww = widthOf(w.codes, size, w.bold);
+    if (line3.length && width + space + ww > maxWidth) {
+      lines.push(line3);
+      line3 = [];
+      width = 0;
+    }
+    width += (line3.length ? space : 0) + ww;
+    line3.push(w);
+  }
+  if (line3.length) lines.push(line3);
+  return lines.length ? lines : [[]];
+}
+var PAGE_W = 612;
+var PAGE_H = 792;
+var MARGIN = 56;
+function pdfString(codes) {
+  return "(" + codes.map((c) => c === 40 || c === 41 || c === 92 ? "\\" + String.fromCharCode(c) : c < 32 || c > 126 ? "\\" + c.toString(8).padStart(3, "0") : String.fromCharCode(c)).join("") + ")";
+}
+var PdfWriter = class {
+  pages = [];
+  ops = [];
+  y = PAGE_H - MARGIN;
+  newPage() {
+    if (this.ops.length) this.pages.push(this.ops.join("\n"));
+    this.ops = [];
+    this.y = PAGE_H - MARGIN;
+  }
+  ensure(height) {
+    if (this.y - height < MARGIN) this.newPage();
+  }
+  text(line3, x, size, gray = 0) {
+    let cx = x;
+    const space = widthOf([32], size, false);
+    for (const w of line3) {
+      this.ops.push(`BT /${w.bold ? "F2" : "F1"} ${size} Tf ${gray} g ${cx.toFixed(2)} ${this.y.toFixed(2)} Td ${pdfString(w.codes)} Tj ET`);
+      cx += widthOf(w.codes, size, w.bold) + space;
+    }
+  }
+  paragraph(text, size, opts = {}) {
+    const lh = size * 1.35;
+    const x = MARGIN + (opts.indent ?? 0);
+    const lines = wrap(opts.bold ? text.map((t) => ({ ...t, bold: true })) : text, size, PAGE_W - MARGIN - x);
+    this.y -= opts.before ?? 0;
+    this.ensure(lh * Math.min(lines.length, 2));
+    for (const line3 of lines) {
+      this.ensure(lh);
+      this.y -= size;
+      this.text(line3, x, size, opts.gray);
+      this.y -= lh - size;
+    }
+    this.y -= opts.after ?? size * 0.5;
+  }
+  table(rows) {
+    const size = 9.5;
+    const lh = size * 1.3;
+    const cols = Math.max(...rows.map((r) => r.length));
+    const colW = (PAGE_W - 2 * MARGIN) / cols;
+    rows.forEach((row, r) => {
+      const cells = Array.from({ length: cols }, (_, c) => wrap(r === 0 ? (row[c] ?? []).map((t) => ({ ...t, bold: true })) : row[c] ?? [], size, colW - 8));
+      const height = Math.max(...cells.map((c) => c.length)) * lh + 6;
+      this.ensure(height);
+      const top = this.y;
+      cells.forEach((lines, c) => {
+        this.y = top - 3;
+        for (const line3 of lines) {
+          this.y -= size;
+          this.text(line3, MARGIN + c * colW + 4, size);
+          this.y -= lh - size;
+        }
+      });
+      this.y = top - height;
+      this.ops.push(`0.75 G 0.5 w ${MARGIN} ${top.toFixed(2)} ${PAGE_W - 2 * MARGIN} ${(-height).toFixed(2)} re S`);
+      for (let c = 1; c < cols; c++) this.ops.push(`${(MARGIN + c * colW).toFixed(2)} ${top.toFixed(2)} m ${(MARGIN + c * colW).toFixed(2)} ${this.y.toFixed(2)} l S`);
+    });
+    this.y -= 10;
+  }
+  finish() {
+    this.newPage();
+    const objects = [];
+    const add2 = (o) => objects.push(o);
+    add2("<< /Type /Catalog /Pages 2 0 R >>");
+    add2("");
+    add2("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
+    add2("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    const kids = [];
+    this.pages.forEach((content, i) => {
+      const footer = `BT /F1 8 Tf 0.5 g ${PAGE_W - MARGIN - 20} 30 Td (${i + 1}/${this.pages.length}) Tj ET`;
+      const stream = deflateSync(Buffer.from(`${content}
+${footer}`, "latin1"));
+      add2(Buffer.concat([Buffer.from(`<< /Length ${stream.length} /Filter /FlateDecode >>
+stream
+`, "latin1"), stream, Buffer.from("\nendstream", "latin1")]));
+      const contentId = objects.length;
+      add2(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`);
+      kids.push(objects.length);
+    });
+    objects[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>`;
+    const chunks = [Buffer.from("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n", "latin1")];
+    const offsets = [];
+    let pos = chunks[0].length;
+    objects.forEach((o, i) => {
+      const body = Buffer.concat([Buffer.from(`${i + 1} 0 obj
+`, "latin1"), typeof o === "string" ? Buffer.from(o, "latin1") : o, Buffer.from("\nendobj\n", "latin1")]);
+      offsets.push(pos);
+      chunks.push(body);
+      pos += body.length;
+    });
+    const xref = [`xref
+0 ${objects.length + 1}
+0000000000 65535 f 
+`, ...offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n 
+`)].join("");
+    chunks.push(Buffer.from(`${xref}trailer
+<< /Size ${objects.length + 1} /Root 1 0 R >>
+startxref
+${pos}
+%%EOF
+`, "latin1"));
+    return Buffer.concat(chunks);
+  }
+};
+function toPdf(blocks) {
+  const pdf = new PdfWriter();
+  for (const b of blocks) {
+    switch (b.kind) {
+      case "heading":
+        pdf.paragraph(b.text, b.level === 1 ? 20 : b.level === 2 ? 14 : 11.5, { bold: true, before: b.level === 1 ? 0 : 10, after: 6 });
+        break;
+      case "paragraph":
+        pdf.paragraph(b.text, 10.5);
+        break;
+      case "quote":
+        pdf.paragraph(b.text, 10, { indent: 14, gray: 0.35 });
+        break;
+      case "list":
+        b.items.forEach((item, n) => pdf.paragraph([{ text: b.ordered ? `${n + 1}.` : "\u2022", bold: false }, ...item], 10.5, { indent: 12, after: 2 }));
+        pdf.y -= 4;
+        break;
+      case "table":
+        pdf.table(b.rows);
+        break;
+      case "pagebreak":
+        pdf.newPage();
+        break;
+    }
+  }
+  return pdf.finish();
+}
+
+// engine/src/export.ts
+var import_yaml5 = __toESM(require_dist(), 1);
+import { existsSync as existsSync9, mkdirSync as mkdirSync5, readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
+import { dirname as dirname2, join as join10 } from "node:path";
+var EXPORTS_FILE = join10(MEP_DIR, "exports.yaml");
+function exportHistory(root) {
+  const file = join10(root, EXPORTS_FILE);
+  return existsSync9(file) ? (0, import_yaml5.parse)(readFileSync8(file, "utf8")) ?? [] : [];
+}
+function exportData(root, profile, catalog, lang, q) {
+  const evaluated = evaluate(profile, catalog);
+  const active = evaluated.filter((e) => e.state === "active");
+  const history = exportHistory(root);
+  const previous = history[history.length - 1];
+  const ids = active.map((e) => e.item.id).sort();
+  const changes = previous ? {
+    since: `v${previous.version}`,
+    added: ids.filter((id) => !previous.items.includes(id)),
+    removed: previous.items.filter((id) => !ids.includes(id)),
+    capabilities_added: profile.capabilities.filter((c) => !previous.capabilities.includes(c)),
+    capabilities_removed: previous.capabilities.filter((c) => !profile.capabilities.includes(c)),
+    total_before: previous.total
+  } : void 0;
+  const top = (phase) => phase.split(".")[0];
+  return {
+    version: (previous?.version ?? 0) + 1,
+    lang,
+    date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+    project: profile.project,
+    profile: { type: profile.type, capabilities: profile.capabilities, markets: profile.markets, audience: profile.audience, context: profile.context, counts: profile.counts },
+    included: { capabilities: profile.capabilities, custom_work: profile.custom_work ?? [], optional_chosen: active.filter((e) => e.level === "optional").map((e) => e.item.title) },
+    out_of_scope: {
+      capabilities_not_included: catalog.dimensions.capabilities.filter((c) => !profile.capabilities.includes(c)),
+      optional_not_chosen: evaluated.filter((e) => e.state === "offered").map((e) => e.item.title),
+      recommended_skipped: evaluated.filter((e) => e.state === "skipped").map((e) => ({ title: e.item.title, reason: e.reason }))
+    },
+    compliance: active.filter((e) => ["legal", "security", "accessibility", "privacy", "cookies"].includes(e.item.category)).map((e) => ({ title: e.item.title, category: e.item.category, references: e.item.references ?? [] })),
+    stack: stackGroups(stack(profile, catalog)).map((g) => ({ decision: g.decisions.map((d) => `${d.key}: ${d.value}`).join(", "), why: g.why })),
+    deliverables: Object.fromEntries(["foundation", "build", "launch"].map((p) => [p, active.filter((e) => top(e.item.phase) === p && e.level !== "optional").map((e) => e.item.title)])),
+    quote: q ? { currency: q.currency, by_phase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance } : void 0,
+    acceptance_criteria: active.filter((e) => e.level === "required").map((e) => ({ id: e.item.id, title: e.item.title, how: e.item.how })),
+    legal_note: lang.startsWith("es") ? "Checklist orientativo, no sustituye asesor\xEDa legal." : "Guidance checklist; not a substitute for legal advice.",
+    changes
+  };
+}
+function recordExport(root, profile, catalog, lang, files, total, version) {
+  const all = exportHistory(root);
+  const history = version === void 0 ? all : all.filter((r) => r.version !== version);
+  const record = {
+    version: version ?? (history[history.length - 1]?.version ?? 0) + 1,
+    date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10),
+    lang,
+    items: evaluate(profile, catalog).filter((e) => e.state === "active").map((e) => e.item.id).sort(),
+    capabilities: [...profile.capabilities],
+    total,
+    files
+  };
+  mkdirSync5(dirname2(join10(root, EXPORTS_FILE)), { recursive: true });
+  writeFileSync6(join10(root, EXPORTS_FILE), (0, import_yaml5.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
+  return record;
+}
+
+// engine/src/quote.ts
+var import_yaml6 = __toESM(require_dist(), 1);
+import { existsSync as existsSync10, mkdirSync as mkdirSync6, readFileSync as readFileSync9, readdirSync as readdirSync5, writeFileSync as writeFileSync7, appendFileSync as appendFileSync2 } from "node:fs";
+import { homedir } from "node:os";
+import { join as join11 } from "node:path";
+function configDir(env = process.env) {
+  return env.MEP_CONFIG_DIR ?? join11(homedir(), ".config", "mep-check");
+}
+var SIZE_HOURS = { XS: [0.5, 1], S: [1, 3], M: [3, 8], L: [8, 20], XL: [20, 40] };
+var DEFAULT_RATES = {
+  currency: "USD",
+  hourly_rate: 0,
+  pm_overhead: 0.1,
+  risk_buffer: 0.2,
+  rounding: 50,
+  maintenance_plans: { basic: { price: 0, hours: 0 }, standard: { price: 0, hours: 0 }, premium: { price: 0, hours: 0 } }
+};
+var RATES_TEMPLATE = `# Tarifas de mep. Fuera del repo: nunca se entregan al cliente.
+currency: USD
+hourly_rate: 0        # define tu tarifa por hora
+pm_overhead: 0.10     # gesti\xF3n de proyecto
+risk_buffer: 0.20     # colch\xF3n de riesgo
+rounding: 50          # redondear precios a m\xFAltiplos de 50
+maintenance_plans:    # precio mensual; horas incluidas por mes
+  basic:    { price: 0, hours: 0 }   # actualizaciones de seguridad + backups
+  standard: { price: 0, hours: 0 }   # + cambios menores
+  premium:  { price: 0, hours: 0 }   # + monitoreo y soporte prioritario
+`;
+function loadRates(env = process.env) {
+  const file = join11(configDir(env), "rates.yaml");
+  let created = false;
+  if (!existsSync10(file)) {
+    mkdirSync6(configDir(env), { recursive: true });
+    writeFileSync7(file, RATES_TEMPLATE);
+    created = true;
+  }
+  const raw = (0, import_yaml6.parse)(readFileSync9(file, "utf8")) ?? {};
+  const rates = { ...DEFAULT_RATES, ...raw, maintenance_plans: { ...DEFAULT_RATES.maintenance_plans, ...raw.maintenance_plans } };
+  return { rates, created, configured: rates.hourly_rate > 0 };
+}
+var add = (a, b) => [a[0] + b[0], a[1] + b[1]];
+var scale = (a, k) => [a[0] * k, a[1] * k];
+var round1 = (a) => [Math.round(a[0] * 10) / 10, Math.round(a[1] * 10) / 10];
+function multiplier(item, profile) {
+  const dim = item.effort.scales_with;
+  if (!dim) return 1;
+  const value = dim === "markets" ? profile.markets.length : profile.counts[dim];
+  return Math.max(1, value ?? 1);
+}
+function line2(e, profile) {
+  const k = multiplier(e.item, profile);
+  return { id: e.item.id, title: e.item.title, phase: e.item.phase, hours: scale(e.item.effort.hours, k), multiplier: k };
+}
+function money(hours, rates) {
+  const r = Math.max(1, rates.rounding);
+  return [Math.ceil(hours[0] * rates.hourly_rate / r) * r, Math.ceil(hours[1] * rates.hourly_rate / r) * r];
+}
+function loaded(hours, rates) {
+  return scale(hours, (1 + rates.pm_overhead) * (1 + rates.risk_buffer));
+}
+function recurringCosts(profile, catalog) {
+  const file = join11(catalog.dir, "costs.yaml");
+  if (!existsSync10(file)) return [];
+  const table = (0, import_yaml6.parse)(readFileSync9(file, "utf8"));
+  const out = Object.entries(table.always ?? {}).map(([key, c]) => ({ key, ...c }));
+  for (const d of stack(profile, catalog)) {
+    const cost = table.stack?.[`${d.key}.${d.value}`];
+    if (cost) out.push({ key: `${d.key}.${d.value}`, ...cost });
+  }
+  return out;
+}
+function quote(profile, catalog, rates) {
+  const evaluated = evaluate(profile, catalog);
+  const lines = evaluated.filter((e) => e.state === "active").map((e) => line2(e, profile));
+  for (const c of profile.custom_work ?? []) {
+    lines.push({ id: `custom:${c.title}`, title: `${c.title} (estimaci\xF3n a revisar)`, phase: c.phase ?? "build.features", hours: SIZE_HOURS[c.size], multiplier: 1, custom: true });
+  }
+  const extras = evaluated.filter((e) => e.state === "offered").map((e) => line2(e, profile));
+  const bySubphase = {};
+  const byPhaseHours = {};
+  for (const l of lines) {
+    bySubphase[l.phase] = add(bySubphase[l.phase] ?? [0, 0], l.hours);
+    const top = l.phase.split(".")[0];
+    byPhaseHours[top] = add(byPhaseHours[top] ?? [0, 0], l.hours);
+  }
+  const subtotal = lines.reduce((acc, l) => add(acc, l.hours), [0, 0]);
+  const pm = scale(subtotal, rates.pm_overhead);
+  const risk = scale(add(subtotal, pm), rates.risk_buffer);
+  const total = add(add(subtotal, pm), risk);
+  const byPhase = Object.fromEntries(Object.entries(byPhaseHours).map(([k, v]) => [k, money(loaded(v, rates), rates)]));
+  return {
+    currency: rates.currency,
+    lines,
+    extras,
+    bySubphase: Object.fromEntries(Object.entries(bySubphase).map(([k, v]) => [k, round1(v)])),
+    subtotal: round1(subtotal),
+    pm: round1(pm),
+    risk: round1(risk),
+    total: round1(total),
+    // The total is the sum of the phase prices, so the client view always adds up.
+    price: Object.values(byPhase).reduce((acc, r) => add(acc, r), [0, 0]),
+    byPhase,
+    extrasPrice: extras.map((x) => ({ id: x.id, title: x.title, price: money(loaded(x.hours, rates), rates) })),
+    recurring: recurringCosts(profile, catalog),
+    maintenance: profile.context === "client-project" ? rates.maintenance_plans : void 0
+  };
+}
+var fmtH = (r) => `${r[0]}\u2013${r[1]} h`;
+var fmtMoney = (r, c) => `${r[0].toLocaleString("en-US")}\u2013${r[1].toLocaleString("en-US")} ${c}`;
+var PHASE_LABEL = { foundation: "Cimientos", build: "Construcci\xF3n", launch: "Lanzamiento" };
+function formatInternal(q, rates, phases) {
+  const out = [`Cotizaci\xF3n interna (${q.currency}, tarifa ${rates.hourly_rate}/h)`];
+  for (const phase of phases) {
+    const items = q.lines.filter((l) => l.phase === phase);
+    if (!items.length) continue;
+    out.push("", `${phase}  ${fmtH(q.bySubphase[phase])}`);
+    for (const l of items) out.push(`  ${l.custom ? "\u270E" : "\xB7"} ${l.id}  ${fmtH(round1(l.hours))}${l.multiplier > 1 ? ` (\xD7${l.multiplier})` : ""}`);
+  }
+  out.push(
+    "",
+    `Subtotal          ${fmtH(q.subtotal)}`,
+    `Gesti\xF3n (${Math.round(rates.pm_overhead * 100)}%)     ${fmtH(q.pm)}`,
+    `Colch\xF3n (${Math.round(rates.risk_buffer * 100)}%)     ${fmtH(q.risk)}`,
+    `Total             ${fmtH(q.total)}  \u2192  ${fmtMoney(q.price, q.currency)}`
+  );
+  if (q.extrasPrice.length) out.push("", "Extras opcionales:", ...q.extrasPrice.map((x) => `  \u26AA ${x.id}  ${fmtMoney(x.price, q.currency)}`));
+  return out.join("\n");
+}
+function formatClient(q) {
+  const out = ["Cotizaci\xF3n"];
+  for (const [phase, price] of Object.entries(q.byPhase)) out.push(`  ${PHASE_LABEL[phase] ?? phase}: ${fmtMoney(price, q.currency)}`);
+  out.push(`  Total: ${fmtMoney(q.price, q.currency)}`);
+  if (q.extrasPrice.length) out.push("", "Extras opcionales:", ...q.extrasPrice.map((x) => `  ${x.title}: ${fmtMoney(x.price, q.currency)}`));
+  if (q.recurring.length) {
+    out.push("", "Costos recurrentes estimados (aparte del proyecto, mensuales, USD):");
+    out.push(...q.recurring.map((r) => `  ${r.label}: ${r.monthly[0]}\u2013${r.monthly[1]}${r.note ? ` \u2014 ${r.note}` : ""}`));
+  }
+  if (q.maintenance) {
+    out.push("", "Planes de mantenimiento (mensual):");
+    const names = { basic: "B\xE1sico (seguridad + backups)", standard: "Est\xE1ndar (+ cambios menores)", premium: "Premium (+ monitoreo y soporte prioritario)" };
+    for (const [k, p] of Object.entries(q.maintenance)) out.push(`  ${names[k]}: ${p.price.toLocaleString("en-US")} ${q.currency}${p.hours ? `, ${p.hours} h incluidas` : ""}`);
+    out.push("  Horas adicionales y features nuevas se cotizan aparte.");
+  }
+  return out.join("\n");
+}
+function projectKey(profile) {
+  return (profile.project || "proyecto").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "proyecto";
+}
+function saveQuote(profile, q, rates, env = process.env) {
+  const dir = join11(configDir(env), "quotes", projectKey(profile));
+  mkdirSync6(dir, { recursive: true });
+  const file = join11(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
+  writeFileSync7(file, (0, import_yaml6.stringify)({ profile: profile.project, catalog_version: profile.catalog_version, rates, quote: q }, { lineWidth: 0 }));
+  return file;
+}
+function logTime(profile, id, hours, env = process.env) {
+  const dir = join11(configDir(env), "actuals");
+  mkdirSync6(dir, { recursive: true });
+  const file = join11(dir, `${projectKey(profile)}.yaml`);
+  appendFileSync2(file, (0, import_yaml6.stringify)([{ id, hours, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), catalog_version: profile.catalog_version }]));
+  return file;
+}
+function calibrate(catalog, env = process.env, minSamples = 3) {
+  const dir = join11(configDir(env), "actuals");
+  if (!existsSync10(dir)) return [];
+  const byId = /* @__PURE__ */ new Map();
+  for (const f of readdirSync5(dir).filter((f2) => f2.endsWith(".yaml"))) {
+    for (const row of (0, import_yaml6.parse)(readFileSync9(join11(dir, f), "utf8")) ?? []) {
+      byId.set(row.id, [...byId.get(row.id) ?? [], row.hours]);
+    }
+  }
+  const out = [];
+  for (const [id, hours] of byId) {
+    const item = catalog.items.find((i) => i.id === id);
+    if (!item || hours.length < minSamples) continue;
+    const sorted = [...hours].sort((a, b) => a - b);
+    const median = sorted[Math.floor(sorted.length / 2)];
+    const [lo, hi] = item.effort.hours;
+    if (median >= lo && median <= hi) continue;
+    const p25 = sorted[Math.floor((sorted.length - 1) * 0.25)];
+    const p75 = sorted[Math.ceil((sorted.length - 1) * 0.75)];
+    out.push({ id, samples: hours.length, median, current: [lo, hi], suggested: [p25, p75] });
+  }
+  return out.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+// engine/src/version.ts
+function compareVersions(a, b) {
+  const pa = a.split(".").map(Number);
+  const pb = b.split(".").map(Number);
+  for (let i = 0; i < Math.max(pa.length, pb.length); i++) {
+    const d = (pa[i] ?? 0) - (pb[i] ?? 0);
+    if (d !== 0) return Math.sign(d);
+  }
+  return 0;
+}
+
+// engine/src/update.ts
+function catalogUpdates(profile, catalog) {
+  const since = profile.catalog_version;
+  const closed = new Set(profile.phase.closed);
+  return evaluate(profile, catalog).filter((e) => compareVersions(e.item.since, since) > 0 || e.item.updated !== void 0 && compareVersions(e.item.updated, since) > 0).map((e) => ({ ...e, change: compareVersions(e.item.since, since) > 0 ? "new" : "modified", inClosedPhase: closed.has(e.item.phase) }));
+}
+function applyUpdate(profile, catalog) {
+  const graced = catalogUpdates(profile, catalog).filter((u) => u.inClosedPhase && u.level === "required" && u.state === "active").map((u) => u.item.id);
+  return {
+    profile: { ...profile, catalog_version: catalog.version, selections: { ...profile.selections, grace: [.../* @__PURE__ */ new Set([...profile.selections.grace, ...graced])].sort() } },
+    graced
+  };
 }
 
 // engine/src/cli.ts
@@ -8600,11 +9482,11 @@ function parseArgs(argv) {
   return out;
 }
 function readInput(source) {
-  if (source === void 0 || source === true || source === "-") return readFileSync7(0, "utf8");
-  return readFileSync7(source, "utf8");
+  if (source === void 0 || source === true || source === "-") return readFileSync10(0, "utf8");
+  return readFileSync10(source, "utf8");
 }
 function proposedProfile(args, catalog) {
-  const raw = (0, import_yaml4.parse)(readInput(args.flags.from)) ?? {};
+  const raw = (0, import_yaml7.parse)(readInput(args.flags.from)) ?? {};
   const presetName = args.flags.preset ?? raw.preset;
   const preset = presetName ? catalog.presets[presetName] : {};
   if (presetName && !preset) fail(`preset desconocido: ${presetName}. Disponibles: ${Object.keys(catalog.presets).join(", ")}`);
@@ -8632,7 +9514,7 @@ function print(text) {
 `);
 }
 function pluginRoot(catalog) {
-  return dirname2(catalog.dir);
+  return dirname3(catalog.dir);
 }
 function requireProfile(root, catalog) {
   if (!hasProfile(root)) fail("Este proyecto no usa mep (falta .mep/profile.yaml). Empieza con /mep:scope.");
@@ -8652,13 +9534,31 @@ function currentBranch(root) {
 }
 function hookInput() {
   try {
-    return JSON.parse(readFileSync7(0, "utf8") || "{}");
+    return JSON.parse(readFileSync10(0, "utf8") || "{}");
   } catch {
     return {};
   }
 }
 function json(value) {
   print(JSON.stringify(value));
+}
+var fmtRange = (r, unit) => `${r[0].toLocaleString("en-US")}\u2013${r[1].toLocaleString("en-US")} ${unit}`;
+var signed = (r, unit) => `${r[0] >= 0 ? "+" : ""}${r[0].toLocaleString("en-US")} a ${r[1] >= 0 ? "+" : ""}${r[1].toLocaleString("en-US")} ${unit}`;
+function quoteOnScopeChange(profile, catalog) {
+  const { rates, created, configured } = loadRates();
+  const q = quote(profile, catalog, rates);
+  if (!configured) return `Esfuerzo estimado: ${fmtRange(q.total, "h")}.${created ? " Se cre\xF3 ~/.config/mep-check/rates.yaml:" : ""} Define hourly_rate en ~/.config/mep-check/rates.yaml para ver precios.`;
+  saveQuote(profile, q, rates);
+  return `Cotizaci\xF3n: ${fmtRange(q.total, "h")} \xB7 ${fmtRange(q.price, q.currency)} (interna guardada fuera del repo; /mep:quote para el detalle).`;
+}
+function closePassingPhases(root, catalog) {
+  const closed = [];
+  for (const sub of catalog.dimensions.phases) {
+    const r = closePhase(root, catalog, sub);
+    if (!r.closed) break;
+    closed.push(sub);
+  }
+  return closed;
 }
 function runHook(event, root, catalog) {
   const input = hookInput();
@@ -8729,14 +9629,22 @@ function main() {
       saveProfile(root, profile);
       regenerate(root, profile, catalog);
       const adrs = writeStackAdrs(root, profile, catalog);
-      const linked = linkClaudeMd(root, readFileSync7(join9(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
-      const ci = join9(root, ".github", "workflows", "mep.yml");
-      if (!existsSync8(ci)) {
-        mkdirSync5(dirname2(ci), { recursive: true });
-        writeFileSync5(ci, readFileSync7(join9(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
+      const linked = linkClaudeMd(root, readFileSync10(join12(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
+      const ci = join12(root, ".github", "workflows", "mep.yml");
+      if (!existsSync11(ci)) {
+        mkdirSync7(dirname3(ci), { recursive: true });
+        writeFileSync8(ci, readFileSync10(join12(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
       }
       log(root, "init", `${profile.type} (${profile.capabilities.join(",")})`);
-      return print(`\u2705 .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? "enlazado" : "ya estaba enlazado"}. CI: .github/workflows/mep.yml.`);
+      const closed = args.flags["close-passing"] ? closePassingPhases(root, catalog) : [];
+      if (closed.length) regenerate(root, loadProfile(root, catalog), catalog);
+      return print(
+        [
+          `\u2705 .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? "enlazado" : "ya estaba enlazado"}. CI: .github/workflows/mep.yml.`,
+          closed.length ? `Sub-etapas ya cumplidas y cerradas: ${closed.join(", ")}.` : "",
+          quoteOnScopeChange(loadProfile(root, catalog), catalog)
+        ].filter(Boolean).join("\n")
+      );
     }
     case "render": {
       const profile = requireProfile(root, catalog);
@@ -8746,7 +9654,7 @@ function main() {
     }
     case "add": {
       const before = requireProfile(root, catalog);
-      const proposed = (0, import_yaml4.parse)(readInput(args.flags.from)) ?? {};
+      const proposed = (0, import_yaml7.parse)(readInput(args.flags.from)) ?? {};
       const after = normalizeProfile({ ...before, ...proposed, phase: before.phase, selections: before.selections }, catalog);
       const errors = validateProfile(after, catalog);
       if (errors.length) fail(`perfil inv\xE1lido:
@@ -8755,16 +9663,23 @@ function main() {
       const labels = { new: "\uFF0B nuevo", raised: "\u2191 sube", lowered: "\u2193 baja", removed: "\uFF0D deja de aplicar" };
       const text = changes.length ? changes.map((c) => `${labels[c.change]}  ${c.id} \u2014 ${c.title}${c.from ? ` (${c.from}${c.to ? ` \u2192 ${c.to}` : ""})` : c.to ? ` (${c.to})` : ""}`).join("\n") : "Sin cambios en el checklist.";
       if (args.flags.json) return json(changes);
+      const { rates, configured } = loadRates();
+      const qa = quote(before, catalog, rates);
+      const qb = quote(after, catalog, rates);
+      const impact = `Impacto: ${signed([qb.total[0] - qa.total[0], qb.total[1] - qa.total[1]], "h")}${configured ? ` \xB7 ${signed([qb.price[0] - qa.price[0], qb.price[1] - qa.price[1]], qb.currency)}` : ""}`;
       if (args.flags.apply) {
         saveProfile(root, after);
         regenerate(root, after, catalog);
         writeStackAdrs(root, after, catalog);
         log(root, "add", changes.map((c) => `${c.change}:${c.id}`).join(","));
         return print(`${text}
+${impact}
 
-\u2705 Perfil actualizado y BRIEF.md regenerado.`);
+\u2705 Perfil actualizado y BRIEF.md regenerado.
+${quoteOnScopeChange(after, catalog)}`);
       }
-      return print(text);
+      return print(`${text}
+${impact}`);
     }
     case "check": {
       const profile = requireProfile(root, catalog);
@@ -8873,7 +9788,7 @@ ${formatItems(pending)}` : `
         if (!id || !["pass", "fail", "risk"].includes(result)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."');
         if (!catalog.items.some((i) => i.id === id && i.category === "security")) fail(`${id} no es un \xEDtem de seguridad`);
         const files = String(args.flags.files ?? "").split(",").map((f) => f.trim()).filter(Boolean);
-        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync8(join9(root, f)));
+        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync11(join12(root, f)));
         if (missing.length) fail(`archivos inexistentes: ${missing.join(", ")}`);
         recordReport(root, { id, result, files, notes: String(args.flags.notes ?? "") });
         return print(`reporte de ${id}: ${result}`);
@@ -8881,6 +9796,120 @@ ${formatItems(pending)}` : `
       const profile = loadProfile(root, catalog);
       const ids = evaluate(profile, catalog).filter((e) => e.state === "active" && e.item.category === "security").map((e) => e.item.id);
       return print(ids.map((id) => `${reportState(root, id).valid ? "\u2705" : "\u274C"} ${id} \u2014 ${reportState(root, id).detail}`).join("\n"));
+    }
+    case "audit": {
+      if (!args.flags.from) {
+        const { profile: profile2, evidence } = inferProfile(root, catalog);
+        if (args.flags.json) return json({ profile: profile2, evidence });
+        const { phase, selections, version, catalog_version, ...shown } = profile2;
+        return print(`${(0, import_yaml7.stringify)(shown, { lineWidth: 0 }).trim()}
+
+Evidencia:
+${Object.entries(evidence).map(([k, v]) => `  ${k}: ${v}`).join("\n")}`);
+      }
+      const profile = proposedProfile(args, catalog);
+      const results = gapReport(root, profile, catalog);
+      const c = counts(results);
+      if (args.flags.json) return json({ counts: c, results: results.map((r) => ({ id: r.item.id, level: r.level, phase: r.item.phase, status: r.status })) });
+      const passing = catalog.dimensions.phases.filter((p) => results.every((r) => r.item.phase !== p || r.level !== "required" || r.status === "pass"));
+      return print(
+        [
+          `Reporte de brecha (nada se bloquea hasta adoptar el brief)`,
+          formatCheck(results, profile, catalog),
+          `
+Pendientes: \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended}`,
+          passing.length ? `Sub-etapas que ya cumplen sus \u{1F534}: ${passing.join(", ")}` : ""
+        ].filter(Boolean).join("\n")
+      );
+    }
+    case "update": {
+      const profile = requireProfile(root, catalog);
+      const updates = catalogUpdates(profile, catalog);
+      if (args.flags.json) return json(updates.map((u) => ({ id: u.item.id, change: u.change, level: u.level, phase: u.item.phase, inClosedPhase: u.inClosedPhase })));
+      if (!updates.length && profile.catalog_version === catalog.version) return print(`Cat\xE1logo al d\xEDa (${catalog.version}).`);
+      const list = updates.map((u) => `${u.change === "new" ? "\uFF0B" : "\u270E"} ${LEVEL_ICON[u.level]} ${u.item.id} (${u.item.phase}${u.inClosedPhase ? ", sub-etapa cerrada" : ""}) \u2014 ${u.item.title}`);
+      const head = `Cat\xE1logo ${profile.catalog_version} \u2192 ${catalog.version}: ${updates.length} \xEDtem(s) nuevos o modificados que aplican a este perfil.`;
+      if (!args.flags.apply) return print([head, ...list].join("\n"));
+      const { profile: next, graced } = applyUpdate(profile, catalog);
+      saveProfile(root, next);
+      regenerate(root, next, catalog);
+      log(root, "update", `${profile.catalog_version}->${catalog.version} grace:${graced.join(",")}`);
+      return print([head, ...list, "", `\u2705 Perfil en cat\xE1logo ${catalog.version}.`, graced.length ? `Periodo de gracia (no bloquean hasta el siguiente cierre o el deploy a producci\xF3n): ${graced.join(", ")}` : ""].filter(Boolean).join("\n"));
+    }
+    case "registry": {
+      if (args.flags.check) {
+        const errors = checkRegistry(root);
+        print(errors.length ? `\u274C REGISTRY.md desactualizado:
+${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
+        process.exitCode = errors.length ? 1 : 0;
+        return;
+      }
+      const r = writeRegistry(root);
+      return print(`REGISTRY.md: ${r.entries} piezas${r.undocumented ? `, ${r.undocumented} sin "Para qu\xE9" (escr\xEDbelo en su comentario /** */)` : ""}.`);
+    }
+    case "codemap": {
+      if (args.flags.check) {
+        const errors = checkCodemap(root);
+        print(errors.length ? `\u274C ${errors.join("\n")}` : "\u2705 CODEMAP.md al d\xEDa");
+        process.exitCode = errors.length ? 1 : 0;
+        return;
+      }
+      writeCodemap(root, catalog);
+      return print("CODEMAP.md regenerado (las notas manuales se conservan).");
+    }
+    case "quote": {
+      const profile = requireProfile(root, catalog);
+      const { rates, created, configured } = loadRates();
+      const q = quote(profile, catalog, rates);
+      if (args.flags.json) return json(args.flags.client ? { byPhase: q.byPhase, total: q.price, extras: q.extrasPrice, recurring: q.recurring, maintenance: q.maintenance, currency: q.currency } : q);
+      if (args.flags.save && configured) saveQuote(profile, q, rates);
+      const warn = configured ? "" : `
+
+\u26A0\uFE0F hourly_rate es 0${created ? " (se cre\xF3 la plantilla)" : ""}: define tu tarifa en ~/.config/mep-check/rates.yaml.`;
+      return print((args.flags.client ? formatClient(q) : formatInternal(q, rates, catalog.dimensions.phases)) + warn);
+    }
+    case "log-time": {
+      const [id, hoursText] = rest;
+      const hours = Number(hoursText);
+      if (!id || !(hours > 0)) fail("Uso: mep log-time <id> <horas>");
+      const profile = requireProfile(root, catalog);
+      if (!catalog.items.some((i) => i.id === id) && !id.startsWith("custom:")) fail(`${id} no es un \xEDtem del cat\xE1logo (para trabajo a la medida usa custom:<nombre>)`);
+      logTime(profile, id, hours);
+      const item = catalog.items.find((i) => i.id === id);
+      return print(`\u23F1\uFE0F ${id}: ${hours} h registradas fuera del repo.${item ? ` Rango del cat\xE1logo: ${item.effort.hours[0]}\u2013${item.effort.hours[1]} h.` : ""}`);
+    }
+    case "calibrate": {
+      const suggestions = calibrate(catalog);
+      if (args.flags.json) return json(suggestions);
+      return print(
+        suggestions.length ? ["Sugerencias de ajuste (mediana fuera del rango, 3+ mediciones):", ...suggestions.map((s) => `  ${s.id}: ${s.current[0]}\u2013${s.current[1]} h \u2192 ${s.suggested[0]}\u2013${s.suggested[1]} h (mediana ${s.median} h, ${s.samples} mediciones)`)].join("\n") : "Sin sugerencias: faltan mediciones o los rangos ya coinciden con las horas reales."
+      );
+    }
+    case "export-data": {
+      const profile = requireProfile(root, catalog);
+      const { rates, configured } = loadRates();
+      return json(exportData(root, profile, catalog, String(args.flags.lang ?? "es"), configured ? quote(profile, catalog, rates) : void 0));
+    }
+    case "export": {
+      const profile = requireProfile(root, catalog);
+      const input = args.flags.in;
+      if (!input || !existsSync11(join12(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
+      const format = String(args.flags.format ?? "both");
+      const blocks = parseMarkdown(readFileSync10(join12(root, input), "utf8"));
+      const base = join12(root, dirname3(input), basename(input).replace(/\.md$/, ""));
+      const files = [];
+      if (format === "docx" || format === "both") {
+        writeFileSync8(`${base}.docx`, toDocx(blocks));
+        files.push(`${base}.docx`.slice(root.length + 1));
+      }
+      if (format === "pdf" || format === "both") {
+        writeFileSync8(`${base}.pdf`, toPdf(blocks));
+        files.push(`${base}.pdf`.slice(root.length + 1));
+      }
+      const { rates, configured } = loadRates();
+      const fromName = basename(input).match(/-v(\d+)\.md$/)?.[1];
+      const record = recordExport(root, profile, catalog, String(args.flags.lang ?? "es"), files, configured ? quote(profile, catalog, rates).price : void 0, fromName ? Number(fromName) : void 0);
+      return print(`\u{1F4C4} Brief v${record.version} para el cliente: ${files.join(", ")}`);
     }
     case "signals": {
       const profile = requireProfile(root, catalog);
@@ -8904,6 +9933,11 @@ ${formatItems(pending)}` : `
           "  phase [close <sub-etapa>]",
           "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> --by <nombre>",
           "  security [record --id --result --files --notes]",
+          "  audit [--from perfil.yaml]                            infiere el perfil / reporte de brecha (no escribe nada)",
+          "  update [--apply]                                      \xEDtems nuevos del cat\xE1logo que aplican",
+          "  registry [--check] \xB7 codemap [--check]                mapas de referencia",
+          "  quote [--client] [--save] \xB7 log-time <id> <horas> \xB7 calibrate",
+          "  export-data [--lang es] \xB7 export --in <md> [--format docx|pdf|both]",
           "  render \xB7 status \xB7 signals \xB7 presets \xB7 version",
           "  hook <session-start|stop|pre-bash|post-edit>          hooks cl\xE1sicos (stdin JSON)"
         ].join("\n")
