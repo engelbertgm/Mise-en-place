@@ -10,6 +10,7 @@ You describe the project. mep knows what to ask and what to require.
 [![Catalog](https://img.shields.io/badge/catalog-2026.10.1-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
+[![Works with batuta](https://img.shields.io/badge/works_with-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **English** · [Español](README.es.md)
@@ -54,6 +55,15 @@ Sub-phases run in order: `foundation.setup → foundation.design → build.data 
 
 > [!NOTE]
 > A security item passes only when its automatic checks pass **and** `mep-security` left a current report. The report stores a hash of the files it reviewed; when any of them changes, the report expires and the item is pending again.
+
+## Works with
+
+| Plugin | How they fit |
+| --- | --- |
+| [ponytail](https://github.com/DietrichGebert/ponytail) | Applies the code mantra on every change. `/ponytail-review` replaces mep's quality review when closing a sub-phase, and its "must fix" findings block the close |
+| [batuta](https://github.com/engelbertgm/Batuta) | Routes each task to the right model (Opus decides, Sonnet executes, Haiku reads). mep's two agents are fixed exceptions: finding code always goes to `mep-locator` and security always to `mep-security` |
+
+Both are optional. mep works on its own.
 
 ## Requirements
 

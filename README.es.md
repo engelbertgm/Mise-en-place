@@ -10,6 +10,7 @@ Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 [![Catálogo](https://img.shields.io/badge/catálogo-2026.10.1-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
+[![Funciona con batuta](https://img.shields.io/badge/funciona_con-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
 [![PRs bienvenidos](https://img.shields.io/badge/PRs-bienvenidos-brightgreen.svg)](CONTRIBUTING.md)
 
 [English](README.md) · **Español**
@@ -54,6 +55,15 @@ Las sub-etapas van en orden: `foundation.setup → foundation.design → build.d
 
 > [!NOTE]
 > Un ítem de seguridad cuenta como cumplido solo si sus verificaciones automáticas pasan **y** `mep-security` dejó un reporte vigente. El reporte guarda un hash de los archivos que revisó; si alguno cambia, el reporte vence y el ítem vuelve a estar pendiente.
+
+## Funciona con
+
+| Plugin | Cómo se complementan |
+| --- | --- |
+| [ponytail](https://github.com/DietrichGebert/ponytail) | Aplica el mantra de código en cada cambio. `/ponytail-review` reemplaza la revisión de calidad de mep al cerrar una sub-etapa, y sus hallazgos "must fix" bloquean el cierre |
+| [batuta](https://github.com/engelbertgm/Batuta) | Envía cada tarea al modelo adecuado (Opus decide, Sonnet ejecuta, Haiku lee). Los dos agentes de mep son excepciones fijas: localizar código siempre va a `mep-locator` y seguridad siempre a `mep-security` |
+
+Los dos son opcionales. mep funciona solo.
 
 ## Requisitos
 
