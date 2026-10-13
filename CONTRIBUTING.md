@@ -37,4 +37,12 @@ Thanks for helping improve mise en place.
 - The engine decides; skills, mods and hooks only call it. One source of truth.
 - Skills, agents and catalog text are written in Spanish, short and imperative. README.md and these files are in English; README.es.md is the Spanish README. Keep both READMEs in sync.
 
-By contributing, you agree your contributions are licensed under [Apache-2.0](LICENSE) and that you follow the [Code of Conduct](CODE_OF_CONDUCT.md).
+## License of contributions
+
+mep is under the [Business Source License 1.1](LICENSE) and is also offered under commercial licenses. By contributing, you:
+
+- confirm the contribution is your own work and you have the right to submit it;
+- license it under the same terms as the project ([BSL 1.1](LICENSE));
+- grant the Licensor a perpetual, worldwide, royalty-free right to use, modify and relicense your contribution, including under commercial licenses.
+
+You also agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).

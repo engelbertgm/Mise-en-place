@@ -5,7 +5,7 @@
 **Scope → brief → verified checklist, for websites and webapps built with Claude Code.**<br>
 You describe the project. mep knows what to ask and what to require.
 
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-0.1.0-informational.svg)](.claude-plugin/plugin.json)
 [![Catalog](https://img.shields.io/badge/catalog-2026.10.1-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
@@ -218,4 +218,10 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) and the [Code of Conduct](CODE_OF_CONDUCT
 
 ## License
 
-[Apache-2.0](LICENSE)
+[Business Source License 1.1](LICENSE). Free to use, including on paid client projects, for:
+
+- individuals (freelance designers and developers),
+- teams of up to 5 people,
+- non-commercial, educational and non-profit use.
+
+Larger organizations need a commercial license; [contact the author](https://github.com/engelbertgm). No one may resell mep or offer it as a competing paid product or service. Each version becomes [Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0) four years after its release.

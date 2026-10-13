@@ -28,5 +28,5 @@
     "typescript": "^7.0.2",
     "yaml": "^2.9.1"
   },
-  "license": "Apache-2.0"
+  "license": "BUSL-1.1"
 }
