@@ -1,0 +1,8 @@
+{
+  "name": "mep",
+  "version": "0.1.0",
+  "description": "Mise en place: convierte el scope de un website o webapp en un brief con stack justificado y checklist verificable, y bloquea cerrar o desplegar si faltan obligatorios.",
+  "author": { "name": "Engelbert Mandujano" },
+  "repository": "https://github.com/engelbertgm/Mise-en-place",
+  "keywords": ["web", "checklist", "seo", "security", "accessibility", "brief"]
+}

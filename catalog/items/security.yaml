@@ -1,0 +1,716 @@
+# Seguridad por capas. Todo ítem de esta categoría se da por cumplido solo con su verify automático
+# Y un reporte vigente de mep-security en .mep/security/<id>.json (ligado al hash de los archivos revisados).
+# locked: no se puede desactivar. Un check `expect: absent` (o sql rls_enabled) que falla es una violación:
+# en un ítem locked bloquea en cualquier momento, sin importar la fase.
+
+# ── Secretos · siempre · locked ─────────────────────────────────────────────
+
+- id: no-secrets-in-repo
+  title: Cero secretos en el repo y en el bundle del cliente
+  category: security
+  level: required
+  phase: foundation.setup
+  locked: true
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Una llave en el repo queda en el historial para siempre; cualquiera con acceso al código (o al bundle) la usa."
+  how: "Secretos solo en el gestor de variables del hosting y en .env local ignorado. Si una llave se filtra: rotarla de inmediato (borrarla no basta)."
+  verify:
+    - { type: grep, pattern: '(?:-----BEGIN [A-Z ]*PRIVATE KEY-----)|(?:\b[sr]k_live_[0-9a-zA-Z]{16,})|(?:\bwhsec_[0-9a-zA-Z]{16,})|(?:\bsk-(?:proj-|ant-)?[A-Za-z0-9_-]{32,})|(?:\bAKIA[0-9A-Z]{16}\b)|(?:\bgh[pousr]_[A-Za-z0-9]{36,})|(?:\bxox[abposr]-[A-Za-z0-9-]{10,})|(?:\bAIza[0-9A-Za-z_-]{35}\b)|(?:\bre_[A-Za-z0-9]{8,}_[A-Za-z0-9]{16,})|(?:\bnpm_[A-Za-z0-9]{36}\b)|(?:"type":\s*"service_account")|(?:\b(?:postgres(?:ql)?|mysql|mongodb(?:\+srv)?|redis)://[^\s:/@"'']+:[^\s@"''$]{3,}@)|(?:(?:NEXT_PUBLIC|VITE|PUBLIC)_[A-Z_]*SERVICE_ROLE)', glob: "**/*", exclude: "{**/.env,**/.env.local,**/.env.*.local,**/.env.development,**/.env.production,**/.env.test,**/*.lock,**/pnpm-lock.yaml,**/package-lock.json,**/*.{png,jpg,jpeg,gif,webp,avif,ico,svg,woff,woff2,ttf,pdf,zip,mp4,webm}}", expect: absent }
+  references: ["https://owasp.org/Top10/A02_2021-Cryptographic_Failures/", "https://github.com/gitleaks/gitleaks"]
+
+- id: env-gitignored
+  title: ".env* en .gitignore (excepto .env.example)"
+  category: security
+  level: required
+  phase: foundation.setup
+  locked: true
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Es la forma más común de filtrar llaves: un .env.local versionado por accidente."
+  how: ".gitignore con .env* y !.env.example; .env.example sin valores reales."
+  verify:
+    - { type: grep, pattern: "^\\.env", glob: .gitignore }
+    - { type: grep, pattern: "=\\s*(sk_live_|sk_test_|whsec_|eyJ[A-Za-z0-9_-]{20,}|[A-Za-z0-9+/]{40,})", glob: .env.example, expect: absent }
+
+- id: public-env-prefix
+  title: "Al cliente solo llegan variables con prefijo público, y ninguna es secreta"
+  category: security
+  level: required
+  phase: foundation.setup
+  locked: true
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Todo lo que lleva NEXT_PUBLIC_, VITE_ o PUBLIC_ se incrusta en el JavaScript que descarga cualquiera."
+  how: "Llaves privilegiadas (service_role de Supabase, secret key de Stripe) solo en servidor, sin prefijo público."
+  verify:
+    - { type: grep, pattern: "\\b(NEXT_PUBLIC|VITE|PUBLIC)_[A-Z0-9_]*(SECRET|SERVICE_ROLE|PRIVATE|PASSWORD|_TOKEN\\b|WEBHOOK)", glob: "**/*.{ts,tsx,js,jsx,mjs,astro,vue,svelte,json,example}", expect: absent }
+
+- id: server-only-keys
+  title: Llaves privilegiadas solo en código de servidor
+  category: security
+  level: required
+  phase: build.features
+  locked: true
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Un import de servidor dentro de un componente de cliente filtra la llave al bundle."
+  how: "Clientes con service_role o secret key en módulos con import \"server-only\"; nunca en archivos \"use client\" ni en components/."
+  verify:
+    - { type: grep, pattern: "SERVICE_ROLE|STRIPE_SECRET|SECRET_KEY|PRIVATE_KEY", glob: "{components,src/components,app/**/_components,src/hooks,hooks}/**/*.{ts,tsx,js,jsx}", expect: absent }
+    - { type: manual, prompt: "Ningún archivo \"use client\" importa módulos con llaves privilegiadas" }
+
+- id: secrets-scan-ci
+  title: Escaneo de secretos en pre-commit y en CI, incluido el historial
+  category: security
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Detecta la llave antes de que llegue al remoto; el escaneo del historial encuentra las que ya se filtraron."
+  how: "gitleaks (o trufflehog) en pre-commit y como job de CI con fetch-depth: 0."
+  verify:
+    - { type: grep, pattern: "gitleaks|trufflehog", glob: ".github/workflows/*.{yml,yaml}" }
+    - { type: grep, pattern: "gitleaks|trufflehog|secretlint", glob: "{.husky/*,lefthook.{yml,yaml},.pre-commit-config.yaml,.lintstagedrc*,package.json}" }
+
+- id: keys-per-environment
+  title: Llaves distintas por entorno (desarrollo, preview, producción)
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Una llave de desarrollo filtrada no debe abrir producción."
+  how: "Variables separadas por entorno en el gestor del hosting; modo test de Stripe fuera de producción."
+  verify:
+    - { type: manual, prompt: "Cada entorno usa sus propias llaves, guardadas en el gestor del hosting" }
+
+- id: key-rotation-procedure
+  title: Procedimiento de rotación de llaves documentado
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Cuando una llave se filtra cada minuto cuenta; sin procedimiento se improvisa."
+  how: "SECURITY.md (o sección del README): dónde vive cada llave, cómo rotarla y a quién avisar."
+  verify:
+    - { type: grep, pattern: "rotaci[oó]n|rotat(e|ion)", glob: "{SECURITY.md,README.md,docs/**/*.md}", flags: i }
+
+# ── Base · siempre ───────────────────────────────────────────────────────────
+
+- id: canonical-redirects
+  title: "Redirección canónica http→https y www↔sin-www"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Una sola versión del dominio: sin contenido duplicado ni cookies servidas por HTTP."
+  how: "Dominio principal en el hosting y redirección 308/301 desde las variantes."
+  verify:
+    - { type: manual, prompt: "http:// y la variante www (o sin www) redirigen al dominio canónico https://" }
+
+- id: security-headers
+  title: "Headers: X-Content-Type-Options, Referrer-Policy, frame-ancestors"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Evitan sniffing de tipos, fuga de URLs a terceros y clickjacking."
+  how: "headers() en next.config: X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, CSP frame-ancestors 'self' (o X-Frame-Options: DENY)."
+  verify:
+    - { type: grep, pattern: "X-Content-Type-Options", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
+    - { type: grep, pattern: "Referrer-Policy", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
+    - { type: grep, pattern: "frame-ancestors|X-Frame-Options", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
+
+- id: lockfile-committed
+  title: Lockfile versionado
+  category: security
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin lockfile cada instalación puede traer versiones distintas, incluida una comprometida."
+  how: "pnpm-lock.yaml (o el del gestor usado) en el repo; CI instala con --frozen-lockfile."
+  verify:
+    - { type: file_exists, path: [pnpm-lock.yaml, package-lock.json, yarn.lock, bun.lockb, bun.lock] }
+
+- id: no-critical-vulnerabilities
+  title: Sin vulnerabilidades críticas en dependencias
+  category: security
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3] }
+  why: "Una dependencia con vulnerabilidad crítica conocida es la entrada más barata para un atacante."
+  how: "pnpm audit --audit-level critical --prod limpio; actualizar o reemplazar lo que falle."
+  verify:
+    - { type: command, run: "if [ -f pnpm-lock.yaml ]; then pnpm audit --audit-level critical --prod; elif [ -f yarn.lock ]; then yarn npm audit --severity critical; else npm audit --audit-level=critical --omit=dev; fi", timeout: 120 }
+
+- id: dependency-scan-ci
+  title: Escaneo de dependencias en CI que falla con críticas
+  category: security
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Las vulnerabilidades aparecen después de instalar; el CI las detecta en cada PR."
+  how: "Paso de CI con pnpm audit (u OSV-Scanner). Revisar paquetes nuevos antes de instalarlos (typosquatting)."
+  verify:
+    - { type: grep, pattern: "\\baudit\\b|osv-scanner|socket", glob: ".github/workflows/*.{yml,yaml}" }
+
+- id: production-errors-hidden
+  title: Errores en producción sin stack traces ni detalles internos
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Un stack trace revela rutas, versiones y consultas que guían un ataque."
+  how: "Páginas de error genéricas; el detalle va al monitoreo de errores, nunca a la respuesta."
+  verify:
+    - { type: grep, pattern: "(error|err)\\.stack|JSON\\.stringify\\((error|err)\\)", glob: "{app,src/app,pages,src/pages}/**/{route,api,*.api}.{ts,js}", expect: absent }
+    - { type: manual, prompt: "Las respuestas de error no exponen stack, SQL ni rutas internas" }
+
+- id: csp-strict
+  title: Content-Security-Policy estricta
+  category: security
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: M, hours: [2, 6] }
+  why: "Limita el daño de un XSS: el navegador no ejecuta scripts de orígenes no permitidos."
+  how: "CSP con nonce (middleware de Next.js) y lista mínima de orígenes."
+  verify:
+    - { type: grep, pattern: "Content-Security-Policy", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers}" }
+
+- id: security-txt
+  title: security.txt
+  category: security
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Dice a quien encuentra una vulnerabilidad cómo reportarla."
+  how: "public/.well-known/security.txt con Contact y Expires."
+  verify:
+    - { type: route_exists, path: /.well-known/security.txt }
+  references: ["https://securitytxt.org/"]
+
+- id: dependency-updates-bot
+  title: Dependabot o Renovate
+  category: security
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Mantiene las dependencias al día con PRs pequeños y revisables."
+  how: ".github/dependabot.yml o renovate.json."
+  verify:
+    - { type: file_exists, path: [.github/dependabot.yml, .github/dependabot.yaml, renovate.json, .github/renovate.json] }
+
+# ── Ciberseguridad · siempre ─────────────────────────────────────────────────
+
+- id: owasp-top10-review
+  title: Checklist OWASP Top 10 revisado
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: M, hours: [2, 6] }
+  why: "Cubre las fallas más explotadas en aplicaciones web."
+  how: "mep-security revisa cada punto del Top 10 contra el código y lo registra."
+  verify:
+    - { type: manual, prompt: "OWASP Top 10 revisado punto por punto" }
+  references: ["https://owasp.org/Top10/"]
+
+- id: no-sql-injection
+  title: "Inyección: consultas parametrizadas u ORM; nunca SQL armado con strings"
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.10.1"
+  when: { signals: { has_db: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "SQL concatenado con datos del usuario permite leer o borrar la base completa."
+  how: "Cliente de Supabase, Drizzle o Prisma con parámetros; prohibido $queryRawUnsafe y template strings en query()."
+  verify:
+    - { type: grep, pattern: "\\$(query|execute)RawUnsafe|\\b(query|execute)\\(\\s*`[^`]*\\$\\{|\\b(query|execute)\\(\\s*[\"'][^\"']*[\"']\\s*\\+", glob: "**/*.{ts,tsx,js,jsx,mjs}", expect: absent }
+
+- id: no-raw-html
+  title: "XSS: nada de HTML crudo sin sanitizar"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "HTML del usuario sin sanitizar ejecuta scripts en el navegador de otros usuarios."
+  how: "Renderizar texto, no HTML. Si hace falta HTML: DOMPurify. JSON-LD con JSON.stringify es la excepción permitida."
+  verify:
+    - { type: grep, pattern: "^(?!.*(DOMPurify|sanitize|JSON\\.stringify)).*(dangerouslySetInnerHTML|v-html=|\\.innerHTML\\s*=|set:html=)", glob: "**/*.{tsx,jsx,ts,js,vue,svelte,astro}", expect: absent }
+
+- id: safe-redirects
+  title: "Redirecciones abiertas: parámetros de redirect contra lista permitida"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un ?next= sin validar convierte tu dominio en un enlace de phishing creíble."
+  how: "Aceptar solo rutas relativas propias (empiezan con / y no con //) o dominios de una lista."
+  verify:
+    - { type: grep, pattern: "redirect\\(\\s*(searchParams|req\\.query|params|query)\\b|location\\.href\\s*=\\s*(searchParams|params|query)", glob: "**/*.{ts,tsx,js,jsx}", expect: absent }
+    - { type: manual, prompt: "Todo parámetro de redirect se valida contra la lista permitida" }
+
+- id: ssrf-allowlist
+  title: "SSRF: si el servidor descarga URLs del usuario, lista permitida de dominios"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Un fetch a una URL del usuario puede alcanzar servicios internos o metadatos del hosting."
+  how: "Si existe esa función: lista de dominios permitidos, sin IPs privadas ni redirecciones. Si no existe, la auditoría lo registra como no aplica."
+  verify:
+    - { type: manual, prompt: "Ningún fetch del servidor usa una URL del usuario sin lista permitida" }
+
+- id: logs-without-secrets
+  title: Logs sin contraseñas, tokens ni datos personales
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los logs los leen más personas y servicios que la base de datos."
+  how: "Loggear IDs, no valores; redactar password, token, authorization y email."
+  verify:
+    - { type: grep, pattern: "console\\.(log|info|debug|warn|error)\\([^)]*\\b(password|passwd|token|secret|apiKey|api_key|authorization)\\b", glob: "**/*.{ts,tsx,js,jsx}", flags: i, expect: absent }
+
+- id: static-analysis-ci
+  title: Análisis estático en CI (Semgrep o CodeQL)
+  category: security
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Encuentra patrones inseguros en cada PR sin depender de la memoria del revisor."
+  how: "Job de CodeQL o Semgrep en GitHub Actions."
+  verify:
+    - { type: grep, pattern: "codeql|semgrep", glob: ".github/workflows/*.{yml,yaml}", flags: i }
+
+- id: waf-ddos
+  title: Firewall/WAF del hosting y protección DDoS
+  category: security
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Frena bots, fuerza bruta y picos maliciosos antes de que lleguen a la app."
+  how: "Vercel Firewall (o equivalente) con reglas para login, API y rate limit global."
+  verify:
+    - { type: manual, prompt: "WAF del hosting configurado" }
+
+- id: pentest-before-launch
+  title: Pentest antes de lanzar
+  category: security
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.1"
+  level_overrides:
+    - { when: { any: [ { capabilities: [payments] }, { audience: { any: [sensitive-data-health, sensitive-data-finance] } } ] }, level: required }
+  effort: { size: L, hours: [8, 20] }
+  why: "Una revisión externa encuentra lo que el equipo ya no ve."
+  how: "Pentest (interno o de terceros) sobre staging con datos ficticios; hallazgos críticos resueltos antes de lanzar."
+  verify:
+    - { type: manual, prompt: "Pentest realizado y hallazgos críticos resueltos" }
+
+# ── Formularios · si hay cualquier formulario ───────────────────────────────
+
+- id: form-server-validation
+  title: Validación server-side de formularios
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "La validación del cliente se salta con una petición directa."
+  how: "Esquema (zod o valibot) compartido entre cliente y servidor; el servidor siempre valida."
+  verify:
+    - { type: grep, pattern: "\"(zod|valibot|yup|joi|@sinclair/typebox|arktype)\"", glob: package.json }
+
+- id: form-anti-spam
+  title: "Anti-spam en formularios (honeypot o captcha)"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un formulario público sin protección recibe spam en horas."
+  how: "Honeypot + Cloudflare Turnstile (o Vercel BotID) en formularios públicos."
+  verify:
+    - { type: grep, pattern: "honeypot|turnstile|recaptcha|hcaptcha|botid", glob: "**/*.{ts,tsx,js,jsx,astro}", flags: i }
+
+- id: form-rate-limit
+  title: Rate limit en endpoints de formularios
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin límite, un bot satura el endpoint o la cuota de email."
+  how: "@upstash/ratelimit (o el WAF del hosting) por IP y por usuario."
+  verify:
+    - { type: grep, pattern: "ratelimit|rate-limit|rateLimit|RateLimiter", glob: "**/*.{ts,tsx,js,jsx,json}", exclude: "{**/node_modules/**,pnpm-lock.yaml}" }
+
+# ── Usuarios · si auth ───────────────────────────────────────────────────────
+
+- id: password-hashing
+  title: Contraseñas con argon2 o bcrypt
+  category: security
+  level: required
+  phase: build.data
+  locked: true
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un hash rápido (md5, sha) se revierte con fuerza bruta en minutos si la base se filtra."
+  how: "Auth gestionada (Supabase Auth) o argon2id/bcrypt; nunca md5, sha1 ni sha256 para contraseñas."
+  verify:
+    - { type: grep, pattern: "\"(argon2|@node-rs/argon2|bcrypt|bcryptjs|@node-rs/bcrypt|@supabase/ssr|@supabase/supabase-js|next-auth|@auth/core|better-auth|@clerk/nextjs|lucia)\"", glob: package.json }
+    - { type: grep, pattern: "createHash\\([\"'](md5|sha1|sha256)[\"']\\)[^\\n]*(password|passwd|pwd)|(md5|sha1)\\([^)]*(password|passwd|pwd)", glob: "**/*.{ts,tsx,js,jsx}", flags: i, expect: absent }
+
+- id: secure-session-cookies
+  title: "Cookies de sesión HttpOnly + Secure + SameSite"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Una cookie legible por JavaScript se roba con un XSS; sin SameSite, se envía en peticiones de otros sitios."
+  how: "httpOnly: true, secure: true, sameSite: 'lax' (Supabase SSR lo configura así)."
+  verify:
+    - { type: grep, pattern: "httpOnly:\\s*false|sameSite:\\s*[\"']none[\"']", glob: "**/*.{ts,tsx,js,jsx}", flags: i, expect: absent }
+    - { type: manual, prompt: "Cookies de sesión con HttpOnly, Secure y SameSite" }
+
+- id: csrf-protection
+  title: Protección CSRF
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin CSRF otro sitio puede ejecutar acciones con la sesión del usuario."
+  how: "Server Actions (verifican Origin), SameSite=Lax y token o verificación de Origin en route handlers que mutan."
+  verify:
+    - { type: manual, prompt: "Toda mutación verifica Origin o token CSRF" }
+
+- id: auth-rate-limit
+  title: Rate limit en login, registro y recuperación
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Frena fuerza bruta y relleno de credenciales filtradas."
+  how: "Límites de Supabase Auth o @upstash/ratelimit por IP y por cuenta."
+  verify:
+    - { type: manual, prompt: "Login, registro y recuperación con rate limit" }
+
+- id: no-user-enumeration
+  title: Mensajes que no revelan si un email existe
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "\"Ese email no existe\" le da a un atacante la lista de cuentas reales."
+  how: "\"Si el correo está registrado, te enviamos un enlace\"; mismo mensaje y tiempo de respuesta en ambos casos."
+  verify:
+    - { type: grep, pattern: "(email|correo|usuario|user)[^\"'`]{0,30}(no existe|not found|does not exist|no registrado|isn'?t registered)", glob: "**/*.{ts,tsx,js,jsx,json}", flags: i, expect: absent }
+
+- id: session-expiry
+  title: Expiración de sesión e invalidación al cambiar contraseña
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Una sesión robada no debe durar para siempre ni sobrevivir a un cambio de contraseña."
+  how: "Tiempo de vida de sesión definido; signOut({ scope: 'others' }) al cambiar contraseña."
+  verify:
+    - { type: manual, prompt: "Sesiones expiran y se invalidan al cambiar contraseña" }
+
+- id: resource-authorization
+  title: "Autorización server-side por recurso"
+  category: security
+  level: required
+  phase: build.data
+  locked: true
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: M, hours: [3, 8], scales_with: entities }
+  why: "Si el servidor no revisa dueño y permisos, cambiar un ID en la URL muestra datos de otro usuario."
+  how: "Cada lectura y escritura filtra por el usuario autenticado (RLS o chequeo explícito en el servidor); tests de usuario A contra datos de B."
+  verify:
+    - { type: manual, prompt: "Cada endpoint y consulta verifica dueño/permiso del recurso en el servidor" }
+
+- id: mfa-optional
+  title: MFA opcional para usuarios
+  category: security
+  level: recommended
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Protege cuentas aunque la contraseña se filtre."
+  how: "TOTP con Supabase Auth MFA."
+  verify:
+    - { type: grep, pattern: "mfa\\.|totp|enroll", glob: "**/*.{ts,tsx,js,jsx}", flags: i }
+
+- id: new-login-alert
+  title: Aviso de inicio de sesión nuevo
+  category: security
+  level: recommended
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [2, 4] }
+  why: "El usuario detecta un acceso que no hizo."
+  how: "Email al detectar un dispositivo o ubicación nuevos."
+  verify:
+    - { type: manual, prompt: "Email de aviso en inicio de sesión desde dispositivo nuevo" }
+
+# ── Base de datos · si hay DB ────────────────────────────────────────────────
+
+- id: rls-all-tables
+  title: RLS activo en todas las tablas
+  category: security
+  level: required
+  phase: build.data
+  locked: true
+  since: "2026.10.1"
+  when: { signals: { has_db: true, db_client_access: true } }
+  effort: { size: M, hours: [2, 6], scales_with: entities }
+  why: "Con acceso directo desde el cliente (Supabase), una tabla sin RLS es pública para cualquiera con la anon key."
+  how: "Cada create table en migraciones va con su enable row level security. Advisors de Supabase sin alertas."
+  verify:
+    - { type: sql, rule: rls_enabled }
+
+- id: rls-policies-per-operation
+  title: Políticas RLS separadas por operación + tests A no ve datos de B
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.10.1"
+  depends_on: [rls-all-tables]
+  when: { signals: { has_db: true, db_client_access: true } }
+  effort: { size: M, hours: [3, 8], scales_with: entities }
+  why: "Una política \"for all\" mezcla permisos; los tests prueban que el aislamiento funciona de verdad."
+  how: "create policy por select, insert, update y delete; tests de políticas con dos usuarios."
+  verify:
+    - { type: sql, rule: policies_per_operation }
+    - { type: manual, prompt: "Tests: el usuario A no puede leer ni modificar datos del usuario B" }
+
+- id: db-least-privilege
+  title: Usuario de DB de la app con privilegios mínimos
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.10.1"
+  when: { signals: { has_db: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Si la app se compromete, el atacante solo puede lo que puede su usuario de DB."
+  how: "Rol de la app sin superuser ni DDL; las migraciones corren con otro rol."
+  verify:
+    - { type: manual, prompt: "La app se conecta con un rol sin privilegios de administración" }
+
+- id: db-ssl
+  title: Conexión cifrada (SSL) a la base de datos
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.10.1"
+  when: { signals: { has_db: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin SSL las consultas y credenciales viajan en claro."
+  how: "sslmode=require en la connection string; nunca ssl: false."
+  verify:
+    - { type: grep, pattern: "sslmode=disable|ssl:\\s*false|rejectUnauthorized:\\s*false", glob: "**/*.{ts,js,mjs,json,toml,yaml,yml,example}", expect: absent }
+
+# ── Pagos · si payments ──────────────────────────────────────────────────────
+
+- id: hosted-checkout
+  title: Checkout o elementos alojados del procesador (nunca tocar datos de tarjeta)
+  category: security
+  level: required
+  phase: build.features
+  locked: true
+  since: "2026.10.1"
+  when: { capabilities: [payments] }
+  effort: { size: M, hours: [3, 8] }
+  why: "Tocar datos de tarjeta te pone en alcance PCI completo; el checkout alojado lo evita."
+  how: "Stripe Checkout o Payment Element; ningún input propio de número de tarjeta o CVC."
+  verify:
+    - { type: grep, pattern: "(name|autocomplete|autoComplete)=[\"'](cardnumber|card-number|cc-number|cc-csc|cvc|cvv)[\"']", glob: "**/*.{tsx,jsx,html,astro,vue,svelte}", flags: i, expect: absent }
+    - { type: grep, pattern: "checkout\\.sessions\\.create|PaymentElement|EmbeddedCheckout|preferences\\.create", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: webhook-signature
+  title: Firma de webhooks verificada
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [payments] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin verificar la firma, cualquiera puede llamar al webhook y marcar un pedido como pagado."
+  how: "stripe.webhooks.constructEvent con el body crudo y el secreto del endpoint."
+  verify:
+    - { type: grep, pattern: "constructEvent|constructEventAsync|verifySignature|validateWebhook", glob: "**/*.{ts,js}" }
+
+- id: webhook-idempotency
+  title: Webhooks idempotentes
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [payments] }
+  effort: { size: S, hours: [1, 3] }
+  why: "El procesador reintenta; sin idempotencia un pago se procesa dos veces."
+  how: "Guardar event.id procesados (o upsert por id de pago) y responder 200 a duplicados."
+  verify:
+    - { type: grep, pattern: "idempoten|processed_events|event\\.id|onConflict|upsert", glob: "**/webhook*/**/*.{ts,js}" }
+
+- id: server-side-prices
+  title: Montos y precios calculados en el servidor
+  category: security
+  level: required
+  phase: build.features
+  locked: true
+  since: "2026.10.1"
+  when: { capabilities: [payments] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Si el precio viene del cliente, se cambia en DevTools."
+  how: "El cliente manda IDs y cantidades; el servidor busca precios (Price IDs de Stripe o DB)."
+  verify:
+    - { type: grep, pattern: "unit_amount:\\s*(body|req\\.body|data|input|formData)|amount:\\s*(body|req\\.body|input|formData)\\.", glob: "**/*.{ts,js}", expect: absent }
+
+# ── Uploads · si uploads ─────────────────────────────────────────────────────
+
+- id: upload-validation
+  title: "Uploads: tipo real, tamaño, nombres aleatorios y storage separado"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [uploads] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Un archivo malicioso con extensión falsa o nombre controlado por el usuario abre XSS, sobrescrituras o ejecución."
+  how: "Validar tipo por contenido (file-type) y tamaño en servidor; nombre con randomUUID; bucket separado del código; nunca ejecutar ni servir como HTML."
+  verify:
+    - { type: grep, pattern: "file-type|fileTypeFromBuffer|magic|allowedMimeTypes|maxFileSize|fileSizeLimit", glob: "**/*.{ts,tsx,js,jsx}" }
+    - { type: grep, pattern: "randomUUID|nanoid|uuidv4|createId\\(", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: upload-antivirus
+  title: Escaneo antivirus de uploads
+  category: security
+  level: recommended
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [uploads] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Evita que la app distribuya malware entre usuarios."
+  how: "Escaneo asíncrono (ClamAV o servicio) antes de publicar el archivo."
+  verify:
+    - { type: manual, prompt: "Uploads escaneados antes de estar disponibles" }
+
+# ── Admin · si admin-panel ───────────────────────────────────────────────────
+
+- id: admin-roles
+  title: Roles y permisos en el panel de administración
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [admin-panel] }
+  effort: { size: M, hours: [3, 8] }
+  why: "No todo admin debe poder todo; un rol de más es una puerta de más."
+  how: "Roles en DB (o claims), verificados en el servidor y en RLS."
+  verify:
+    - { type: grep, pattern: "\\brole\\b|\\broles\\b|permission", glob: "**/*.{ts,tsx,sql}" }
+
+- id: admin-mfa
+  title: MFA obligatorio para admins
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [admin-panel] }
+  effort: { size: S, hours: [2, 4] }
+  why: "La cuenta de un admin es el objetivo más valioso."
+  how: "Requerir aal2 (MFA) para rutas y políticas de admin."
+  verify:
+    - { type: grep, pattern: "aal2|mfa|totp", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: admin-audit-log
+  title: Log de auditoría de acciones de admin
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [admin-panel] }
+  effort: { size: M, hours: [2, 5] }
+  why: "Saber quién cambió qué y cuándo; requisito en incidentes y disputas."
+  how: "Tabla audit_log (actor, acción, recurso, antes/después, fecha) escrita desde el servidor."
+  verify:
+    - { type: grep, pattern: "audit_log|auditLog|audit_logs", glob: "**/*.{ts,tsx,sql}" }
+
+# ── API pública · si api-public ──────────────────────────────────────────────
+
+- id: api-auth
+  title: "API pública: auth por API key o token + rate limit"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [api-public] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Una API abierta se abusa: scraping, costos y datos."
+  how: "API keys hasheadas en DB (o tokens), rate limit por key."
+  verify:
+    - { type: grep, pattern: "api[_-]?key|authorization|bearer", glob: "{app,src/app,pages,src/pages}/api/**/*.{ts,js}", flags: i }
+
+- id: api-cors
+  title: CORS restrictivo
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [api-public] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Access-Control-Allow-Origin: * con credenciales expone datos a cualquier sitio."
+  how: "Lista de orígenes permitidos; nunca * en endpoints con sesión."
+  verify:
+    - { type: grep, pattern: "Access-Control-Allow-Origin[\"']?\\s*[:,]\\s*[\"']\\*[\"']|origin:\\s*[\"']\\*[\"']|origin:\\s*true", glob: "**/*.{ts,js,json}", expect: absent }
+
+- id: api-versioning
+  title: API versionada
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { capabilities: [api-public] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Cambiar una API sin versión rompe a quien la usa y fuerza parches inseguros."
+  how: "Rutas /api/v1/…; cambios incompatibles en una versión nueva."
+  verify:
+    - { type: file_exists, path: ["{app,src/app,pages,src/pages}/api/v*/**/*"] }

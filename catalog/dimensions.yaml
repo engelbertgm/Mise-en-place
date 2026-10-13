@@ -1,0 +1,43 @@
+# Valores válidos de cada dimensión. Solo se aceptan valores de aquí.
+type: [landing, corporate, local-business, blog, portfolio, ecommerce, saas, marketplace, internal-app, directory, booking]
+capabilities: [auth, payments, subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration]
+markets: [MX, USA, CA, EU, UK, BR, IN]   # CN: reservado para una fase futura
+market_sublevels:
+  USA: [USA:AL, USA:AK, USA:AZ, USA:AR, USA:CA, USA:CO, USA:CT, USA:DE, USA:FL, USA:GA, USA:HI, USA:ID, USA:IL, USA:IN, USA:IA, USA:KS, USA:KY, USA:LA, USA:ME, USA:MD, USA:MA, USA:MI, USA:MN, USA:MS, USA:MO, USA:MT, USA:NE, USA:NV, USA:NH, USA:NJ, USA:NM, USA:NY, USA:NC, USA:ND, USA:OH, USA:OK, USA:OR, USA:PA, USA:RI, USA:SC, USA:SD, USA:TN, USA:TX, USA:UT, USA:VT, USA:VA, USA:WA, USA:WV, USA:WI, USA:WY, USA:DC]
+  CA: [CA:AB, CA:BC, CA:MB, CA:NB, CA:NL, CA:NS, CA:ON, CA:PE, CA:QC, CA:SK, CA:NT, CA:NU, CA:YT]
+  EU: [EU:AT, EU:BE, EU:BG, EU:HR, EU:CY, EU:CZ, EU:DK, EU:EE, EU:FI, EU:FR, EU:DE, EU:GR, EU:HU, EU:IE, EU:IT, EU:LV, EU:LT, EU:LU, EU:MT, EU:NL, EU:PL, EU:PT, EU:RO, EU:SK, EU:SI, EU:ES, EU:SE]
+audience: [b2b, b2c, minors, sensitive-data-health, sensitive-data-finance]
+context: [client-project, own-product]
+
+# Hechos del proyecto que activan bloques. /mep:scope los infiere; /mep:check los detecta en el código.
+signals:
+  has_forms: { values: [true, false], default: false }
+  has_long_forms: { values: [true, false], default: false }
+  has_db: { values: [true, false], default: false }
+  db_client_access: { values: [true, false], default: false }
+  has_personal_data: { values: [true, false], default: false }
+  has_dates: { values: [true, false], default: false }
+  has_tables: { values: [true, false], default: false }
+  has_destructive_actions: { values: [true, false], default: false }
+  has_embeds: { values: [true, false], default: false }
+  has_nonessential_cookies: { values: [true, false], default: false }
+  team: { values: [solo, team], default: solo }
+
+# Sub-etapas en orden. Al cerrar una, la activa pasa a la siguiente.
+phases: [foundation.setup, foundation.design, build.data, build.features, build.ux, launch.content, launch.seo, launch.ops]
+
+# Lo que una capacidad implica. Solo enciende señales; nunca las apaga.
+implies:
+  auth: { signals: { has_forms: true, has_db: true, has_personal_data: true } }
+  payments: { signals: { has_forms: true, has_db: true, has_personal_data: true } }
+  subscriptions: { capabilities: [payments] }
+  ugc: { signals: { has_forms: true, has_db: true, has_destructive_actions: true } }
+  uploads: { signals: { has_db: true } }
+  newsletter: { signals: { has_forms: true, has_personal_data: true } }
+  email: { signals: { has_personal_data: true } }
+  admin-panel: { capabilities: [auth], signals: { has_tables: true, has_destructive_actions: true } }
+  search: { signals: { has_forms: true } }
+  analytics: { signals: { has_personal_data: true } }
+  maps: { signals: { has_embeds: true } }
+  notifications: { signals: { has_db: true } }
+  realtime: { signals: { has_db: true } }

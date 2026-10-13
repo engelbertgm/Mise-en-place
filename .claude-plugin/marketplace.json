@@ -1,0 +1,8 @@
+{
+  "name": "mise-en-place",
+  "owner": { "name": "Engelbert Mandujano" },
+  "description": "Mise en place (mep): brief, checklist y verificación para websites y webapps.",
+  "plugins": [
+    { "name": "mep", "source": ".", "description": "Scope → perfil → brief + checklist verificable, con hooks que bloquean cerrar o desplegar si faltan obligatorios." }
+  ]
+}

@@ -1,0 +1,4 @@
+type: marketplace
+capabilities: [auth, payments, ugc, uploads, search, notifications, admin-panel]
+signals: { has_dates: true, has_tables: true }
+counts: { pages: 15, entities: 8, languages: 1, integrations: 4 }

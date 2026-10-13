@@ -1,0 +1,4 @@
+type: saas
+capabilities: [auth, subscriptions, payments, email, notifications, admin-panel, analytics]
+signals: { has_dates: true, has_tables: true }
+counts: { pages: 12, entities: 6, languages: 1, integrations: 3 }

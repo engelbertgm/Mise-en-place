@@ -1,0 +1,33 @@
+# Generado por mep. Hazlo check obligatorio del PR a main (Settings → Branches → Require status checks: "mep").
+# Es la barrera real: el deploy a producción suele dispararse al hacer merge, donde los hooks de Claude Code no corren.
+name: mep
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  mep:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Secretos en el código y en todo el historial (fetch-depth: 0).
+      # En cuentas de organización, gitleaks-action pide GITLEAKS_LICENSE (gratis en gitleaks.io).
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Falla con vulnerabilidades críticas en dependencias de producción.
+      - run: pnpm audit --audit-level critical --prod
+      # Las verificaciones de HTML (títulos únicos, un h1, og:image…) corren sobre la salida del build.
+      - run: pnpm build
+      - run: pnpm dlx @engelbertgm/mep@0.1.0 verify --prod

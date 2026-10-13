@@ -1,0 +1,23 @@
+# Detectores de señales en el código. El primero que encuentra evidencia gana.
+has_forms:
+  - { grep: "<form\\b|onSubmit=|useForm\\(", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+has_db:
+  - { dependency: [prisma, "@prisma/client", drizzle-orm, "@supabase/supabase-js", pg, postgres, mysql2, mongoose, kysely, "@libsql/client", better-sqlite3] }
+  - { file: "**/migrations/*.sql" }
+db_client_access:
+  - { grep: "createBrowserClient|createClient\\(.*NEXT_PUBLIC_SUPABASE|createClient\\(.*VITE_SUPABASE", glob: "**/*.{ts,tsx,js,jsx,astro,vue,svelte}" }
+has_personal_data:
+  - { grep: "type=[\"']email[\"']|autoComplete=[\"']email|autocomplete=[\"']email", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+has_dates:
+  - { dependency: [date-fns, dayjs, luxon, moment, "@internationalized/date"] }
+  - { grep: "timestamptz|type=[\"'](date|datetime-local|time)[\"']", glob: "**/*.{tsx,jsx,astro,vue,svelte,html,sql}" }
+has_tables:
+  - { dependency: ["@tanstack/react-table", ag-grid-react] }
+  - { grep: "<table\\b|<Table\\b", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+has_destructive_actions:
+  - { grep: "\\.delete\\(|method:\\s*[\"']DELETE|onDelete=|variant=[\"']destructive", glob: "**/*.{ts,tsx,js,jsx}" }
+has_embeds:
+  - { grep: "<iframe\\b", glob: "**/*.{tsx,jsx,astro,vue,svelte,html,mdx}" }
+has_nonessential_cookies:
+  - { grep: "googletagmanager|gtag\\(|fbq\\(|connect\\.facebook\\.net|hotjar|clarity\\.ms|posthog|mixpanel|segment\\.com", glob: "**/*.{ts,tsx,js,jsx,astro,html}" }
+  - { dependency: [posthog-js, mixpanel-browser, "@segment/analytics-next", react-ga4, "@next/third-parties"] }

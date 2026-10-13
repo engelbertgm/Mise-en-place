@@ -1,0 +1,30 @@
+{
+  "name": "@engelbertgm/mep",
+  "version": "0.1.0",
+  "description": "Mise en place: brief, checklist y verificación determinista para websites y webapps.",
+  "type": "module",
+  "bin": {
+    "mep": "engine/dist/mep.mjs"
+  },
+  "files": [
+    "engine/dist",
+    "catalog",
+    "templates"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "esbuild engine/src/cli.ts --bundle --platform=node --format=esm --target=node20 --outfile=engine/dist/mep.mjs --banner:js=\"#!/usr/bin/env node\nimport { createRequire } from 'node:module'; const require = createRequire(import.meta.url);\"",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "node --test --experimental-strip-types tests/*.spec.ts",
+    "validate": "claude plugin validate .",
+    "pretest": "pnpm build"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2",
+    "yaml": "^2.9.1"
+  }
+}

@@ -1,0 +1,4 @@
+type: corporate
+capabilities: [cms]
+signals: { has_forms: true, has_personal_data: true }
+counts: { pages: 8, entities: 2, languages: 1, integrations: 2 }

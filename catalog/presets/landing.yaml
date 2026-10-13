@@ -1,0 +1,4 @@
+type: landing
+capabilities: [analytics]
+signals: { has_forms: true, has_personal_data: true }
+counts: { pages: 1, entities: 0, languages: 1, integrations: 1 }

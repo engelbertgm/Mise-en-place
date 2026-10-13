@@ -1,0 +1,15 @@
+# Rutas sensibles: editarlas pide una auditoría de mep-security (hook PostToolUse y mod gate).
+paths:
+  - "**/auth/**"
+  - "**/*auth*.{ts,tsx,js,jsx}"
+  - "**/{payments,billing,checkout,stripe}/**"
+  - "**/webhooks/**"
+  - "**/middleware.{ts,js}"
+  - "supabase/migrations/**"
+  - "**/migrations/**"
+  - "**/*.sql"
+  - "**/{policies,rls}/**"
+  - ".env.example"
+  - "next.config.{js,mjs,ts}"
+  - "vercel.json"
+  - "**/{security,secrets}*.{ts,js}"

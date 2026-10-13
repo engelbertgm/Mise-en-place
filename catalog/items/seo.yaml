@@ -1,0 +1,213 @@
+# SEO. Las verificaciones de HTML corren sobre la salida del build (out/, .next/server/app, dist/).
+
+- id: public-page-urls
+  title: Cada página pública tiene URL propia
+  category: seo
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3] }
+  why: "Lo que no tiene URL no se indexa, no se comparte y no sobrevive a recargar."
+  how: "Rutas reales (/servicios, /blog/post), no estados internos de la SPA ni hash routing."
+  verify:
+    - { type: grep, pattern: "createHashRouter|<HashRouter|useHashLocation", glob: "**/*.{tsx,jsx,ts,js}", expect: absent }
+    - { type: manual, prompt: "Cada sección pública abre directo desde su URL" }
+
+- id: server-rendered-content
+  title: Contenido público renderizado en el HTML (SSR/SSG)
+  category: seo
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  when: { not: { type: internal-app } }
+  effort: { size: M, hours: [3, 8] }
+  why: "Los buscadores y las redes leen el HTML inicial; el contenido que solo pinta JavaScript se indexa tarde o nunca."
+  how: "Páginas públicas como Server Components / SSG; datos del cliente solo en zonas privadas."
+  verify:
+    - { type: html, rule: single_h1 }
+
+- id: heading-hierarchy
+  title: "Un solo <h1> por página y uso correcto de h2, h3 y body"
+  category: seo
+  level: required
+  phase: build.ux
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3], scales_with: pages }
+  why: "La jerarquía de headings es el índice de la página para buscadores y lectores de pantalla; saltar niveles la rompe."
+  how: "Un h1 por página; h2 para secciones, h3 dentro de h2, sin saltar niveles; el texto corrido usa el estilo body. Cada nivel usa su token de texto (text-h1, text-h2, text-h3, text-body), nunca un heading elegido por tamaño."
+  verify:
+    - { type: html, rule: single_h1 }
+    - { type: html, rule: heading_order }
+    - { type: manual, prompt: "h2, h3 y body usan los estilos de texto del sistema de diseño según su rol, no por apariencia" }
+
+- id: sitemap-indexable-only
+  title: sitemap.xml incluye solo páginas indexables
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  depends_on: [sitemap-xml]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un sitemap con páginas noindex, redirecciones o 404 desperdicia rastreo y confunde a Google."
+  how: "Generar el sitemap desde la misma lista de rutas públicas; excluir privadas, noindex y redirecciones."
+  verify:
+    - { type: manual, prompt: "El sitemap no lista dashboard, cuenta, checkout, búsqueda interna ni páginas noindex" }
+
+- id: noindex-private-pages
+  title: "noindex y fuera del sitemap: dashboard, cuenta, checkout, búsqueda interna"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  when: { capabilities: { any: [auth, payments, search, admin-panel] } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Estas páginas no aportan a la búsqueda y pueden exponer información en resultados."
+  how: "robots: { index: false } en el layout de las zonas privadas y de /search."
+  verify:
+    - { type: grep, pattern: "noindex|index:\\s*false", glob: "{app,src/app,pages,src/pages}/**/{dashboard,account,cuenta,checkout,search,buscar,admin,settings,(app),(dashboard),(private)}/**/*.{tsx,ts,jsx,js,astro}" }
+
+- id: robots-allows-assets
+  title: robots.txt no bloquea CSS ni JS
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  depends_on: [robots-txt]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Google renderiza la página; si no puede bajar CSS o JS, la evalúa rota."
+  how: "Nunca Disallow sobre /_next, /assets, /static ni archivos .css/.js."
+  verify:
+    - { type: grep, pattern: "[Dd]isallow:\\s*/(_next|static|assets|css|js|_astro)\\b|[Dd]isallow:.*\\.(css|js)\\b|disallow:\\s*\\[?[\"']/(_next|static|assets|_astro)", glob: "{public/robots.txt,static/robots.txt,app/robots.{ts,js},src/app/robots.{ts,js}}", expect: absent }
+
+- id: clean-urls
+  title: "URLs limpias: minúsculas, guiones, sin IDs innecesarios; trailing slash consistente"
+  category: seo
+  level: required
+  phase: build.features
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "URLs legibles se comparten y posicionan mejor; mezclar estilos crea duplicados."
+  how: "Carpetas de rutas en kebab-case; slugs en lugar de IDs; trailingSlash fijo en la config."
+  verify:
+    - { type: file_exists, path: ["{app,src/app,pages,src/pages,src/routes}/**/*"] }
+    - { type: manual, prompt: "Rutas en minúsculas con guiones, slugs en vez de IDs y trailing slash consistente" }
+
+- id: redirects-on-change
+  title: 301 cuando una URL cambia
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 2] }
+  why: "Una URL que existía y ahora da 404 pierde su posicionamiento y los enlaces que apuntan a ella."
+  how: "redirects() en next.config (o vercel.json) con permanent: true para cada URL que cambió."
+  verify:
+    - { type: manual, prompt: "Ninguna URL publicada antes responde 404; las que cambiaron tienen 301" }
+
+- id: crawlable-links
+  title: "Enlaces internos con <a href> rastreable"
+  category: seo
+  level: required
+  phase: build.ux
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los buscadores siguen href, no onClick; tampoco funcionan abrir en pestaña nueva ni el clic medio."
+  how: "Navegación con <Link href> / <a href>; nunca div o span con onClick que navega."
+  verify:
+    - { type: grep, pattern: "<(div|span|li|td|tr)\\b[^>]*onClick=\\{[^}]*(router\\.push|navigate\\(|location\\.href)", glob: "**/*.{tsx,jsx}", expect: absent }
+
+- id: og-image-default
+  title: "Imagen de preview al compartir (og:image) por defecto + por página clave"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un link con imagen grande recibe muchos más clics en WhatsApp, LinkedIn y X."
+  how: "opengraph-image por defecto en la raíz y una propia en producto, post o perfil. URL absoluta https://."
+  verify:
+    - { type: file_exists, path: ["app/opengraph-image.{png,jpg,jpeg,tsx,ts,js}", "src/app/opengraph-image.{png,jpg,jpeg,tsx,ts,js}", "public/og*.{png,jpg,jpeg}", "public/**/og*.{png,jpg,jpeg}"] }
+    - { type: html, rule: absolute_og_image }
+
+- id: og-image-specs
+  title: "og:image 1200×630 JPG/PNG < 300 KB, con width, height, alt y twitter:card"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  depends_on: [og-image-default]
+  effort: { size: S, hours: [1, 2] }
+  why: "Fuera de estas medidas las redes recortan o no muestran la imagen; WhatsApp falla con imágenes pesadas."
+  how: "1200×630, JPG o PNG (no WebP/AVIF), < 300 KB, texto importante al centro; og:image:width/height/alt; twitter:card = summary_large_image."
+  verify:
+    - { type: html, rule: meta, property: "og:image:width" }
+    - { type: html, rule: meta, property: "og:image:height" }
+    - { type: html, rule: meta, property: "og:image:alt" }
+    - { type: html, rule: meta, name: "twitter:card" }
+    - { type: manual, prompt: "La imagen pesa < 300 KB y el texto importante está en el área central" }
+
+- id: og-image-generated
+  title: og:image generada automáticamente por página
+  category: seo
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.1"
+  when: { any: [ { type: { any: [blog, ecommerce, marketplace, directory, saas] } }, { capabilities: [cms] } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Cada post o producto comparte su propia imagen sin diseñarla a mano."
+  how: "opengraph-image.tsx con ImageResponse: título sobre plantilla de marca."
+  verify:
+    - { type: file_exists, path: ["**/opengraph-image.{tsx,ts,js,jsx}"] }
+
+- id: json-ld-base
+  title: "JSON-LD: Organization + WebSite (y Product / Article / LocalBusiness según tipo)"
+  category: seo
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.1"
+  level_overrides:
+    - { when: { type: local-business }, level: required }
+  effort: { size: S, hours: [1, 3] }
+  why: "Datos estructurados habilitan resultados enriquecidos (logo, precio, estrellas, horario)."
+  how: "<script type=\"application/ld+json\"> en el layout con Organization y WebSite; el tipo propio en cada plantilla."
+  verify:
+    - { type: grep, pattern: "application/ld\\+json", glob: "**/*.{tsx,jsx,ts,js,astro,html}" }
+
+- id: breadcrumbs
+  title: Breadcrumbs con JSON-LD
+  category: seo
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.1"
+  when: { type: { any: [ecommerce, marketplace, directory, blog, corporate] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Orientan al usuario y Google los muestra en el resultado en sitios con más de 2 niveles."
+  how: "Componente Breadcrumbs del sistema + BreadcrumbList en JSON-LD."
+  verify:
+    - { type: grep, pattern: "BreadcrumbList", glob: "**/*.{tsx,jsx,ts,js,astro}" }
+
+- id: search-console
+  title: Search Console verificado y sitemap enviado
+  category: seo
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Avisa de errores de indexación y muestra con qué búsquedas llega la gente."
+  how: "Verificar el dominio (DNS) y enviar /sitemap.xml."
+  verify:
+    - { type: manual, prompt: "Dominio verificado en Search Console y sitemap enviado" }
+
+- id: i18n-hreflang
+  title: "hreflang, URL por idioma y lang correcto por página"
+  category: seo
+  level: required
+  phase: launch.content
+  since: "2026.10.1"
+  when: { capabilities: [i18n] }
+  effort: { size: M, hours: [3, 6], scales_with: languages }
+  why: "Sin hreflang Google muestra el idioma equivocado o trata las traducciones como duplicados."
+  how: "Rutas /es/, /en/; alternates.languages en metadata con x-default; <html lang> por idioma."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/[locale]/**/*", "{app,src/app}/[lang]/**/*", "src/pages/{es,en,fr,pt,de}/**/*"] }
+    - { type: grep, pattern: "hreflang|alternates:\\s*\\{[^}]*languages|languages:\\s*\\{", glob: "**/*.{tsx,jsx,ts,js,astro}" }

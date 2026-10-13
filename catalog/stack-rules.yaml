@@ -1,0 +1,63 @@
+# Reglas de decisión de stack. La primera regla que recomienda una llave gana; una decisión en el perfil gana sobre todas.
+- id: framework-static-content
+  when: { all: [ { type: { any: [landing, blog, portfolio] } }, { not: { capabilities: { any: [auth, payments, ugc, realtime] } } } ] }
+  recommend: { framework: nextjs, rendering: static, backend: none }
+  why: "Contenido público sin datos de usuario: Next.js con export estático da HTML listo para SEO, sin servidor que mantener."
+  alternatives:
+    - { framework: astro, when: "sitio de contenido casi sin interactividad" }
+
+- id: framework-spa-internal
+  when: { all: [ { type: internal-app }, { not: { capabilities: { any: [payments, api-public] } } } ] }
+  recommend: { framework: vite-react, rendering: spa }
+  why: "App interna detrás de login: no necesita SEO ni SSR; Vite es más simple y rápido de construir."
+  alternatives:
+    - { framework: nextjs, when: "si después se necesitan rutas públicas o API propia" }
+
+- id: framework-default
+  recommend: { framework: nextjs, rendering: hybrid }
+  why: "Next.js: SSR/SSG por ruta (SEO), API en el mismo proyecto, imágenes y fuentes optimizadas, deploy nativo en Vercel."
+  alternatives:
+    - { framework: vite-react, when: "SPA sin SEO ni backend propio" }
+    - { framework: astro, when: "sitio de contenido con poca interactividad" }
+
+- id: hosting-vercel
+  recommend: { hosting: vercel }
+  why: "Deploy por git con previews por PR, CDN global, HTTPS automático y soporte de primera para Next.js."
+  alternatives:
+    - { hosting: netlify, when: "si el cliente ya opera ahí" }
+
+- id: db-relational
+  when: { any: [ { capabilities: { any: [auth, payments, subscriptions, ugc, admin-panel] } }, { signals: { has_db: true } } ] }
+  recommend: { db: postgresql, db_provider: supabase }
+  why: "Datos relacionales, transacciones y consistencia para usuarios y pagos. Supabase da PostgreSQL gestionado con auth, storage y RLS."
+  alternatives:
+    - { db: sqlite, when: "internal-app de bajo volumen" }
+    - { db_provider: neon, when: "solo base de datos, sin auth ni storage gestionados" }
+
+- id: db-none
+  when: { not: { any: [ { capabilities: { any: [auth, payments, subscriptions, ugc, admin-panel, cms, notifications, realtime] } }, { signals: { has_db: true } } ] } }
+  recommend: { db: none }
+  why: "Sin datos de usuario no hace falta base de datos: más rápido, barato y sin superficie de ataque."
+
+- id: auth-supabase
+  when: { capabilities: [auth] }
+  recommend: { auth: supabase-auth }
+  why: "Integrada con la base de datos y RLS: el usuario autenticado es el que filtran las políticas."
+  alternatives:
+    - { auth: auth-js, when: "si la base de datos no es Supabase" }
+
+- id: payments-stripe
+  when: { capabilities: [payments] }
+  recommend: { payments: stripe }
+  why: "Checkout alojado (nunca tocamos datos de tarjeta), webhooks firmados, impuestos y suscripciones."
+  alternatives:
+    - { payments: mercadopago, when: "mercado solo MX/LatAm con OXXO o SPEI como prioridad" }
+
+- id: ui-react
+  recommend: { ui: shadcn-ui, styling: tailwind }
+  why: "Con React: shadcn/ui hereda los tokens del sistema de diseño (variables CSS), así cada componente sale congruente. Sin React: mismos tokens + componentes equivalentes."
+
+- id: email-resend
+  when: { capabilities: { any: [email, newsletter] } }
+  recommend: { email: resend, email_templates: react-email }
+  why: "API simple, buen deliverability y plantillas como componentes React bajo los tokens del sistema."

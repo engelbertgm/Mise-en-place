@@ -1,0 +1,242 @@
+# Base: todo website. Los meta tags dinámicos (producto, post, perfil) se verifican por plantilla en el HTML del build.
+
+- id: meta-charset
+  title: "<meta charset=\"utf-8\">"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin charset declarado el navegador puede adivinar mal la codificación y romper acentos y emojis."
+  how: "<meta charset=\"utf-8\"> como primer hijo de <head> (Next.js lo agrega solo)."
+  verify:
+    - { type: html, rule: charset }
+
+- id: meta-viewport
+  title: "<meta name=\"viewport\">"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin viewport el móvil muestra la versión de escritorio reducida; Google penaliza sitios no aptos para móvil."
+  how: "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">; nunca bloquear el zoom."
+  verify:
+    - { type: html, rule: meta, name: viewport }
+    - { type: grep, pattern: "user-scalable\\s*=\\s*(no|0)|maximum-scale\\s*=\\s*1(\\.0)?[\"',]", glob: "**/*.{tsx,jsx,ts,js,astro,html}", expect: absent }
+
+- id: html-lang
+  title: "Atributo lang en <html>"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Lectores de pantalla y buscadores usan lang para la pronunciación y el idioma de los resultados."
+  how: "<html lang=\"es-MX\"> (o el idioma de cada página si hay i18n)."
+  verify:
+    - { type: html, rule: html_lang }
+
+- id: unique-title
+  title: "<title> único por página"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3], scales_with: pages }
+  why: "El título es lo primero que ve el usuario en Google y en la pestaña; repetido, las páginas compiten entre sí."
+  how: "Título propio por página (metadata/generateMetadata en Next.js), 50–60 caracteres, con plantilla \"%s · Marca\"."
+  verify:
+    - { type: html, rule: unique_title }
+
+- id: unique-description
+  title: "<meta name=\"description\"> única por página"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3], scales_with: pages }
+  why: "Google la usa como texto del resultado; repetida o ausente, el buscador inventa una."
+  how: "Descripción propia por página, 140–160 caracteres, que invite al clic."
+  verify:
+    - { type: html, rule: unique_description }
+
+- id: open-graph-basic
+  title: "Open Graph mínimo (og:title, og:description, og:image, og:url, og:type)"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Sin Open Graph, WhatsApp, LinkedIn, Slack y Facebook muestran un link sin título ni imagen."
+  how: "openGraph en metadata (Next.js) o <meta property=\"og:*\"> en el layout, con valores por página."
+  verify:
+    - { type: html, rule: meta, property: "og:title" }
+    - { type: html, rule: meta, property: "og:description" }
+    - { type: html, rule: meta, property: "og:image" }
+    - { type: html, rule: meta, property: "og:url" }
+    - { type: html, rule: meta, property: "og:type" }
+
+- id: canonical-link
+  title: "<link rel=\"canonical\"> en cada página"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Evita contenido duplicado por parámetros, www, mayúsculas o trailing slash."
+  how: "alternates.canonical (Next.js) con URL absoluta de producción."
+  verify:
+    - { type: html, rule: link, rel: canonical }
+
+- id: favicon
+  title: "Favicon (ico/svg) + apple-touch-icon"
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Identifica el sitio en pestañas, favoritos, resultados de búsqueda y la pantalla de inicio del móvil."
+  how: "favicon.ico o icon.svg + apple-icon.png 180×180 (en app/ de Next.js o en public/)."
+  verify:
+    - { type: file_exists, path: ["app/favicon.ico", "src/app/favicon.ico", "app/icon.svg", "src/app/icon.svg", "app/icon.png", "src/app/icon.png", "public/favicon.ico", "public/favicon.svg"] }
+    - { type: file_exists, path: ["app/apple-icon.png", "src/app/apple-icon.png", "public/apple-touch-icon.png"] }
+
+- id: robots-txt
+  title: robots.txt
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Indica a los buscadores qué rastrear y dónde está el sitemap."
+  how: "app/robots.ts (Next.js) o public/robots.txt con la línea Sitemap: absoluta."
+  verify:
+    - { type: route_exists, path: /robots.txt }
+
+- id: sitemap-xml
+  title: sitemap.xml
+  category: base
+  level: required
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3] }
+  why: "Acelera el descubrimiento de páginas nuevas y ayuda a indexar las que tienen pocos enlaces."
+  how: "app/sitemap.ts generado desde las rutas y el contenido (incluye solo páginas indexables)."
+  verify:
+    - { type: route_exists, path: /sitemap.xml }
+
+- id: error-pages
+  title: Páginas 404 y 500
+  category: base
+  level: required
+  phase: build.ux
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 3] }
+  why: "Una página de error útil, con salida, retiene al usuario; la del framework por defecto lo pierde."
+  how: "app/not-found.tsx y app/error.tsx (o 404/500 del framework) con el sistema de diseño y enlace al inicio."
+  verify:
+    - { type: route_exists, path: /404 }
+    - { type: route_exists, path: /500 }
+
+- id: https-hsts
+  title: HTTPS + HSTS
+  category: security
+  level: required
+  phase: launch.ops
+  locked: true
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin HTTPS las contraseñas y datos viajan en claro; HSTS evita que un atacante degrade la conexión a HTTP."
+  how: "Strict-Transport-Security: max-age=63072000; includeSubDomains; preload (headers en next.config o vercel.json)."
+  verify:
+    - { type: grep, pattern: "Strict-Transport-Security", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
+  references: ["https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security", "https://hstspreload.org/"]
+
+- id: noindex-preview
+  title: "noindex en preview/staging, nunca en producción"
+  category: base
+  level: required
+  phase: launch.ops
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Si Google indexa un preview, compite con producción; si producción lleva noindex, el sitio desaparece."
+  how: "robots condicionado al entorno (VERCEL_ENV !== 'production' → noindex, o header X-Robots-Tag en previews)."
+  verify:
+    - { type: grep, pattern: "VERCEL_ENV|NODE_ENV|X-Robots-Tag|process\\.env\\.[A-Z_]*ENV", glob: "{app,src/app,src/pages,pages}/**/robots.{ts,js}" }
+
+- id: env-example
+  title: ".env.example sin valores reales"
+  category: base
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Documenta qué variables necesita el proyecto sin exponer secretos."
+  how: ".env.example en la raíz con cada variable y un comentario de dónde obtenerla, sin valores."
+  verify:
+    - { type: file_exists, path: .env.example }
+
+- id: gitignore
+  title: ".gitignore con dependencias y build"
+  category: base
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Evita versionar secretos, dependencias y artefactos de build."
+  how: ".gitignore con node_modules, .next, dist, .vercel (los .env* los exige env-gitignored)."
+  verify:
+    - { type: grep, pattern: "node_modules", glob: .gitignore }
+
+- id: readme
+  title: README con arranque, scripts y estructura
+  category: base
+  level: required
+  phase: foundation.setup
+  since: "2026.10.1"
+  effort: { size: S, hours: [1, 2] }
+  why: "Cualquier persona (o agente) debe poder levantar el proyecto sin preguntar."
+  how: "README.md: requisitos, instalación, variables, scripts, convención de carpetas y despliegue."
+  verify:
+    - { type: file_exists, path: README.md }
+    - { type: grep, pattern: "^#+\\s*(Instalaci|Install|Setup|Arranque|Getting started)", glob: README.md, flags: i }
+
+- id: theme-color
+  title: "<meta name=\"theme-color\">"
+  category: base
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Colorea la barra del navegador móvil con la marca."
+  how: "viewport.themeColor (Next.js) desde el token de color primario, con variante para tema oscuro."
+  verify:
+    - { type: html, rule: meta, name: theme-color }
+
+- id: web-manifest
+  title: Web manifest
+  category: base
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.1"
+  effort: { size: XS, hours: [0.5, 1] }
+  level_overrides:
+    - { when: { capabilities: [pwa] }, level: required }
+  why: "Nombre, íconos y colores al agregar el sitio a la pantalla de inicio."
+  how: "app/manifest.ts (Next.js) o public/manifest.webmanifest."
+  verify:
+    - { type: file_exists, path: ["app/manifest.ts", "src/app/manifest.ts", "app/manifest.json", "public/manifest.webmanifest", "public/manifest.json", "public/site.webmanifest"] }
+
+- id: og-locale
+  title: "og:locale"
+  category: base
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.1"
+  when: { capabilities: [i18n] }
+  effort: { size: XS, hours: [0.5, 1], scales_with: languages }
+  why: "Indica a las redes el idioma de la página compartida."
+  how: "openGraph.locale por idioma (es_MX, en_US) + og:locale:alternate."
+  verify:
+    - { type: html, rule: meta, property: "og:locale" }
