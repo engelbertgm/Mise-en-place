@@ -1,6 +1,6 @@
 {
   "name": "mep",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Scope → brief → verified checklist for websites and webapps: justified stack, required items, and blocks on closing or deploying while they are missing.",
   "author": {
     "name": "Engel",
