@@ -2,6 +2,22 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.2.0
+
+Hardening: mep's blocks now hold against the agent's own shortcuts. Nothing on the same machine is tamper-proof, so the rule is that no shortcut is silent: it needs the person, or it shows up in CI.
+
+- **Seal.** Every write through the CLI seals mep's state (`.mep/profile.yaml`, `log`, `security/`, `reviews/`) with a hash line in `.mep/log`. A state changed outside the CLI blocks `mep verify` (also in CI, and `MEP_BYPASS` does not get past it), and no command seals over it until the person runs `/mep:resync`. A 0.1.x repo is sealed once on first use (`seal-initial`, logged).
+- **Guard.** Edit/Write on state files and shell writes into `.mep` are denied (mod and classic hook). Commands that mention `MEP_BYPASS` or the human flag are denied too.
+- **Human-only actions.** `/mep:confirm` (new), `/mep:override`, `/mep:threshold` (new, when relaxing) and `/mep:resync` (new) are user-only skills answered by the mod. From the agent's Bash they are denied; without mods they run only in an interactive terminal. `confirm` records the git user, not a typed name, and is logged.
+- **Security reports cover their files.** `catalog/sensitive.yaml` is grouped (`auth`, `payments`, `db`, `config`) and security items declare `sensitive: [...]`. `security record` always includes the repo files of those groups; `--files` only adds.
+- **PR review is real.** `mep review record --pr` stores the branch review, tied to the code hash (committing it does not expire it). The PR gate blocks until it is current with no "must fix" — a second attempt no longer goes through — and CI asks for it with `verify --pr`.
+- **PR summary.** New `mep changes --base <ref>`: every state event of the PR (overrides, confirmations, phase closes, thresholds, bypasses, seals, reviews, audits). The CI template writes it to the job summary.
+- **More deploy platforms** for the gate: Cloudflare (`wrangler deploy`, `wrangler pages deploy`), Fly.io, Railway, Firebase (`hosting:channel:deploy` is a preview) and Supabase (`db push`, `functions deploy`).
+- Review and report hashes normalize line endings (CRLF), so a review recorded on Windows stays valid in CI. Existing reviews and reports expire once after the upgrade.
+- Build: the bundle banner works on Windows (the hashbang lives in `cli.ts`).
+
+Migration: update `.github/workflows/mep.yml` from `templates/ci/mep.yml` (0.2.0, `--pr`, summary step). Before a PR into main, record the branch review with `mep review record --pr`.
+
 ## 0.1.6
 
 - Ponytail is enforced, not just suggested: `mep phase close` requires a recorded quality review for that sub-phase (`mep review record --must-fix <n>`), with no "must fix" and on the current code (it expires when the code changes).

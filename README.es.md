@@ -6,7 +6,7 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.1.6-informational.svg)](.claude-plugin/plugin.json)
+[![Versión](https://img.shields.io/badge/versión-0.2.0-informational.svg)](.claude-plugin/plugin.json)
 [![Catálogo](https://img.shields.io/badge/catálogo-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -97,7 +97,8 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:check` | Estado por sub-etapa: ✅ cumplido · ❌ pendiente · ⏭️ omitido · ⚠️ desactivado. Avisa si el código muestra señales que el perfil no tiene |
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
-| `/mep:override <id> <razón>` | Desactiva un ítem 🔴 tras confirmar; rechaza ítems 🔒 |
+| `/mep:override <id> <razón>` | Desactiva un ítem 🔴; rechaza ítems 🔒. Solo lo escribes tú: el agente no puede |
+| `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Acciones tuyas, nunca del agente: confirmar un ítem manual (con tu usuario de git), relajar un umbral de calidad, re-sellar el estado cambiado fuera de la CLI |
 | `/mep:audit [scope]` | Para un repo existente: parte del scope del proyecto, lo contrasta con lo que muestra el código (lo que sobra y lo que falta) y reporta la brecha solo con las reglas que ese scope activa. No cambia nada hasta que adoptes el brief |
 | `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil. Los que caen en una sub-etapa cerrada tienen periodo de gracia |
 | `/mep:quote [--client]` | Cotización desde el brief. Vista interna (horas, tarifa, márgenes) o vista cliente (precio y semanas estimadas por fase, extras, costos recurrentes, planes de mantenimiento) |

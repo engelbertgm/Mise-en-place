@@ -2,6 +2,7 @@
 // only within a file). They never verify anything themselves: they call the engine.
 import type { EngineInterface, Register } from 'claude-code'
 import { deployKind, mayDeploy, prToMain } from '../engine/src/deploy.ts'
+import { guardCommand, guardFile } from '../engine/src/guard.ts'
 import { findSecret, LOCAL_SECRET_FILE } from '../engine/src/secrets.ts'
 
 async function runEngine($: EngineInterface, args: string[], timeoutMs = 600_000) {
@@ -29,6 +30,8 @@ async function refreshStatus($: EngineInterface) {
 export const register: Register = on => {
   // ── gate: deploys wait for the engine's gate; secrets never reach a versioned file ──
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
+    const guarded = guardCommand(e.command)
+    if (guarded && (await hasProfile($))) return { deny: guarded }
     if (!mayDeploy(e.command) || !(await hasProfile($))) return next(e)
     if (prToMain(e.command)) {
       const review = await runEngine($, ['pr-gate'], 30_000)
@@ -43,14 +46,28 @@ export const register: Register = on => {
   }).catch(($, e, next) => (next.called ? next(e) : { deny: 'mep: no se pudo verificar el deploy (¿node disponible?). Corre /mep:check.' }))
 
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
-    const deny = (await hasProfile($)) ? secretIn(e.file_path, e.content) : undefined
+    const deny = (await hasProfile($)) ? (guardFile(e.file_path) ?? secretIn(e.file_path, e.content)) : undefined
     return deny ? { deny } : next(e)
   })
 
   on('tool.call', { tool: 'Edit' }, async ($, e, next) => {
-    const deny = (await hasProfile($)) ? secretIn(e.file_path, e.new_string) : undefined
+    const deny = (await hasProfile($)) ? (guardFile(e.file_path) ?? secretIn(e.file_path, e.new_string)) : undefined
     return deny ? { deny } : next(e)
   })
+
+  // ── human actions: these skills have disable-model-invocation, so only the person types them. The mod
+  // answers without a Claude turn and passes the human channel the agent's Bash is denied. ──
+  const HUMAN: Record<string, string[]> = { 'mep:confirm': ['confirm'], 'mep:override': ['override'], 'mep:threshold': ['threshold'], 'mep:resync': ['resync'] }
+  for (const [command, engineArgs] of Object.entries(HUMAN)) {
+    on('command.run', { command }, async ($, e, next) => {
+      if (!(await hasProfile($))) return next(e)
+      const args = (e.args ?? '').split(/\s+/).filter(Boolean)
+      // Typing the command with its reason is the explicit confirmation.
+      const yes = command === 'mep:override' || command === 'mep:threshold' ? ['--yes'] : []
+      const r = await runEngine($, [...engineArgs, ...args, ...yes, '--human'], 30_000)
+      return { text: (r.stdout || r.stderr).trim() }
+    })
+  }
 
   // ── commands: instant answers, no Claude turn. `/mep:phase close` goes on to the skill (audit + review). ──
   on('command.run', { command: 'mep:check' }, async ($, e, next) => {

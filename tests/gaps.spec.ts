@@ -8,6 +8,7 @@ import { loadCatalog } from '../engine/src/catalog.ts'
 import { prToMain } from '../engine/src/deploy.ts'
 import { checkDesign, fontFamilies, fontWeights } from '../engine/src/design.ts'
 import { prReviewGate } from '../engine/src/gate.ts'
+import { PR_REVIEW, recordReview } from '../engine/src/review.ts'
 import { evaluate, stack } from '../engine/src/evaluate.ts'
 import { inferProfile } from '../engine/src/audit.ts'
 import { checkBuild, checkRobots } from '../engine/src/build.ts'
@@ -57,7 +58,8 @@ describe('2. quality thresholds from the profile', () => {
     run(['init', '--from', 'p.yaml'])
     assert.match(run(['threshold', 'complexity', '15']).stderr, /requiere una razón/)
     assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado']).status, 2)
-    assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado', '--yes']).status, 0)
+    assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado', '--yes']).status, 3)
+    assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado', '--yes', '--human']).status, 0)
     assert.match(readFileSync(join(root, 'BRIEF.md'), 'utf8'), /⚠️ umbral `complexity` — complexity = 15 \(por defecto 10\): código legado/)
     assert.match(readFileSync(join(root, '.mep/log'), 'utf8'), /threshold complexity=15/)
     assert.equal(run(['threshold', 'max_lines', '200']).status, 0)
@@ -136,23 +138,30 @@ describe('7. review before a PR into main', () => {
     assert.equal(prToMain('gh pr view 12'), false)
   })
 
-  test('held once per commit with the instructions, then let through', () => {
-    const root = makeRepo()
-    spawnSync('git', ['init', '-q'], { cwd: root })
-    spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'a'], { cwd: root })
+  test('held until a current branch review is recorded; a second attempt alone never goes through', () => {
+    const root = makeRepo({ 'app.ts': 'export const a = 1\n' })
+    const git = (...args: string[]) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: root })
+    git('init', '-q')
+    git('add', '.')
+    git('commit', '-q', '-m', 'a')
     assert.equal(prReviewGate(root).block, false)
     withProfile(root, real)
-    const first = prReviewGate(root, { MEP_PONYTAIL: '1' })
+    const env = { MEP_PONYTAIL: '1' }
+    const first = prReviewGate(root, env)
     assert.equal(first.block, true)
     assert.match(first.message, /ponytail-review branch/)
-    assert.equal(prReviewGate(root).block, false)
-    spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'b'], { cwd: root })
-    const second = prReviewGate(root, { MEP_PONYTAIL: '0' })
-    assert.equal(second.block, true)
-    assert.match(second.message, /Ponytail no está instalado: revisa duplicados/)
-    const hook = spawnSync('node', [CLI, 'hook', 'pre-bash'], { cwd: root, encoding: 'utf8', input: JSON.stringify({ cwd: root, tool_input: { command: 'gh pr create --fill' } }) })
-    assert.equal(hook.stdout, '')
-    assert.ok(existsSync(join(root, '.mep/.gitignore')))
+    assert.equal(prReviewGate(root, env).block, true)
+    const hook = (command: string) => spawnSync('node', [CLI, 'hook', 'pre-bash'], { cwd: root, encoding: 'utf8', env: { ...process.env, ...env }, input: JSON.stringify({ cwd: root, tool_input: { command } }) })
+    assert.match(hook('gh pr create --fill').stdout, /"deny"/)
+    recordReview(root, { sub: PR_REVIEW, tool: 'ponytail', must_fix: 0, notes: '' })
+    assert.equal(prReviewGate(root, env).block, false)
+    // Committing the review does not expire it: it is tied to the code, not to the commit.
+    git('add', '.')
+    git('commit', '-q', '-m', 'review')
+    assert.equal(hook('gh pr create --fill').stdout, '')
+    // Changing the code does.
+    writeFileSync(join(root, 'app.ts'), 'export const a = 2\n')
+    assert.match(prReviewGate(root, env).message, /revisión vencida/)
   })
 })
 

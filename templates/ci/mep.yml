@@ -30,4 +30,8 @@ jobs:
       - run: pnpm audit --audit-level critical --prod
       # Las verificaciones de HTML (títulos únicos, un h1, og:image…) corren sobre la salida del build.
       - run: pnpm build
-      - run: pnpm dlx @engelbertgm/mep@0.1.6 verify --prod
+      # En un PR a main también exige la revisión de calidad de la rama (los hooks no corren al fusionar en GitHub).
+      - run: pnpm dlx @engelbertgm/mep@0.2.0 verify --prod ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+      # Todo cambio de estado de mep del PR (overrides, confirmaciones, cierres, bypass, re-sellados), a la vista antes del merge.
+      - if: github.event_name == 'pull_request'
+        run: pnpm dlx @engelbertgm/mep@0.2.0 changes --base origin/${{ github.base_ref }} >> "$GITHUB_STEP_SUMMARY"

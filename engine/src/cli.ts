@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import { execSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { basename, dirname, join, resolve } from 'node:path'
@@ -10,9 +11,12 @@ import { cachedGate, closePhase, formatItems, gate, prReviewGate } from './gate.
 import { hasProfile, loadProfile, log, normalizeProfile, saveProfile, today } from './profile.ts'
 import { linkClaudeMd, renderBrief, writeBrief, writeStackAdrs } from './render.ts'
 import { counts, formatCheck, formatProposal } from './report.ts'
-import { ponytailInstalled, recordReview, reviewState } from './review.ts'
+import { PR_REVIEW, ponytailInstalled, recordReview, reviewState } from './review.ts'
 import type { ReviewTool } from './review.ts'
 import { recordReport, reportState } from './security.ts'
+import { guardCommand, guardFile } from './guard.ts'
+import { confirmHuman, gitUser, NOT_HUMAN } from './human.ts'
+import { checkSeal, resync, SealBroken, stateChanges } from './seal.ts'
 import { missingSignals } from './signals.ts'
 import { globToRegExp } from './files.ts'
 import { verifyItems } from './verify.ts'
@@ -190,6 +194,8 @@ function runHook(event: string, root: string, catalog: Catalog): void {
     }
     case 'pre-bash': {
       const command = String(input.tool_input?.command ?? '')
+      const guarded = guardCommand(command)
+      if (guarded) return json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: guarded } })
       if (!mayDeploy(command)) return
       if (prToMain(command)) {
         const review = prReviewGate(cwd)
@@ -202,6 +208,11 @@ function runHook(event: string, root: string, catalog: Catalog): void {
       if (result.block) {
         json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: result.message } })
       }
+      return
+    }
+    case 'pre-edit': {
+      const guarded = guardFile(String(input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? ''))
+      if (guarded) json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: guarded } })
       return
     }
     case 'post-edit': {
@@ -311,9 +322,23 @@ function main(): void {
       if (!hasProfile(root)) return print('mep: sin .mep/profile.yaml, nada que verificar.')
       const kind = args.flags.prod ? 'prod' : 'stop'
       const result = args.flags['no-cache'] ? gate(root, catalog, kind) : cachedGate(root, catalog, kind)
-      print(result.message || '✅ mep: sin 🔴 pendientes que bloqueen.')
-      process.exitCode = result.block ? 1 : 0
+      // --pr (CI on a pull request into main): the branch review must be recorded and current too.
+      const review = args.flags.pr ? prReviewGate(root) : { block: false, message: '' }
+      print([result.message, review.message].filter(Boolean).join('\n') || '✅ mep: sin 🔴 pendientes que bloqueen.')
+      process.exitCode = result.block || review.block ? 1 : 0
       return
+    }
+    case 'changes': {
+      // Markdown for the PR summary in CI: every state event since the base branch.
+      return print(stateChanges(root, String(args.flags.base ?? 'origin/main')))
+    }
+    case 'resync': {
+      requireProfile(root, catalog)
+      if (checkSeal(root).ok) return print('✅ El estado de mep ya está sellado; no hay nada que re-sellar.')
+      if (!confirmHuman(args.flags, 'resync')) fail(NOT_HUMAN, 3)
+      const by = gitUser(root)
+      resync(root, by)
+      return print(`✅ Estado de mep re-sellado por ${by} (registrado en .mep/log; aparece en el resumen del PR).`)
     }
     case 'pr-gate': {
       const review = prReviewGate(root)
@@ -360,12 +385,13 @@ function main(): void {
         if (e.item.locked) fail(`${id} es locked 🔒: no se puede desactivar.`)
         if (e.level !== 'required') fail(`/mep:override solo aplica a 🔴. ${id} es ${e.level}${e.level === 'recommended' ? ': usa /mep:skip' : ''}.`)
         if (!args.flags.yes) fail(`Desactivar ${id} requiere confirmación explícita (--yes).`, 2)
+        if (!confirmHuman(args.flags, id)) fail(NOT_HUMAN, 3)
         profile.selections.overrides = profile.selections.overrides.filter(s => s.id !== id).concat({ id, reason, date: today() })
       }
       saveProfile(root, profile)
       log(root, cmd, `${id} "${reason}"`)
       regenerate(root, profile, catalog)
-      return print(cmd === 'skip' ? `⏭️ ${id} omitido: ${reason}` : `⚠️ ${id} desactivado: ${reason} (registrado en .mep/log)`)
+      return print(cmd === 'skip' ? `⏭️ ${id} omitido: ${reason}` : `⚠️ ${id} desactivado: ${reason} (registrado en .mep/log)\nRiesgo aceptado: ${e.item.why}`)
     }
     case 'threshold': {
       const [key, valueText, ...reasonParts] = rest
@@ -377,6 +403,7 @@ function main(): void {
       const laxer = value > QUALITY_DEFAULTS[key as QualityKey]
       if (laxer && !reason) fail(`Relajar ${key} a ${value} (por defecto ${QUALITY_DEFAULTS[key as QualityKey]}) requiere una razón.`)
       if (laxer && !args.flags.yes) fail(`Relajar ${key} requiere confirmación explícita (--yes).`, 2)
+      if (laxer && !confirmHuman(args.flags, key)) fail(NOT_HUMAN, 3)
       profile.quality = { ...profile.quality, [key]: value }
       const id = `threshold:${key}`
       profile.selections.overrides = profile.selections.overrides.filter(o => o.id !== id)
@@ -395,19 +422,23 @@ function main(): void {
       }
       profile.selections.optional_added = [...new Set([...profile.selections.optional_added, ...rest])].sort()
       saveProfile(root, profile)
+      log(root, 'select', rest.join(','))
       regenerate(root, profile, catalog)
       return print(`⚪ agregados: ${rest.join(', ')}`)
     }
     case 'confirm': {
       const [id] = rest
-      const by = args.flags.by as string | undefined
-      if (!id || !by) fail('Uso: mep confirm <id> --by <nombre>')
+      if (!id) fail('Uso: mep confirm <id>')
       const profile = requireProfile(root, catalog)
       const e = evaluate(profile, catalog).find(x => x.item.id === id)
       if (!e?.item.verify.some(v => v.type === 'manual')) fail(`${id} no tiene verificación manual`)
       if (e.item.category === 'security') fail(`${id} es de seguridad: lo confirma una auditoría de mep-security, no una persona.`)
+      if (!confirmHuman(args.flags, id)) fail(NOT_HUMAN, 3)
+      // Who confirms comes from git, never from an argument.
+      const by = gitUser(root)
       profile.selections.manual_confirmed = profile.selections.manual_confirmed.filter(c => c.id !== id).concat({ id, by, date: today() })
       saveProfile(root, profile)
+      log(root, 'confirm', `${id} ${by}`)
       regenerate(root, profile, catalog)
       return print(`✅ ${id} confirmado por ${by}`)
     }
@@ -415,11 +446,11 @@ function main(): void {
       const profile = requireProfile(root, catalog)
       const ponytail = ponytailInstalled(root)
       if (rest[0] === 'record') {
-        const sub = String(args.flags.sub ?? profile.phase.active)
+        const sub = args.flags.pr ? PR_REVIEW : String(args.flags.sub ?? profile.phase.active)
         const tool = String(args.flags.tool ?? (ponytail ? 'ponytail' : 'mep')) as ReviewTool
         const mustFix = Number(args.flags['must-fix'])
-        if (!catalog.dimensions.phases.includes(sub)) fail(`sub-etapa desconocida: ${sub}`)
-        if (!['ponytail', 'mep'].includes(tool) || !Number.isInteger(mustFix) || mustFix < 0) fail('Uso: mep review record --sub <sub-etapa> --tool ponytail|mep --must-fix <n> --notes "..."')
+        if (sub !== PR_REVIEW && !catalog.dimensions.phases.includes(sub)) fail(`sub-etapa desconocida: ${sub}`)
+        if (!['ponytail', 'mep'].includes(tool) || !Number.isInteger(mustFix) || mustFix < 0) fail('Uso: mep review record (--sub <sub-etapa> | --pr) --tool ponytail|mep --must-fix <n> --notes "..."')
         if (ponytail && tool !== 'ponytail') fail('Ponytail está instalado: la revisión se hace con /ponytail-review (--tool ponytail).')
         recordReview(root, { sub, tool, must_fix: mustFix, notes: String(args.flags.notes ?? '') })
         log(root, 'review', `${sub} ${tool} must_fix=${mustFix}`)
@@ -435,12 +466,17 @@ function main(): void {
         const id = args.flags.id as string
         const result = args.flags.result as 'pass' | 'fail' | 'risk'
         if (!id || !['pass', 'fail', 'risk'].includes(result)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."')
-        if (!catalog.items.some(i => i.id === id && i.category === 'security')) fail(`${id} no es un ítem de seguridad`)
-        const files = String(args.flags.files ?? '').split(',').map(f => f.trim()).filter(Boolean)
-        const missing = files.filter(f => !matchFiles(root, f).length && !existsSync(join(root, f)))
+        const item = catalog.items.find(i => i.id === id && i.category === 'security')
+        if (!item) fail(`${id} no es un ítem de seguridad`)
+        const given = String(args.flags.files ?? '').split(',').map(f => f.trim()).filter(Boolean)
+        const missing = given.filter(f => !matchFiles(root, f).length && !existsSync(join(root, f)))
         if (missing.length) fail(`archivos inexistentes: ${missing.join(', ')}`)
+        // The item's sensitive groups are always covered: --files can add files, never leave these out.
+        const forced = (item.sensitive ?? []).flatMap(g => catalog.sensitiveGroups[g]).flatMap(p => matchFiles(root, p))
+        const files = [...new Set([...given, ...forced])].sort()
         recordReport(root, { id, result, files, notes: String(args.flags.notes ?? '') })
-        return print(`reporte de ${id}: ${result}`)
+        log(root, 'security', `${id} ${result} (${files.length} archivo(s))`)
+        return print(`reporte de ${id}: ${result} · cubre ${files.length} archivo(s)${forced.length ? ` (${forced.length} por sus grupos sensibles)` : ''}`)
       }
       const profile = loadProfile(root, catalog)
       const ids = evaluate(profile, catalog).filter(e => e.state === 'active' && e.item.category === 'security').map(e => e.item.id)
@@ -594,12 +630,13 @@ function main(): void {
           '  init --from perfil.yaml [--preset x]                  crea perfil, BRIEF.md, ADRs, CLAUDE.md y CI',
           '  add --from cambio.yaml [--apply]                      diff del checklist',
           '  check [--fast] [--all] [--json]                       verificación por sub-etapa',
-          '  verify [--prod]                                       gate para CI (sale con 1 si bloquea)',
+          '  verify [--prod] [--pr]                                gate para CI (sale con 1 si bloquea; --pr exige la revisión de la rama)',
+          '  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)',
           '  phase [close <sub-etapa>]',
-          '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> --by <nombre>',
+          '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> · resync   (override, confirm y resync: solo el usuario)',
           '  threshold <complexity|max_lines|max_function_lines> <valor> [razón --yes]',
           '  security [record --id --result --files --notes]',
-          '  review [<sub-etapa>] · review record --must-fix <n> [--sub] [--tool ponytail|mep] [--notes]   revisión de calidad para cerrar',
+          '  review [<sub-etapa>] · review record --must-fix <n> [--sub | --pr] [--tool ponytail|mep] [--notes]   revisión de calidad (cierre o PR)',
           '  audit [--from scope.yaml]                             evidencia del código / brecha según el scope (no escribe nada)',
           '  explain <id> [--from perfil.yaml]                     por qué una regla aplica o no a este scope',
           '  update [--apply]                                      ítems nuevos del catálogo que aplican',
@@ -607,11 +644,17 @@ function main(): void {
           '  quote [--client] [--save] · log-time <id> <horas> · calibrate',
           '  export-data [--lang es] · export --in <md> [--format docx|pdf|both]',
           '  render · status · signals · presets · version',
-          '  hook <session-start|stop|pre-bash|post-edit>          hooks clásicos (stdin JSON)',
+          '  hook <session-start|stop|pre-bash|pre-edit|post-edit> hooks clásicos (stdin JSON)',
         ].join('\n'),
       )
       if (cmd) process.exitCode = 1
   }
 }
 
-main()
+try {
+  main()
+} catch (e) {
+  // A writer found mep's state changed outside the CLI: it refuses to seal someone else's edit.
+  if (e instanceof SealBroken) fail(`mep: ${e.message}`)
+  throw e
+}

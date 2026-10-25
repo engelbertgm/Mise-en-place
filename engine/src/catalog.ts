@@ -40,6 +40,7 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
       presets[f.replace(/\.yaml$/, '')] = readYaml(join(presetsDir, f))
     }
   }
+  const sensitiveGroups = readYaml<{ groups: Record<string, string[]> }>(join(dir, 'sensitive.yaml')).groups
   const catalog: Catalog = {
     version: readFileSync(join(dir, 'VERSION'), 'utf8').trim(),
     dir,
@@ -47,7 +48,8 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
     items: [...readYamlDir<Item>(join(dir, 'items')), ...readYamlDir<Item>(join(dir, 'markets'))],
     stackRules: readYaml<StackRule[]>(join(dir, 'stack-rules.yaml')) ?? [],
     presets,
-    sensitivePaths: readYaml<{ paths: string[] }>(join(dir, 'sensitive.yaml')).paths,
+    sensitiveGroups,
+    sensitivePaths: [...new Set(Object.values(sensitiveGroups).flat())],
   }
   const errors = validateCatalog(catalog)
   if (errors.length) throw new Error(`mep: invalid catalog\n- ${errors.join('\n- ')}`)
@@ -143,6 +145,7 @@ export function validateCatalog(catalog: Catalog): string[] {
     if (!Array.isArray(item.verify) || item.verify.length === 0) errors.push(`${where}: needs at least one verify`)
     else item.verify.forEach(c => errors.push(...validateCheck(c, where)))
     if (item.when) errors.push(...validateCondition(item.when, dims, where))
+    for (const g of item.sensitive ?? []) if (!catalog.sensitiveGroups[g]) errors.push(`${where}: unknown sensitive group ${g}`)
     for (const o of item.level_overrides ?? []) {
       if (!LEVELS.includes(o.level)) errors.push(`${where}: invalid override level`)
       errors.push(...validateCondition(o.when, dims, where))

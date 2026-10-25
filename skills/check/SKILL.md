@@ -11,4 +11,4 @@ Corre `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" check $ARGUMENTS` y mues
 
 - Las verificaciones de HTML corren sobre el build: si salen como ❔ "sin salida de build", sugiere correr el build.
 - Si el motor avisa señales que el perfil no tiene, propone `/mep:add` para incorporarlas.
-- No marques nada como cumplido por tu cuenta: los ítems manuales se confirman con `confirm <id> --by <nombre>` solo cuando el usuario lo afirma, y los de seguridad solo con una auditoría de `mep-security`.
+- No marques nada como cumplido por tu cuenta: los ítems manuales los confirma el usuario con `/mep:confirm <id>` (tú no puedes: la guardia lo niega), y los de seguridad solo con una auditoría de `mep-security`.

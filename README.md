@@ -6,7 +6,7 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.6-informational.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.2.0-informational.svg)](.claude-plugin/plugin.json)
 [![Catalog](https://img.shields.io/badge/catalog-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -97,7 +97,8 @@ Then, in a new or existing project folder:
 | `/mep:check` | Status by sub-phase: ✅ done · ❌ pending · ⏭️ skipped · ⚠️ overridden. Warns about signals in the code the profile does not have |
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` runs the security audit and quality review, then closes it |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |
-| `/mep:override <id> <reason>` | Turns off a 🔴 item after confirmation; rejects 🔒 items |
+| `/mep:override <id> <reason>` | Turns off a 🔴 item; rejects 🔒 items. Only you type it: the agent cannot |
+| `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Your actions, never the agent's: confirm a manual item (recorded with your git user), relax a quality threshold, re-seal state changed outside the CLI |
 | `/mep:audit [scope]` | For an existing repo: starts from the project's scope, compares it with what the code shows (code-only vs scope-only), and reports the gap with only the rules that scope activates. Changes nothing until you adopt the brief |
 | `/mep:update` | Brings new catalog items that apply to your profile. Items that land in a closed sub-phase get a grace period |
 | `/mep:quote [--client]` | Quote from the brief. Internal view (hours, rate, margins) or client view (price and estimated weeks per phase, extras, recurring costs, maintenance plans) |

@@ -4,7 +4,8 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { evaluate } from './evaluate.ts'
 import { MEP_DIR, hasProfile, loadProfile, log, saveProfile } from './profile.ts'
-import { ponytailInstalled, reviewState } from './review.ts'
+import { PR_REVIEW, reviewState } from './review.ts'
+import { checkSeal, stateHash } from './seal.ts'
 import { failingDetail, verifyItems } from './verify.ts'
 import type { Mode } from './verify.ts'
 import type { Catalog, ItemResult, Profile } from './types.ts'
@@ -34,6 +35,9 @@ export function formatItems(results: ItemResult[], max = 15): string {
  */
 export function gate(root: string, catalog: Catalog, kind: GateKind, env = process.env): GateResult {
   if (!hasProfile(root)) return PASS
+  // State changed outside the CLI: nothing else counts until the person re-seals it. Never bypassable.
+  const sealed = checkSeal(root)
+  if (!sealed.ok) return { block: true, blockers: [], info: [], bypassed: false, message: `mep bloquea: ${sealed.detail}` }
   const profile = loadProfile(root, catalog)
   const mode: Mode = kind === 'prod' ? 'full' : 'fast'
   const results = verifyItems(root, profile, evaluate(profile, catalog), mode).filter(r => r.state === 'active')
@@ -121,7 +125,7 @@ function gitState(root: string): string {
 export function cachedGate(root: string, catalog: Catalog, kind: GateKind, env = process.env): Pick<GateResult, 'block' | 'message'> {
   if (!hasProfile(root)) return PASS
   const key = createHash('sha256')
-    .update(`${kind}\0${env.MEP_BYPASS ?? ''}\0${gitState(root)}\0${readFileSync(join(root, MEP_DIR, 'profile.yaml'), 'utf8')}`)
+    .update(`${kind}\0${env.MEP_BYPASS ?? ''}\0${gitState(root)}\0${readFileSync(join(root, MEP_DIR, 'profile.yaml'), 'utf8')}\0${stateHash(root)}`)
     .digest('hex')
   const dir = join(root, MEP_DIR, '.cache')
   const file = join(dir, `gate-${kind}.json`)
@@ -137,32 +141,11 @@ export function cachedGate(root: string, catalog: Catalog, kind: GateKind, env =
 }
 
 /**
- * Before a PR into main: one quality review per commit (/ponytail-review branch, or mep's own review).
- * The first attempt is held with the instructions; the next one for the same commit goes through.
+ * Before a PR into main: a quality review of the branch, recorded and current for the code as it is now
+ * (/ponytail-review branch, or mep's own review), with no "must fix". CI asks for the same one (verify --pr).
  */
 export function prReviewGate(root: string, env = process.env): { block: boolean; message: string } {
   if (!hasProfile(root)) return { block: false, message: '' }
-  let sha = 'no-git'
-  try {
-    sha = execSync('git rev-parse HEAD', { cwd: root, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
-  } catch {
-    // Without git there is no commit to key the review on: the review is asked for every time.
-  }
-  const dir = join(root, MEP_DIR, '.cache')
-  const marker = join(dir, `pr-review-${sha}`)
-  if (existsSync(marker)) return { block: false, message: '' }
-  mkdirSync(dir, { recursive: true })
-  writeFileSync(join(root, MEP_DIR, '.gitignore'), '.cache/\n')
-  writeFileSync(marker, new Date().toISOString())
-  log(root, 'pr-review', sha)
-  return {
-    block: true,
-    message: [
-      'mep: antes del PR a main, revisión de calidad de la rama.',
-      ponytailInstalled(root, env)
-        ? '- Ponytail está instalado: corre /ponytail-review branch y resuelve sus "must fix".'
-        : '- Ponytail no está instalado: revisa duplicados, nombres, complejidad y oportunidades de reutilizar contra REGISTRY.md.',
-      'Después vuelve a ejecutar el mismo comando (la revisión se pide una vez por commit).',
-    ].join('\n'),
-  }
+  const state = reviewState(root, PR_REVIEW, env)
+  return state.valid ? { block: false, message: '' } : { block: true, message: `mep: antes del PR a main, revisión de calidad de la rama: ${state.detail}` }
 }

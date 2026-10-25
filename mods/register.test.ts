@@ -58,10 +58,31 @@ describe('gate', () => {
     expect(bad.deny).toContain('Stripe secret key')
     expect((await $.tool.call({ tool: 'Write', file_path: '.env.local', content: `STRIPE_SECRET_KEY=${key}` })).result).toBe('ran')
   })
+
+  test("mep's state changes only through the CLI; human actions are not the agent's", async ($, on) => {
+    repo(on)
+    expect((await $.tool.call({ tool: 'Edit', file_path: '.mep/profile.yaml', old_string: 'closed: []', new_string: 'closed: [x]' })).deny).toContain('solo cambia con la CLI')
+    expect((await $.tool.call({ tool: 'Bash', command: 'echo x >> .mep/log' })).deny).toContain('solo cambia con la CLI')
+    expect((await $.tool.call({ tool: 'Bash', command: 'node mep.mjs confirm git-protected-main' })).deny).toContain('esta acción es tuya')
+    expect((await $.tool.call({ tool: 'Bash', command: 'MEP_BYPASS=1 vercel --prod' })).deny).toContain('MEP_BYPASS')
+    expect((await $.tool.call({ tool: 'Bash', command: 'cat .mep/log' })).result).toBe('ran')
+  })
 })
 
 // The kit fills in the fields the engine stamps (origin, presentation).
 const cmd = (command: string, args = '') => ({ command, args }) as CommandRunInput
+
+describe('human actions', () => {
+  test('/mep:override, /mep:confirm and /mep:resync reach the engine with the human channel', async ($, on) => {
+    const calls = repo(on)
+    await $.command.run(cmd('mep:override', 'readme el cliente no lo quiere'))
+    expect(calls.some(a => a.includes('override') && a.includes('--yes') && a.includes('--human'))).toBe(true)
+    await $.command.run(cmd('mep:confirm', 'git-protected-main'))
+    expect(calls.some(a => a.includes('confirm') && a.includes('--human') && !a.includes('--yes'))).toBe(true)
+    await $.command.run(cmd('mep:resync'))
+    expect(calls.some(a => a.includes('resync') && a.includes('--human'))).toBe(true)
+  })
+})
 
 describe('commands', () => {
   test('/mep:check answers from the engine, without a Claude turn', async ($, on) => {

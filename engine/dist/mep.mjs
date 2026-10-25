@@ -7368,9 +7368,9 @@ var require_dist = __commonJS({
 
 // engine/src/cli.ts
 var import_yaml8 = __toESM(require_dist(), 1);
-import { execSync as execSync4 } from "node:child_process";
-import { existsSync as existsSync14, mkdirSync as mkdirSync8, readFileSync as readFileSync13, writeFileSync as writeFileSync10 } from "node:fs";
-import { basename, dirname as dirname3, join as join15, resolve as resolve2 } from "node:path";
+import { execSync as execSync6 } from "node:child_process";
+import { existsSync as existsSync15, mkdirSync as mkdirSync9, readFileSync as readFileSync14, writeFileSync as writeFileSync10 } from "node:fs";
+import { basename, dirname as dirname3, join as join16, resolve as resolve2 } from "node:path";
 
 // engine/src/catalog.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7405,6 +7405,7 @@ function loadCatalog(dir = defaultCatalogDir()) {
       presets[f.replace(/\.yaml$/, "")] = readYaml(join(presetsDir, f));
     }
   }
+  const sensitiveGroups = readYaml(join(dir, "sensitive.yaml")).groups;
   const catalog = {
     version: readFileSync(join(dir, "VERSION"), "utf8").trim(),
     dir,
@@ -7412,7 +7413,8 @@ function loadCatalog(dir = defaultCatalogDir()) {
     items: [...readYamlDir(join(dir, "items")), ...readYamlDir(join(dir, "markets"))],
     stackRules: readYaml(join(dir, "stack-rules.yaml")) ?? [],
     presets,
-    sensitivePaths: readYaml(join(dir, "sensitive.yaml")).paths
+    sensitiveGroups,
+    sensitivePaths: [...new Set(Object.values(sensitiveGroups).flat())]
   };
   const errors = validateCatalog(catalog);
   if (errors.length) throw new Error(`mep: invalid catalog
@@ -7502,6 +7504,7 @@ function validateCatalog(catalog) {
     if (!Array.isArray(item.verify) || item.verify.length === 0) errors.push(`${where}: needs at least one verify`);
     else item.verify.forEach((c) => errors.push(...validateCheck(c, where)));
     if (item.when) errors.push(...validateCondition(item.when, dims, where));
+    for (const g of item.sensitive ?? []) if (!catalog.sensitiveGroups[g]) errors.push(`${where}: unknown sensitive group ${g}`);
     for (const o of item.level_overrides ?? []) {
       if (!LEVELS.includes(o.level)) errors.push(`${where}: invalid override level`);
       errors.push(...validateCondition(o.when, dims, where));
@@ -7544,11 +7547,24 @@ var PROD = [
   /\bvercel\s+(?:deploy\s+)?--prod\b/,
   /\bvercel\s+promote\b/,
   /\bnetlify\s+deploy\b(?=[^|;&]*\s--prod\b)/,
-  /\bgit\s+push\b[^|;&]*\s(?:\S+\s+)?(?:HEAD:)?(?:refs\/heads\/)?(?:main|master)\b/
+  /\bgit\s+push\b[^|;&]*\s(?:\S+\s+)?(?:HEAD:)?(?:refs\/heads\/)?(?:main|master)\b/,
+  // Cloudflare: a Worker deploy, or Pages without a branch or on main.
+  /\bwrangler\s+deploy\b/,
+  /\bwrangler\s+pages\s+deploy\b(?![^|;&]*--branch[\s=]+(?!(?:main|master)\b))/,
+  /\b(?:fly|flyctl)\s+deploy\b/,
+  /\brailway\s+(?:up|redeploy)\b/,
+  /\bfirebase\s+deploy\b/,
+  /\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/
 ];
-var PREVIEW = [/\bvercel(?:\s+deploy)?(?:\s|$)/, /\bnetlify\s+deploy\b/];
+var PREVIEW = [
+  /\bvercel(?:\s+deploy)?(?:\s|$)/,
+  /\bnetlify\s+deploy\b/,
+  /\bwrangler\s+(?:pages\s+deploy|versions\s+upload)\b/,
+  /\bfirebase\s+hosting:channel:deploy\b/
+];
 function deployKind(command, currentBranch2) {
   const cmd = command.trim();
+  if (/\bfirebase\s+hosting:channel:deploy\b/.test(cmd)) return "preview";
   if (PROD.some((re) => re.test(cmd))) return "prod";
   if (currentBranch2 && /^(main|master)$/.test(currentBranch2) && /\bgit\s+push\b(?![^|;&]*\s(?:-d|--delete)\b)/.test(cmd)) {
     const args = cmd.replace(/^.*?\bgit\s+push\b/, "").split(/[|;&]/)[0].trim().split(/\s+/).filter((a) => a && !a.startsWith("-"));
@@ -7559,7 +7575,7 @@ function deployKind(command, currentBranch2) {
   return void 0;
 }
 function mayDeploy(command) {
-  return /\b(vercel|netlify|git\s+push|gh\s+pr)\b/.test(command);
+  return /\b(vercel|netlify|git\s+push|gh\s+pr|wrangler|fly|flyctl|railway|firebase|supabase)\b/.test(command);
 }
 function prToMain(command) {
   if (/\bgh\s+pr\s+merge\b/.test(command)) return true;
@@ -7821,19 +7837,110 @@ function parseJsonc(text) {
 }
 
 // engine/src/gate.ts
-import { execSync as execSync3 } from "node:child_process";
-import { createHash as createHash3 } from "node:crypto";
-import { existsSync as existsSync8, mkdirSync as mkdirSync4, readFileSync as readFileSync7, writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join9 } from "node:path";
+import { execSync as execSync4 } from "node:child_process";
+import { createHash as createHash4 } from "node:crypto";
+import { existsSync as existsSync9, mkdirSync as mkdirSync5, readFileSync as readFileSync8, writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join10 } from "node:path";
 
 // engine/src/profile.ts
 var import_yaml2 = __toESM(require_dist(), 1);
-import { existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, writeFileSync, appendFileSync } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync } from "node:fs";
+import { join as join4 } from "node:path";
+
+// engine/src/seal.ts
+import { execSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { appendFileSync, existsSync as existsSync3, mkdirSync, readdirSync as readdirSync3, readFileSync as readFileSync3 } from "node:fs";
 import { join as join3 } from "node:path";
+var DIR = ".mep";
+var LOG = join3(DIR, "log");
+var STATE_LINE = / state ([0-9a-f]{64})$/;
+function read(root, rel) {
+  try {
+    return readFileSync3(join3(root, rel), "utf8").replace(/\r\n/g, "\n");
+  } catch {
+    return void 0;
+  }
+}
+function jsonFiles(root, sub) {
+  try {
+    return readdirSync3(join3(root, DIR, sub)).filter((f) => f.endsWith(".json")).sort().map((f) => `${DIR}/${sub}/${f}`);
+  } catch {
+    return [];
+  }
+}
+function logLines(root) {
+  return (read(root, LOG) ?? "").split("\n").filter(Boolean);
+}
+function stateHash(root) {
+  const h = createHash("sha256");
+  for (const rel of [`${DIR}/profile.yaml`, ...jsonFiles(root, "security"), ...jsonFiles(root, "reviews")]) {
+    h.update(`${rel}\0${read(root, rel) ?? "<missing>"}\0`);
+  }
+  h.update(logLines(root).filter((l) => !STATE_LINE.test(l)).join("\n"));
+  return h.digest("hex");
+}
+function lastSeal(root) {
+  return logLines(root).reverse().map((l) => l.match(STATE_LINE)?.[1]).find(Boolean);
+}
+function append(root, event, detail) {
+  mkdirSync(join3(root, DIR), { recursive: true });
+  appendFileSync(join3(root, LOG), `${(/* @__PURE__ */ new Date()).toISOString()} ${event} ${detail}
+`);
+}
+function seal(root) {
+  append(root, "state", stateHash(root));
+}
+var SealBroken = class extends Error {
+};
+var BROKEN = "estado de mep modificado fuera de la CLI (.mep/profile.yaml, log, security/ o reviews/). Revisa el cambio y, si es tuyo, corre /mep:resync.";
+function checkSeal(root) {
+  if (!existsSync3(join3(root, DIR, "profile.yaml")) && !existsSync3(join3(root, LOG))) return { ok: true, detail: "sin estado todav\xEDa" };
+  const sealed = lastSeal(root);
+  if (!sealed) {
+    append(root, "seal-initial", "repo sin sello (0.1.x): sellado por primera vez");
+    seal(root);
+    return { ok: true, detail: "sellado por primera vez" };
+  }
+  return sealed === stateHash(root) ? { ok: true, detail: "sellado" } : { ok: false, detail: BROKEN };
+}
+function assertSealed(root) {
+  if (!checkSeal(root).ok) throw new SealBroken(BROKEN);
+}
+function resync(root, by) {
+  append(root, "resync", by);
+  seal(root);
+}
+function stateChanges(root, base) {
+  let before = [];
+  try {
+    before = execSync(`git show ${base}:.mep/log`, { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().replace(/\r\n/g, "\n").split("\n").filter(Boolean);
+  } catch {
+  }
+  const seen = new Set(before);
+  const events = logLines(root).filter((l) => !seen.has(l) && !STATE_LINE.test(l)).map((l) => l.match(/^(\S+) (\S+) ?(.*)$/)).filter((m) => Boolean(m));
+  if (!events.length) return "### mep: sin cambios de estado en este PR\n";
+  const cell = (s) => s.replace(/\|/g, "\\|");
+  return [
+    `### mep: ${events.length} cambio(s) de estado en este PR`,
+    "",
+    "| Fecha | Evento | Detalle |",
+    "| --- | --- | --- |",
+    ...events.map(([, date, event, detail]) => `| ${date.slice(0, 16).replace("T", " ")} | ${cell(event)} | ${cell(detail)} |`),
+    ""
+  ].join("\n");
+}
+function logEvent(root, event, detail) {
+  assertSealed(root);
+  append(root, event, detail);
+  seal(root);
+}
+
+// engine/src/profile.ts
 var MEP_DIR = ".mep";
-var PROFILE_FILE = join3(MEP_DIR, "profile.yaml");
+var PROFILE_FILE = join4(MEP_DIR, "profile.yaml");
 function hasProfile(root) {
-  return existsSync3(join3(root, PROFILE_FILE));
+  return existsSync4(join4(root, PROFILE_FILE));
 }
 function emptyProfile(catalog) {
   const signals = {};
@@ -7913,32 +8020,32 @@ function applyImplications(profile, catalog) {
   return profile;
 }
 function loadProfile(root, catalog) {
-  const raw = (0, import_yaml2.parse)(readFileSync3(join3(root, PROFILE_FILE), "utf8"));
+  const raw = (0, import_yaml2.parse)(readFileSync4(join4(root, PROFILE_FILE), "utf8"));
   return normalizeProfile(raw, catalog);
 }
 function saveProfile(root, profile) {
-  mkdirSync(join3(root, MEP_DIR), { recursive: true });
-  writeFileSync(join3(root, PROFILE_FILE), (0, import_yaml2.stringify)(profile, { lineWidth: 0 }));
+  assertSealed(root);
+  mkdirSync2(join4(root, MEP_DIR), { recursive: true });
+  writeFileSync(join4(root, PROFILE_FILE), (0, import_yaml2.stringify)(profile, { lineWidth: 0 }));
+  seal(root);
 }
 function today() {
   return (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
 }
 function log(root, event, detail) {
-  mkdirSync(join3(root, MEP_DIR), { recursive: true });
-  appendFileSync(join3(root, MEP_DIR, "log"), `${(/* @__PURE__ */ new Date()).toISOString()} ${event} ${detail}
-`);
+  logEvent(root, event, detail);
 }
 
 // engine/src/review.ts
-import { execSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
+import { execSync as execSync2 } from "node:child_process";
+import { createHash as createHash2 } from "node:crypto";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync2 } from "node:fs";
 import { homedir } from "node:os";
-import { join as join4 } from "node:path";
-var REVIEWS_DIR = join4(MEP_DIR, "reviews");
+import { join as join5 } from "node:path";
+var REVIEWS_DIR = join5(MEP_DIR, "reviews");
 function readJson(file) {
   try {
-    return JSON.parse(readFileSync4(file, "utf8"));
+    return JSON.parse(readFileSync5(file, "utf8"));
   } catch {
     return void 0;
   }
@@ -7946,40 +8053,40 @@ function readJson(file) {
 function ponytailInstalled(root, env = process.env) {
   if (env.MEP_PONYTAIL === "1") return true;
   if (env.MEP_PONYTAIL === "0") return false;
-  const claudeDir = env.CLAUDE_CONFIG_DIR ?? join4(homedir(), ".claude");
-  const settings = [join4(root, ".claude", "settings.local.json"), join4(root, ".claude", "settings.json"), join4(claudeDir, "settings.json")];
+  const claudeDir = env.CLAUDE_CONFIG_DIR ?? join5(homedir(), ".claude");
+  const settings = [join5(root, ".claude", "settings.local.json"), join5(root, ".claude", "settings.json"), join5(claudeDir, "settings.json")];
   for (const file of settings) {
     const enabled = readJson(file)?.enabledPlugins;
     const key = Object.keys(enabled ?? {}).find((k) => k.startsWith("ponytail@"));
     if (key) return enabled[key] === true;
   }
-  const installed = join4(claudeDir, "plugins", "installed_plugins.json");
-  return existsSync4(installed) && /"ponytail@/.test(readFileSync4(installed, "utf8"));
+  const installed = join5(claudeDir, "plugins", "installed_plugins.json");
+  return existsSync5(installed) && /"ponytail@/.test(readFileSync5(installed, "utf8"));
 }
 var GENERATED = /* @__PURE__ */ new Set(["SCOPE.md", "BRIEF.md", "REGISTRY.md", "CODEMAP.md"]);
 function projectFiles(root) {
   try {
-    const out = execSync("git ls-files -co --exclude-standard", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString();
+    const out = execSync2("git ls-files -co --exclude-standard", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString();
     return out.split("\n").filter((f) => f && !f.startsWith(`${MEP_DIR}/`)).sort();
   } catch {
     return listFiles(root);
   }
 }
 function hashProject(root) {
-  const h = createHash("sha256");
+  const h = createHash2("sha256");
   for (const f of projectFiles(root).filter((f2) => !GENERATED.has(f2))) {
     let content;
     try {
-      content = readFileSync4(join4(root, f));
+      content = readFileSync5(join5(root, f)).toString("latin1").replace(/\r\n/g, "\n");
     } catch {
       content = "<missing>";
     }
-    h.update(`${f}\0`).update(content).update("\0");
+    h.update(`${f}\0`).update(content, "latin1").update("\0");
   }
   return h.digest("hex");
 }
 function readReview(root, sub) {
-  const text = readText(root, join4(REVIEWS_DIR, `${sub}.json`));
+  const text = readText(root, join5(REVIEWS_DIR, `${sub}.json`));
   if (!text) return void 0;
   try {
     return JSON.parse(text);
@@ -7988,14 +8095,18 @@ function readReview(root, sub) {
   }
 }
 function recordReview(root, input) {
+  assertSealed(root);
   const review = { ...input, hash: hashProject(root), date: today() };
-  mkdirSync2(join4(root, REVIEWS_DIR), { recursive: true });
-  writeFileSync2(join4(root, REVIEWS_DIR, `${input.sub}.json`), JSON.stringify(review, null, 2) + "\n");
+  mkdirSync3(join5(root, REVIEWS_DIR), { recursive: true });
+  writeFileSync2(join5(root, REVIEWS_DIR, `${input.sub}.json`), JSON.stringify(review, null, 2) + "\n");
+  seal(root);
   return review;
 }
+var PR_REVIEW = "pr";
 function reviewState(root, sub, env = process.env) {
   const ponytail = ponytailInstalled(root, env);
-  const how = ponytail ? `corre /ponytail-review y registra el resultado: mep review record --sub ${sub} --tool ponytail --must-fix <n>` : `haz la revisi\xF3n propia (duplicados, nombres, complejidad, reutilizaci\xF3n contra REGISTRY.md) y reg\xEDstrala: mep review record --sub ${sub} --tool mep --must-fix <n>`;
+  const target = sub === PR_REVIEW ? "--pr" : `--sub ${sub}`;
+  const how = ponytail ? `corre /ponytail-review${sub === PR_REVIEW ? " branch" : ""} y registra el resultado: mep review record ${target} --tool ponytail --must-fix <n>` : `haz la revisi\xF3n propia (duplicados, nombres, complejidad, reutilizaci\xF3n contra REGISTRY.md) y reg\xEDstrala: mep review record ${target} --tool mep --must-fix <n>`;
   const review = readReview(root, sub);
   if (!review) return { valid: false, detail: `sin revisi\xF3n de calidad: ${how}` };
   if (ponytail && review.tool !== "ponytail") return { valid: false, detail: `Ponytail est\xE1 instalado y la revisi\xF3n no es de /ponytail-review: ${how}` };
@@ -8005,7 +8116,7 @@ function reviewState(root, sub, env = process.env) {
 }
 
 // engine/src/verify.ts
-import { execSync as execSync2 } from "node:child_process";
+import { execSync as execSync3 } from "node:child_process";
 
 // engine/src/framework.ts
 function readPackageJson(root) {
@@ -8095,17 +8206,17 @@ function routeExists(root, path) {
 }
 
 // engine/src/html.ts
-import { existsSync as existsSync5 } from "node:fs";
-import { join as join5 } from "node:path";
+import { existsSync as existsSync6 } from "node:fs";
+import { join as join6 } from "node:path";
 var OUTPUT_DIRS = ["out", ".vercel/output/static", ".next/server/app", ".next/server/pages", "dist", "build"];
 function buildOutputDir(root) {
   if (process.env.MEP_BUILD_DIR) return process.env.MEP_BUILD_DIR;
-  return OUTPUT_DIRS.find((d) => existsSync5(join5(root, d)));
+  return OUTPUT_DIRS.find((d) => existsSync6(join6(root, d)));
 }
 function loadPages(root) {
   const dir = buildOutputDir(root);
   if (!dir) return void 0;
-  const base = join5(root, dir);
+  const base = join6(root, dir);
   return listFiles(base, { includeIgnored: true }).filter((f) => f.endsWith(".html") && !/(^|\/)_(not-found|error|global-error)/.test(f)).map((f) => ({ file: `${dir}/${f}`, html: readText(base, f) ?? "" }));
 }
 function isErrorPage(file) {
@@ -8221,8 +8332,8 @@ function checkHtml(root, check) {
 
 // engine/src/maps.ts
 var import_yaml3 = __toESM(require_dist(), 1);
-import { existsSync as existsSync6, readdirSync as readdirSync3, readFileSync as readFileSync5, statSync as statSync2, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join6 } from "node:path";
+import { existsSync as existsSync7, readdirSync as readdirSync4, readFileSync as readFileSync6, statSync as statSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join7 } from "node:path";
 var REGISTRY_FILE = "REGISTRY.md";
 var CODEMAP_FILE = "CODEMAP.md";
 var REGISTRY_GLOB = "{src/,}{components,hooks,lib,utils,services,types,emails}/**/*.{ts,tsx,js,jsx}";
@@ -8327,16 +8438,16 @@ function checkRegistry(root) {
 }
 function writeRegistry(root) {
   const entries = scanExports(root);
-  writeFileSync3(join6(root, REGISTRY_FILE), renderRegistry(entries));
+  writeFileSync3(join7(root, REGISTRY_FILE), renderRegistry(entries));
   return { entries: entries.length, undocumented: entries.filter((e) => !e.purpose).length };
 }
 function codemapData(catalog) {
-  const file = join6(catalog.dir, "codemap.yaml");
-  return existsSync6(file) ? (0, import_yaml3.parse)(readFileSync5(file, "utf8")) : { folders: {}, conventions: {} };
+  const file = join7(catalog.dir, "codemap.yaml");
+  return existsSync7(file) ? (0, import_yaml3.parse)(readFileSync6(file, "utf8")) : { folders: {}, conventions: {} };
 }
 var SKIP_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", "test-results", "playwright-report", "blob-report", "storybook-static", ".mep"]);
 function folders(root) {
-  const dirs = (dir) => existsSync6(join6(root, dir)) ? readdirSync3(join6(root, dir)).filter((d) => !SKIP_DIRS.has(d) && !d.startsWith(".") && statSync2(join6(root, dir, d)).isDirectory()) : [];
+  const dirs = (dir) => existsSync7(join7(root, dir)) ? readdirSync4(join7(root, dir)).filter((d) => !SKIP_DIRS.has(d) && !d.startsWith(".") && statSync2(join7(root, dir, d)).isDirectory()) : [];
   const top = dirs(".").sort();
   const nested = ["src", "src/app", "app"].flatMap((parent) => top.includes(parent.split("/")[0]) ? dirs(parent).map((d) => `${parent}/${d}`) : []);
   return [...top, ...nested.sort()];
@@ -8399,7 +8510,7 @@ function renderCodemap(root, catalog) {
   return out.join("\n");
 }
 function writeCodemap(root, catalog) {
-  writeFileSync3(join6(root, CODEMAP_FILE), renderCodemap(root, catalog));
+  writeFileSync3(join7(root, CODEMAP_FILE), renderCodemap(root, catalog));
 }
 function checkCodemap(root) {
   const text = readText(root, CODEMAP_FILE);
@@ -8537,13 +8648,13 @@ function checkDesign(root, check) {
 }
 
 // engine/src/build.ts
-import { existsSync as existsSync7, readFileSync as readFileSync6, statSync as statSync3 } from "node:fs";
-import { join as join7 } from "node:path";
+import { existsSync as existsSync8, readFileSync as readFileSync7, statSync as statSync3 } from "node:fs";
+import { join as join8 } from "node:path";
 import { gzipSync } from "node:zlib";
 var JS_DIRS = [".next/static", "out/_next/static", "dist/assets", "dist/_astro", "build/static/js", ".vercel/output/static"];
 var PUBLIC_DIRS = ["out", "dist", "build", ".next/static", ".vercel/output/static"];
 function filesUnder(root, dirs, ext) {
-  return dirs.filter((d) => existsSync7(join7(root, d))).flatMap((d) => listFiles(join7(root, d), { includeIgnored: true }).filter((f) => ext.test(f)).map((f) => `${d}/${f}`));
+  return dirs.filter((d) => existsSync8(join8(root, d))).flatMap((d) => listFiles(join8(root, d), { includeIgnored: true }).filter((f) => ext.test(f)).map((f) => `${d}/${f}`));
 }
 var VITE_SSR = ["vike", "vite-plugin-ssr", "@react-router/dev", "@tanstack/react-start", "@remix-run/dev", "waku", "vite-react-ssg", "react-snap"];
 function serverRendered(root) {
@@ -8556,7 +8667,7 @@ function serverRendered(root) {
 function maxJsChunk(root, maxKb) {
   const files = filesUnder(root, JS_DIRS, /\.m?js$/);
   if (!files.length) return { ok: null, detail: "sin salida de build con JavaScript (corre el build primero)" };
-  const sizes = files.filter((f) => statSync3(join7(root, f)).size < 2e7).map((f) => ({ f, kb: Math.round(gzipSync(readFileSync6(join7(root, f))).length / 1024) })).sort((a, b) => b.kb - a.kb);
+  const sizes = files.filter((f) => statSync3(join8(root, f)).size < 2e7).map((f) => ({ f, kb: Math.round(gzipSync(readFileSync7(join8(root, f))).length / 1024) })).sort((a, b) => b.kb - a.kb);
   const big = sizes.filter((s) => s.kb > maxKb);
   return big.length ? { ok: false, detail: `${big.length} archivo(s) JS sobre ${maxKb} KB gzip: ${big.slice(0, 3).map((s) => `${s.f} (${s.kb} KB)`).join(", ")}` } : { ok: true, detail: `el m\xE1s grande: ${sizes[0].f} (${sizes[0].kb} KB gzip)` };
 }
@@ -8592,7 +8703,7 @@ function blockedInTxt(text) {
   return blocked;
 }
 function checkRobots(root) {
-  const txt = ["public/robots.txt", "static/robots.txt", "out/robots.txt", "dist/robots.txt", ".next/server/app/robots.txt.body"].find((f) => existsSync7(join7(root, f)));
+  const txt = ["public/robots.txt", "static/robots.txt", "out/robots.txt", "dist/robots.txt", ".next/server/app/robots.txt.body"].find((f) => existsSync8(join8(root, f)));
   if (txt) {
     const blocked2 = [...new Set(blockedInTxt(readText(root, txt) ?? ""))];
     return blocked2.length ? { ok: false, detail: `${txt} bloquea el sitio a: ${blocked2.join(", ")}` } : { ok: true, detail: `${txt}: buscadores y asistentes de IA pueden leer el sitio` };
@@ -8606,19 +8717,19 @@ function checkRobots(root) {
 }
 
 // engine/src/security.ts
-import { createHash as createHash2 } from "node:crypto";
-import { mkdirSync as mkdirSync3, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join8 } from "node:path";
-var SECURITY_DIR = join8(MEP_DIR, "security");
+import { createHash as createHash3 } from "node:crypto";
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join9 } from "node:path";
+var SECURITY_DIR = join9(MEP_DIR, "security");
 function hashFiles(root, files) {
-  const h = createHash2("sha256");
+  const h = createHash3("sha256");
   for (const f of [...files].sort()) {
-    h.update(`${f}\0${readText(root, f) ?? "<missing>"}\0`);
+    h.update(`${f}\0${readText(root, f)?.replace(/\r\n/g, "\n") ?? "<missing>"}\0`);
   }
   return h.digest("hex");
 }
 function readReport(root, id) {
-  const text = readText(root, join8(SECURITY_DIR, `${id}.json`));
+  const text = readText(root, join9(SECURITY_DIR, `${id}.json`));
   if (!text) return void 0;
   try {
     return JSON.parse(text);
@@ -8634,9 +8745,11 @@ function reportState(root, id) {
   return { valid: true, detail: `auditado ${report.date}` };
 }
 function recordReport(root, input) {
+  assertSealed(root);
   const report = { ...input, hash: hashFiles(root, input.files), date: today(), by: "mep-security" };
-  mkdirSync3(join8(root, SECURITY_DIR), { recursive: true });
-  writeFileSync4(join8(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
+  mkdirSync4(join9(root, SECURITY_DIR), { recursive: true });
+  writeFileSync4(join9(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
+  seal(root);
   return report;
 }
 
@@ -8688,7 +8801,7 @@ function runCheck(root, check, profile, itemId, mode) {
     case "command": {
       if (mode === "fast") return { ok: null, detail: `se verifica en /mep:check: ${check.run}` };
       try {
-        execSync2(check.run, { cwd: root, stdio: "pipe", timeout: (check.timeout ?? 300) * 1e3 });
+        execSync3(check.run, { cwd: root, stdio: "pipe", timeout: (check.timeout ?? 300) * 1e3 });
         return { ok: true, detail: `${check.run} \u2713` };
       } catch (err) {
         const out = String(err.stdout ?? "") + String(err.stderr ?? "");
@@ -8756,6 +8869,8 @@ function formatItems(results, max = 15) {
 }
 function gate(root, catalog, kind, env = process.env) {
   if (!hasProfile(root)) return PASS;
+  const sealed = checkSeal(root);
+  if (!sealed.ok) return { block: true, blockers: [], info: [], bypassed: false, message: `mep bloquea: ${sealed.detail}` };
   const profile = loadProfile(root, catalog);
   const mode = kind === "prod" ? "full" : "fast";
   const results = verifyItems(root, profile, evaluate(profile, catalog), mode).filter((r) => r.state === "active");
@@ -8812,53 +8927,35 @@ ${formatItems(pending)}`);
 var CACHE_TTL_MS = 12e4;
 function gitState(root) {
   try {
-    return execSync3('git rev-parse HEAD && git status --porcelain -- . ":!.mep"', { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString();
+    return execSync4('git rev-parse HEAD && git status --porcelain -- . ":!.mep"', { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString();
   } catch {
     return "no-git";
   }
 }
 function cachedGate(root, catalog, kind, env = process.env) {
   if (!hasProfile(root)) return PASS;
-  const key = createHash3("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync7(join9(root, MEP_DIR, "profile.yaml"), "utf8")}`).digest("hex");
-  const dir = join9(root, MEP_DIR, ".cache");
-  const file = join9(dir, `gate-${kind}.json`);
-  if (existsSync8(file)) {
-    const cached = JSON.parse(readFileSync7(file, "utf8"));
+  const key = createHash4("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync8(join10(root, MEP_DIR, "profile.yaml"), "utf8")}\0${stateHash(root)}`).digest("hex");
+  const dir = join10(root, MEP_DIR, ".cache");
+  const file = join10(dir, `gate-${kind}.json`);
+  if (existsSync9(file)) {
+    const cached = JSON.parse(readFileSync8(file, "utf8"));
     if (cached.key === key && Date.now() - cached.time < CACHE_TTL_MS) return cached;
   }
   const { block, message } = gate(root, catalog, kind, env);
-  mkdirSync4(dir, { recursive: true });
-  writeFileSync5(join9(root, MEP_DIR, ".gitignore"), ".cache/\n");
+  mkdirSync5(dir, { recursive: true });
+  writeFileSync5(join10(root, MEP_DIR, ".gitignore"), ".cache/\n");
   writeFileSync5(file, JSON.stringify({ key, time: Date.now(), block, message }));
   return { block, message };
 }
 function prReviewGate(root, env = process.env) {
   if (!hasProfile(root)) return { block: false, message: "" };
-  let sha = "no-git";
-  try {
-    sha = execSync3("git rev-parse HEAD", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
-  } catch {
-  }
-  const dir = join9(root, MEP_DIR, ".cache");
-  const marker = join9(dir, `pr-review-${sha}`);
-  if (existsSync8(marker)) return { block: false, message: "" };
-  mkdirSync4(dir, { recursive: true });
-  writeFileSync5(join9(root, MEP_DIR, ".gitignore"), ".cache/\n");
-  writeFileSync5(marker, (/* @__PURE__ */ new Date()).toISOString());
-  log(root, "pr-review", sha);
-  return {
-    block: true,
-    message: [
-      "mep: antes del PR a main, revisi\xF3n de calidad de la rama.",
-      ponytailInstalled(root, env) ? '- Ponytail est\xE1 instalado: corre /ponytail-review branch y resuelve sus "must fix".' : "- Ponytail no est\xE1 instalado: revisa duplicados, nombres, complejidad y oportunidades de reutilizar contra REGISTRY.md.",
-      "Despu\xE9s vuelve a ejecutar el mismo comando (la revisi\xF3n se pide una vez por commit)."
-    ].join("\n")
-  };
+  const state = reviewState(root, PR_REVIEW, env);
+  return state.valid ? { block: false, message: "" } : { block: true, message: `mep: antes del PR a main, revisi\xF3n de calidad de la rama: ${state.detail}` };
 }
 
 // engine/src/render.ts
-import { existsSync as existsSync9, mkdirSync as mkdirSync5, readdirSync as readdirSync4, readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
-import { join as join10 } from "node:path";
+import { existsSync as existsSync10, mkdirSync as mkdirSync6, readdirSync as readdirSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
+import { join as join11 } from "node:path";
 var BRIEF_FILE = "BRIEF.md";
 var ADR_DIR = "docs/decisions";
 var LEGAL_NOTE = "> Checklist orientativo, no sustituye asesor\xEDa legal.";
@@ -8964,27 +9061,27 @@ function renderBrief(profile, evaluated, catalog, results) {
   return out.join("\n") + "\n";
 }
 function writeBrief(root, content) {
-  writeFileSync6(join10(root, BRIEF_FILE), content);
+  writeFileSync6(join11(root, BRIEF_FILE), content);
 }
 function slug(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 function writeStackAdrs(root, profile, catalog) {
-  const dir = join10(root, ADR_DIR);
-  mkdirSync5(dir, { recursive: true });
-  const existing = readdirSync4(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
+  const dir = join11(root, ADR_DIR);
+  mkdirSync6(dir, { recursive: true });
+  const existing = readdirSync5(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
   const written = [];
   let next = existing.length ? Number(existing[existing.length - 1].slice(0, 4)) + 1 : 1;
   for (const g of stackGroups(stack(profile, catalog))) {
     const decision = g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ");
     const base = `stack-${slug(g.rule)}`;
     const previous = existing.filter((f) => f.slice(5).startsWith(base)).pop();
-    if (previous && readFileSync8(join10(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
+    if (previous && readFileSync9(join11(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
 `)) continue;
     const file = `${String(next++).padStart(4, "0")}-${base}.md`;
     const alternatives = catalog.stackRules.find((r) => r.id === g.rule)?.alternatives ?? [];
     writeFileSync6(
-      join10(dir, file),
+      join11(dir, file),
       [
         `# Stack: ${decision}`,
         "",
@@ -9013,8 +9110,8 @@ function writeStackAdrs(root, profile, catalog) {
 }
 var CLAUDE_MARKER = "<!-- mep -->";
 function linkClaudeMd(root, template) {
-  const file = join10(root, "CLAUDE.md");
-  const current = existsSync9(file) ? readFileSync8(file, "utf8") : "";
+  const file = join11(root, "CLAUDE.md");
+  const current = existsSync10(file) ? readFileSync9(file, "utf8") : "";
   if (current.includes(CLAUDE_MARKER)) return false;
   const block = `${CLAUDE_MARKER}
 ${template.trim()}
@@ -9078,13 +9175,71 @@ function counts(results) {
   };
 }
 
+// engine/src/guard.ts
+var STATE_PATH = /(?:^|[\\/])\.mep[\\/](?:profile\.yaml|log|security[\\/]|reviews[\\/])/;
+var MENTIONS_MEP = /(?:^|[\s"'=\\/(])\.mep(?:$|[\s"'\\/)])/;
+var WRITES = /\b(?:tee|cp|mv|rm|truncate|sed\s+-i|perl\s+-[a-z]*[ip]|git\s+(?:checkout|restore|rm)|node\s+-e|python3?\s+-c|Out-File|Set-Content|Add-Content|Remove-Item|Move-Item|Copy-Item)\b/;
+var REDIRECT_INTO_MEP = /(?:^|[^<])>{1,2}\s*["']?[^\s"']*\.mep[\\/]/;
+var ENGINE = String.raw`(?:mep\.mjs["']?|@engelbertgm\/mep\S*|(?:^|[;&|]\s*|\b(?:npx|bunx|pnpm(?:\s+dlx|\s+exec)?|yarn)\s+)mep)\s+`;
+var ENGINE_CALL = new RegExp(ENGINE);
+var HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`);
+var STATE_HINT = "mep: el estado de mep (.mep/profile.yaml, log, security/, reviews/) solo cambia con la CLI de mep. Usa /mep:add, /mep:skip, /mep:phase o mep review/security record.";
+function guardFile(path) {
+  return STATE_PATH.test(path) ? STATE_HINT : void 0;
+}
+function guardCommand(command) {
+  if (/\bMEP_BYPASS\b/.test(command)) return "mep: MEP_BYPASS es una decisi\xF3n tuya, no del agente: ponla en tu entorno al abrir la sesi\xF3n.";
+  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return "mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:threshold, /mep:resync).";
+  if (HUMAN_ACTION.test(command)) return "mep: esta acci\xF3n es tuya. Escr\xEDbela t\xFA: /mep:confirm <id>, /mep:override <id> <raz\xF3n>, /mep:threshold <clave> <valor> <raz\xF3n> o /mep:resync.";
+  if (REDIRECT_INTO_MEP.test(command)) return STATE_HINT;
+  if (ENGINE_CALL.test(command) && !/[;&|]/.test(command)) return void 0;
+  return MENTIONS_MEP.test(command) && WRITES.test(command) ? STATE_HINT : void 0;
+}
+
+// engine/src/human.ts
+import { execSync as execSync5 } from "node:child_process";
+import { readSync } from "node:fs";
+import { userInfo } from "node:os";
+function gitUser(root) {
+  const get = (key) => {
+    try {
+      return execSync5(`git config ${key}`, { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    } catch {
+      return "";
+    }
+  };
+  const name = get("user.name") || userInfo().username;
+  const email = get("user.email");
+  return email ? `${name} <${email}>` : name;
+}
+function readLine() {
+  const buf = Buffer.alloc(256);
+  let line3 = "";
+  try {
+    while (!line3.includes("\n")) {
+      const n = readSync(0, buf, 0, buf.length, null);
+      if (!n) break;
+      line3 += buf.toString("utf8", 0, n);
+    }
+  } catch {
+  }
+  return line3.trim();
+}
+var NOT_HUMAN = "esta acci\xF3n es tuya, no del agente. Escr\xEDbela t\xFA en Claude Code (/mep:confirm, /mep:override, /mep:threshold, /mep:resync) o c\xF3rrela en tu propia terminal.";
+function confirmHuman(flags, id) {
+  if (flags.human === true) return true;
+  if (!process.stdin.isTTY) return false;
+  process.stderr.write(`Escribe "${id}" para confirmar: `);
+  return readLine() === id;
+}
+
 // engine/src/signals.ts
 var import_yaml4 = __toESM(require_dist(), 1);
-import { existsSync as existsSync10, readFileSync as readFileSync9 } from "node:fs";
-import { join as join11 } from "node:path";
+import { existsSync as existsSync11, readFileSync as readFileSync10 } from "node:fs";
+import { join as join12 } from "node:path";
 function loadDetectors(catalog, name = "signals.yaml") {
-  const file = join11(catalog.dir, name);
-  return existsSync10(file) ? (0, import_yaml4.parse)(readFileSync9(file, "utf8")) : {};
+  const file = join12(catalog.dir, name);
+  return existsSync11(file) ? (0, import_yaml4.parse)(readFileSync10(file, "utf8")) : {};
 }
 function fires(root, d, deps) {
   if ("dependency" in d) return d.dependency.find((dep) => deps.has(dep));
@@ -9243,12 +9398,12 @@ function applicability(profile, catalog) {
 
 // engine/src/scope.ts
 var import_yaml5 = __toESM(require_dist(), 1);
-import { existsSync as existsSync11, readFileSync as readFileSync10, writeFileSync as writeFileSync7 } from "node:fs";
-import { join as join12 } from "node:path";
+import { existsSync as existsSync12, readFileSync as readFileSync11, writeFileSync as writeFileSync7 } from "node:fs";
+import { join as join13 } from "node:path";
 var SCOPE_FILE = "SCOPE.md";
 function labels(catalog) {
-  const file = join12(catalog.dir, "labels.yaml");
-  return existsSync11(file) ? (0, import_yaml5.parse)(readFileSync10(file, "utf8")) : {};
+  const file = join13(catalog.dir, "labels.yaml");
+  return existsSync12(file) ? (0, import_yaml5.parse)(readFileSync11(file, "utf8")) : {};
 }
 function market(m, l) {
   const [parent, sub] = m.split(":");
@@ -9329,7 +9484,7 @@ function renderScope(profile, evaluated, catalog) {
   return out.filter((line3, i, all) => !(line3 === "" && all[i - 1] === "")).join("\n");
 }
 function writeScope(root, content) {
-  writeFileSync7(join12(root, SCOPE_FILE), content);
+  writeFileSync7(join13(root, SCOPE_FILE), content);
 }
 function plural(n, one, many) {
   return `${n} ${n === 1 ? one : many}`;
@@ -9676,12 +9831,12 @@ function toPdf(blocks) {
 
 // engine/src/export.ts
 var import_yaml6 = __toESM(require_dist(), 1);
-import { existsSync as existsSync12, mkdirSync as mkdirSync6, readFileSync as readFileSync11, writeFileSync as writeFileSync8 } from "node:fs";
-import { dirname as dirname2, join as join13 } from "node:path";
-var EXPORTS_FILE = join13(MEP_DIR, "exports.yaml");
+import { existsSync as existsSync13, mkdirSync as mkdirSync7, readFileSync as readFileSync12, writeFileSync as writeFileSync8 } from "node:fs";
+import { dirname as dirname2, join as join14 } from "node:path";
+var EXPORTS_FILE = join14(MEP_DIR, "exports.yaml");
 function exportHistory(root) {
-  const file = join13(root, EXPORTS_FILE);
-  return existsSync12(file) ? (0, import_yaml6.parse)(readFileSync11(file, "utf8")) ?? [] : [];
+  const file = join14(root, EXPORTS_FILE);
+  return existsSync13(file) ? (0, import_yaml6.parse)(readFileSync12(file, "utf8")) ?? [] : [];
 }
 function exportData(root, profile, catalog, lang, q, priced = q !== void 0) {
   const evaluated = evaluate(profile, catalog);
@@ -9733,18 +9888,18 @@ function recordExport(root, profile, catalog, lang, files, total, version) {
     total,
     files
   };
-  mkdirSync6(dirname2(join13(root, EXPORTS_FILE)), { recursive: true });
-  writeFileSync8(join13(root, EXPORTS_FILE), (0, import_yaml6.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
+  mkdirSync7(dirname2(join14(root, EXPORTS_FILE)), { recursive: true });
+  writeFileSync8(join14(root, EXPORTS_FILE), (0, import_yaml6.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
   return record;
 }
 
 // engine/src/quote.ts
 var import_yaml7 = __toESM(require_dist(), 1);
-import { existsSync as existsSync13, mkdirSync as mkdirSync7, readFileSync as readFileSync12, readdirSync as readdirSync5, writeFileSync as writeFileSync9, appendFileSync as appendFileSync2 } from "node:fs";
+import { existsSync as existsSync14, mkdirSync as mkdirSync8, readFileSync as readFileSync13, readdirSync as readdirSync6, writeFileSync as writeFileSync9, appendFileSync as appendFileSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { join as join14 } from "node:path";
+import { join as join15 } from "node:path";
 function configDir(env = process.env) {
-  return env.MEP_CONFIG_DIR ?? join14(homedir2(), ".config", "mep-check");
+  return env.MEP_CONFIG_DIR ?? join15(homedir2(), ".config", "mep-check");
 }
 var SIZE_HOURS = { XS: [0.5, 1], S: [1, 3], M: [3, 8], L: [8, 20], XL: [20, 40] };
 var DEFAULT_RATES = {
@@ -9769,14 +9924,14 @@ maintenance_plans:    # precio mensual; horas incluidas por mes
   premium:  { price: 0, hours: 0 }   # + monitoreo y soporte prioritario
 `;
 function loadRates(env = process.env) {
-  const file = join14(configDir(env), "rates.yaml");
+  const file = join15(configDir(env), "rates.yaml");
   let created = false;
-  if (!existsSync13(file)) {
-    mkdirSync7(configDir(env), { recursive: true });
+  if (!existsSync14(file)) {
+    mkdirSync8(configDir(env), { recursive: true });
     writeFileSync9(file, RATES_TEMPLATE);
     created = true;
   }
-  const raw = (0, import_yaml7.parse)(readFileSync12(file, "utf8")) ?? {};
+  const raw = (0, import_yaml7.parse)(readFileSync13(file, "utf8")) ?? {};
   const rates = { ...DEFAULT_RATES, ...raw, maintenance_plans: { ...DEFAULT_RATES.maintenance_plans, ...raw.maintenance_plans } };
   return { rates, created, configured: rates.hourly_rate > 0 };
 }
@@ -9801,9 +9956,9 @@ function loaded(hours, rates) {
   return scale(hours, (1 + rates.pm_overhead) * (1 + rates.risk_buffer));
 }
 function recurringCosts(profile, catalog) {
-  const file = join14(catalog.dir, "costs.yaml");
-  if (!existsSync13(file)) return [];
-  const table = (0, import_yaml7.parse)(readFileSync12(file, "utf8"));
+  const file = join15(catalog.dir, "costs.yaml");
+  if (!existsSync14(file)) return [];
+  const table = (0, import_yaml7.parse)(readFileSync13(file, "utf8"));
   const out = Object.entries(table.always ?? {}).map(([key, c]) => ({ key, ...c }));
   for (const d of stack(profile, catalog)) {
     const cost = table.stack?.[`${d.key}.${d.value}`];
@@ -9896,25 +10051,25 @@ function projectKey(profile) {
   return (profile.project || "proyecto").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "proyecto";
 }
 function saveQuote(profile, q, rates, env = process.env) {
-  const dir = join14(configDir(env), "quotes", projectKey(profile));
-  mkdirSync7(dir, { recursive: true });
-  const file = join14(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
+  const dir = join15(configDir(env), "quotes", projectKey(profile));
+  mkdirSync8(dir, { recursive: true });
+  const file = join15(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
   writeFileSync9(file, (0, import_yaml7.stringify)({ profile: profile.project, catalog_version: profile.catalog_version, rates, quote: q }, { lineWidth: 0 }));
   return file;
 }
 function logTime(profile, id, hours, env = process.env) {
-  const dir = join14(configDir(env), "actuals");
-  mkdirSync7(dir, { recursive: true });
-  const file = join14(dir, `${projectKey(profile)}.yaml`);
+  const dir = join15(configDir(env), "actuals");
+  mkdirSync8(dir, { recursive: true });
+  const file = join15(dir, `${projectKey(profile)}.yaml`);
   appendFileSync2(file, (0, import_yaml7.stringify)([{ id, hours, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), catalog_version: profile.catalog_version }]));
   return file;
 }
 function calibrate(catalog, env = process.env, minSamples = 3) {
-  const dir = join14(configDir(env), "actuals");
-  if (!existsSync13(dir)) return [];
+  const dir = join15(configDir(env), "actuals");
+  if (!existsSync14(dir)) return [];
   const byId = /* @__PURE__ */ new Map();
-  for (const f of readdirSync5(dir).filter((f2) => f2.endsWith(".yaml"))) {
-    for (const row of (0, import_yaml7.parse)(readFileSync12(join14(dir, f), "utf8")) ?? []) {
+  for (const f of readdirSync6(dir).filter((f2) => f2.endsWith(".yaml"))) {
+    for (const row of (0, import_yaml7.parse)(readFileSync13(join15(dir, f), "utf8")) ?? []) {
       byId.set(row.id, [...byId.get(row.id) ?? [], row.hours]);
     }
   }
@@ -9973,8 +10128,8 @@ function parseArgs(argv) {
   return out;
 }
 function readInput(source) {
-  if (source === void 0 || source === true || source === "-") return readFileSync13(0, "utf8");
-  return readFileSync13(source, "utf8");
+  if (source === void 0 || source === true || source === "-") return readFileSync14(0, "utf8");
+  return readFileSync14(source, "utf8");
 }
 function proposedProfile(args, catalog) {
   const raw = (0, import_yaml8.parse)(readInput(args.flags.from)) ?? {};
@@ -10019,14 +10174,14 @@ function regenerate(root, profile, catalog) {
 }
 function currentBranch(root) {
   try {
-    return execSync4("git rev-parse --abbrev-ref HEAD", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    return execSync6("git rev-parse --abbrev-ref HEAD", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
   } catch {
     return void 0;
   }
 }
 function hookInput() {
   try {
-    return JSON.parse(readFileSync13(0, "utf8") || "{}");
+    return JSON.parse(readFileSync14(0, "utf8") || "{}");
   } catch {
     return {};
   }
@@ -10053,13 +10208,13 @@ function closePassingPhases(root, catalog) {
   return closed;
 }
 function installResponsiveTest(root, catalog) {
-  const target = join15(root, "tests", "responsive.spec.ts");
-  if (existsSync14(target)) return void 0;
-  mkdirSync8(dirname3(target), { recursive: true });
-  writeFileSync10(target, readFileSync13(join15(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
-  const pkgFile = join15(root, "package.json");
-  if (existsSync14(pkgFile)) {
-    const text = readFileSync13(pkgFile, "utf8");
+  const target = join16(root, "tests", "responsive.spec.ts");
+  if (existsSync15(target)) return void 0;
+  mkdirSync9(dirname3(target), { recursive: true });
+  writeFileSync10(target, readFileSync14(join16(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
+  const pkgFile = join16(root, "package.json");
+  if (existsSync15(pkgFile)) {
+    const text = readFileSync14(pkgFile, "utf8");
     const pkg = JSON.parse(text);
     if (!pkg.scripts?.["test:responsive"]) {
       pkg.scripts = { ...pkg.scripts, "test:responsive": "playwright test tests/responsive.spec.ts" };
@@ -10095,6 +10250,8 @@ function runHook(event, root, catalog) {
     }
     case "pre-bash": {
       const command = String(input.tool_input?.command ?? "");
+      const guarded = guardCommand(command);
+      if (guarded) return json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: guarded } });
       if (!mayDeploy(command)) return;
       if (prToMain(command)) {
         const review = prReviewGate(cwd);
@@ -10107,6 +10264,11 @@ function runHook(event, root, catalog) {
       if (result.block) {
         json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: result.message } });
       }
+      return;
+    }
+    case "pre-edit": {
+      const guarded = guardFile(String(input.tool_input?.file_path ?? input.tool_input?.notebook_path ?? ""));
+      if (guarded) json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: guarded } });
       return;
     }
     case "post-edit": {
@@ -10143,11 +10305,11 @@ function main() {
       saveProfile(root, profile);
       regenerate(root, profile, catalog);
       const adrs = writeStackAdrs(root, profile, catalog);
-      const linked = linkClaudeMd(root, readFileSync13(join15(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
-      const ci = join15(root, ".github", "workflows", "mep.yml");
-      if (!existsSync14(ci)) {
-        mkdirSync8(dirname3(ci), { recursive: true });
-        writeFileSync10(ci, readFileSync13(join15(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
+      const linked = linkClaudeMd(root, readFileSync14(join16(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
+      const ci = join16(root, ".github", "workflows", "mep.yml");
+      if (!existsSync15(ci)) {
+        mkdirSync9(dirname3(ci), { recursive: true });
+        writeFileSync10(ci, readFileSync14(join16(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
       }
       const responsive = installResponsiveTest(root, catalog);
       log(root, "init", `${profile.type} (${profile.capabilities.join(",")})`);
@@ -10218,9 +10380,21 @@ ${signals.map((s) => `  - ${s.signal} (${s.evidence})`).join("\n")}`);
       if (!hasProfile(root)) return print("mep: sin .mep/profile.yaml, nada que verificar.");
       const kind = args.flags.prod ? "prod" : "stop";
       const result = args.flags["no-cache"] ? gate(root, catalog, kind) : cachedGate(root, catalog, kind);
-      print(result.message || "\u2705 mep: sin \u{1F534} pendientes que bloqueen.");
-      process.exitCode = result.block ? 1 : 0;
+      const review = args.flags.pr ? prReviewGate(root) : { block: false, message: "" };
+      print([result.message, review.message].filter(Boolean).join("\n") || "\u2705 mep: sin \u{1F534} pendientes que bloqueen.");
+      process.exitCode = result.block || review.block ? 1 : 0;
       return;
+    }
+    case "changes": {
+      return print(stateChanges(root, String(args.flags.base ?? "origin/main")));
+    }
+    case "resync": {
+      requireProfile(root, catalog);
+      if (checkSeal(root).ok) return print("\u2705 El estado de mep ya est\xE1 sellado; no hay nada que re-sellar.");
+      if (!confirmHuman(args.flags, "resync")) fail(NOT_HUMAN, 3);
+      const by = gitUser(root);
+      resync(root, by);
+      return print(`\u2705 Estado de mep re-sellado por ${by} (registrado en .mep/log; aparece en el resumen del PR).`);
     }
     case "pr-gate": {
       const review = prReviewGate(root);
@@ -10270,12 +10444,14 @@ ${formatItems(pending)}` : `
         if (e.item.locked) fail(`${id} es locked \u{1F512}: no se puede desactivar.`);
         if (e.level !== "required") fail(`/mep:override solo aplica a \u{1F534}. ${id} es ${e.level}${e.level === "recommended" ? ": usa /mep:skip" : ""}.`);
         if (!args.flags.yes) fail(`Desactivar ${id} requiere confirmaci\xF3n expl\xEDcita (--yes).`, 2);
+        if (!confirmHuman(args.flags, id)) fail(NOT_HUMAN, 3);
         profile.selections.overrides = profile.selections.overrides.filter((s) => s.id !== id).concat({ id, reason, date: today() });
       }
       saveProfile(root, profile);
       log(root, cmd, `${id} "${reason}"`);
       regenerate(root, profile, catalog);
-      return print(cmd === "skip" ? `\u23ED\uFE0F ${id} omitido: ${reason}` : `\u26A0\uFE0F ${id} desactivado: ${reason} (registrado en .mep/log)`);
+      return print(cmd === "skip" ? `\u23ED\uFE0F ${id} omitido: ${reason}` : `\u26A0\uFE0F ${id} desactivado: ${reason} (registrado en .mep/log)
+Riesgo aceptado: ${e.item.why}`);
     }
     case "threshold": {
       const [key, valueText, ...reasonParts] = rest;
@@ -10287,6 +10463,7 @@ ${formatItems(pending)}` : `
       const laxer = value > QUALITY_DEFAULTS[key];
       if (laxer && !reason) fail(`Relajar ${key} a ${value} (por defecto ${QUALITY_DEFAULTS[key]}) requiere una raz\xF3n.`);
       if (laxer && !args.flags.yes) fail(`Relajar ${key} requiere confirmaci\xF3n expl\xEDcita (--yes).`, 2);
+      if (laxer && !confirmHuman(args.flags, key)) fail(NOT_HUMAN, 3);
       profile.quality = { ...profile.quality, [key]: value };
       const id = `threshold:${key}`;
       profile.selections.overrides = profile.selections.overrides.filter((o) => o.id !== id);
@@ -10305,19 +10482,22 @@ ${formatItems(pending)}` : `
       }
       profile.selections.optional_added = [.../* @__PURE__ */ new Set([...profile.selections.optional_added, ...rest])].sort();
       saveProfile(root, profile);
+      log(root, "select", rest.join(","));
       regenerate(root, profile, catalog);
       return print(`\u26AA agregados: ${rest.join(", ")}`);
     }
     case "confirm": {
       const [id] = rest;
-      const by = args.flags.by;
-      if (!id || !by) fail("Uso: mep confirm <id> --by <nombre>");
+      if (!id) fail("Uso: mep confirm <id>");
       const profile = requireProfile(root, catalog);
       const e = evaluate(profile, catalog).find((x) => x.item.id === id);
       if (!e?.item.verify.some((v) => v.type === "manual")) fail(`${id} no tiene verificaci\xF3n manual`);
       if (e.item.category === "security") fail(`${id} es de seguridad: lo confirma una auditor\xEDa de mep-security, no una persona.`);
+      if (!confirmHuman(args.flags, id)) fail(NOT_HUMAN, 3);
+      const by = gitUser(root);
       profile.selections.manual_confirmed = profile.selections.manual_confirmed.filter((c) => c.id !== id).concat({ id, by, date: today() });
       saveProfile(root, profile);
+      log(root, "confirm", `${id} ${by}`);
       regenerate(root, profile, catalog);
       return print(`\u2705 ${id} confirmado por ${by}`);
     }
@@ -10325,11 +10505,11 @@ ${formatItems(pending)}` : `
       const profile = requireProfile(root, catalog);
       const ponytail = ponytailInstalled(root);
       if (rest[0] === "record") {
-        const sub2 = String(args.flags.sub ?? profile.phase.active);
+        const sub2 = args.flags.pr ? PR_REVIEW : String(args.flags.sub ?? profile.phase.active);
         const tool = String(args.flags.tool ?? (ponytail ? "ponytail" : "mep"));
         const mustFix = Number(args.flags["must-fix"]);
-        if (!catalog.dimensions.phases.includes(sub2)) fail(`sub-etapa desconocida: ${sub2}`);
-        if (!["ponytail", "mep"].includes(tool) || !Number.isInteger(mustFix) || mustFix < 0) fail('Uso: mep review record --sub <sub-etapa> --tool ponytail|mep --must-fix <n> --notes "..."');
+        if (sub2 !== PR_REVIEW && !catalog.dimensions.phases.includes(sub2)) fail(`sub-etapa desconocida: ${sub2}`);
+        if (!["ponytail", "mep"].includes(tool) || !Number.isInteger(mustFix) || mustFix < 0) fail('Uso: mep review record (--sub <sub-etapa> | --pr) --tool ponytail|mep --must-fix <n> --notes "..."');
         if (ponytail && tool !== "ponytail") fail("Ponytail est\xE1 instalado: la revisi\xF3n se hace con /ponytail-review (--tool ponytail).");
         recordReview(root, { sub: sub2, tool, must_fix: mustFix, notes: String(args.flags.notes ?? "") });
         log(root, "review", `${sub2} ${tool} must_fix=${mustFix}`);
@@ -10346,12 +10526,16 @@ ${state.valid ? "\u2705" : "\u274C"} ${sub} \u2014 ${state.detail}`);
         const id = args.flags.id;
         const result = args.flags.result;
         if (!id || !["pass", "fail", "risk"].includes(result)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."');
-        if (!catalog.items.some((i) => i.id === id && i.category === "security")) fail(`${id} no es un \xEDtem de seguridad`);
-        const files = String(args.flags.files ?? "").split(",").map((f) => f.trim()).filter(Boolean);
-        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync14(join15(root, f)));
+        const item = catalog.items.find((i) => i.id === id && i.category === "security");
+        if (!item) fail(`${id} no es un \xEDtem de seguridad`);
+        const given = String(args.flags.files ?? "").split(",").map((f) => f.trim()).filter(Boolean);
+        const missing = given.filter((f) => !matchFiles(root, f).length && !existsSync15(join16(root, f)));
         if (missing.length) fail(`archivos inexistentes: ${missing.join(", ")}`);
+        const forced = (item.sensitive ?? []).flatMap((g) => catalog.sensitiveGroups[g]).flatMap((p) => matchFiles(root, p));
+        const files = [.../* @__PURE__ */ new Set([...given, ...forced])].sort();
         recordReport(root, { id, result, files, notes: String(args.flags.notes ?? "") });
-        return print(`reporte de ${id}: ${result}`);
+        log(root, "security", `${id} ${result} (${files.length} archivo(s))`);
+        return print(`reporte de ${id}: ${result} \xB7 cubre ${files.length} archivo(s)${forced.length ? ` (${forced.length} por sus grupos sensibles)` : ""}`);
       }
       const profile = loadProfile(root, catalog);
       const ids = evaluate(profile, catalog).filter((e) => e.state === "active" && e.item.category === "security").map((e) => e.item.id);
@@ -10474,10 +10658,10 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
     case "export": {
       const profile = requireProfile(root, catalog);
       const input = args.flags.in;
-      if (!input || !existsSync14(join15(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
+      if (!input || !existsSync15(join16(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
       const format = String(args.flags.format ?? "both");
-      const blocks = parseMarkdown(readFileSync13(join15(root, input), "utf8"));
-      const base = join15(root, dirname3(input), basename(input).replace(/\.md$/, ""));
+      const blocks = parseMarkdown(readFileSync14(join16(root, input), "utf8"));
+      const base = join16(root, dirname3(input), basename(input).replace(/\.md$/, ""));
       const files = [];
       if (format === "docx" || format === "both") {
         writeFileSync10(`${base}.docx`, toDocx(blocks));
@@ -10510,12 +10694,13 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  init --from perfil.yaml [--preset x]                  crea perfil, BRIEF.md, ADRs, CLAUDE.md y CI",
           "  add --from cambio.yaml [--apply]                      diff del checklist",
           "  check [--fast] [--all] [--json]                       verificaci\xF3n por sub-etapa",
-          "  verify [--prod]                                       gate para CI (sale con 1 si bloquea)",
+          "  verify [--prod] [--pr]                                gate para CI (sale con 1 si bloquea; --pr exige la revisi\xF3n de la rama)",
+          "  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)",
           "  phase [close <sub-etapa>]",
-          "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> --by <nombre>",
+          "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> \xB7 resync   (override, confirm y resync: solo el usuario)",
           "  threshold <complexity|max_lines|max_function_lines> <valor> [raz\xF3n --yes]",
           "  security [record --id --result --files --notes]",
-          "  review [<sub-etapa>] \xB7 review record --must-fix <n> [--sub] [--tool ponytail|mep] [--notes]   revisi\xF3n de calidad para cerrar",
+          "  review [<sub-etapa>] \xB7 review record --must-fix <n> [--sub | --pr] [--tool ponytail|mep] [--notes]   revisi\xF3n de calidad (cierre o PR)",
           "  audit [--from scope.yaml]                             evidencia del c\xF3digo / brecha seg\xFAn el scope (no escribe nada)",
           "  explain <id> [--from perfil.yaml]                     por qu\xE9 una regla aplica o no a este scope",
           "  update [--apply]                                      \xEDtems nuevos del cat\xE1logo que aplican",
@@ -10523,10 +10708,15 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  quote [--client] [--save] \xB7 log-time <id> <horas> \xB7 calibrate",
           "  export-data [--lang es] \xB7 export --in <md> [--format docx|pdf|both]",
           "  render \xB7 status \xB7 signals \xB7 presets \xB7 version",
-          "  hook <session-start|stop|pre-bash|post-edit>          hooks cl\xE1sicos (stdin JSON)"
+          "  hook <session-start|stop|pre-bash|pre-edit|post-edit> hooks cl\xE1sicos (stdin JSON)"
         ].join("\n")
       );
       if (cmd) process.exitCode = 1;
   }
 }
-main();
+try {
+  main();
+} catch (e) {
+  if (e instanceof SealBroken) fail(`mep: ${e.message}`);
+  throw e;
+}

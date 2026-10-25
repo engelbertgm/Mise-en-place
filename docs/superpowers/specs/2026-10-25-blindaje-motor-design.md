@@ -108,6 +108,13 @@ Netlify y Vercel quedan como están. Los prefijos `npx`, `pnpm dlx`, `bunx` se c
 - Cada hueco cerrado lleva al menos una prueba que falla si el hueco se reabre: `tests/*.spec.ts` para el motor, `mods/register.test.ts` para el mod.
 - Versión 0.2.0, con entrada en `CHANGELOG.md` y nota de migración (sellado automático de `state`).
 
+## Notas de implementación (0.2.0)
+
+- **Canal humano (C):** resuelto sin verificar el tool Skill. Las skills `override`, `confirm`, `threshold` y `resync` llevan `disable-model-invocation: true`, así que solo el usuario las dispara; el mod las atiende y pasa `--human`. La guardia niega `--human` desde el Bash del agente. Sin mods, el motor pide TTY y teclear el id.
+- **Re-sellado automático en merges: no se implementó.** Al construirlo resultó casi código muerto. Cada cambio de estado agrega líneas al final de `.mep/log`. Si solo una rama tocó el estado, el merge deja el sello válido sin hacer nada. Si las dos lo tocaron, git produce un conflicto en `.mep/log`, y tras resolverlo hace falta `/mep:resync` de todos modos. Esto se revisa si en la práctica molesta.
+- **Restricción de `security record` al agente `mep-security`: no se implementó.** No hay forma confiable de saber desde el hook qué agente llama. El alcance forzado (D) cierra lo principal; queda como techo y a la vista en el resumen del PR (evento `security`).
+- Los hashes de revisiones y reportes normalizan CRLF: una revisión registrada en Windows sigue vigente en el CI de Linux. Las existentes vencen una vez al actualizar.
+
 ## Lo que queda a criterio de quien construya
 
 - Formato exacto de la línea `state` y qué archivos entran al hash (siempre que cubra los listados en A).

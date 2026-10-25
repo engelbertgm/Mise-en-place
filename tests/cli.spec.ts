@@ -4,6 +4,7 @@ import { existsSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
 import { parse } from 'yaml'
+import { seal } from '../engine/src/seal.ts'
 import { CLI, makeRepo, tempDir } from './helpers.ts'
 
 const CONFIG = tempDir('mep-config-')
@@ -70,7 +71,9 @@ describe('skip / override', () => {
     const root = initialized()
     assert.match(mep(root, ['override', 'rls-all-tables', 'x', '--yes']).err, /locked/)
     assert.equal(mep(root, ['override', 'readme', 'el cliente no lo quiere']).code, 2)
-    assert.equal(mep(root, ['override', 'readme', 'el cliente no lo quiere', '--yes']).code, 0)
+    // Without the human channel (the agent's Bash: no --human, no terminal) it is refused.
+    assert.equal(mep(root, ['override', 'readme', 'el cliente no lo quiere', '--yes']).code, 3)
+    assert.equal(mep(root, ['override', 'readme', 'el cliente no lo quiere', '--yes', '--human']).code, 0)
     assert.match(readFileSync(join(root, 'BRIEF.md'), 'utf8'), /⚠️ `readme`/)
     assert.match(readFileSync(join(root, '.mep/log'), 'utf8'), /override readme/)
   })
@@ -144,6 +147,9 @@ describe('classic hooks', () => {
     assert.doesNotMatch(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root })).out, /"decision"/)
     const file = join(root, '.mep/profile.yaml')
     writeFileSync(file, readFileSync(file, 'utf8').replace('closed: []', 'closed: [foundation.setup]'))
+    // Edited outside the CLI: the seal blocks before anything else, until the person re-seals.
+    assert.match(JSON.parse(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root })).out).reason, /fuera de la CLI/)
+    seal(root)
     const out = JSON.parse(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root })).out)
     assert.equal(out.decision, 'block')
     assert.match(out.reason, /mep bloquea cerrar el trabajo: \d+ 🔴/)

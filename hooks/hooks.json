@@ -1,5 +1,5 @@
 {
-  "description": "mep: mods (gate, comandos instantáneos, estado) y hooks clásicos de respaldo. Ninguno actúa sin .mep/profile.yaml.",
+  "description": "mep: mods (gate, guardia del estado, comandos instantáneos, estado) y hooks clásicos de respaldo. Ninguno actúa sin .mep/profile.yaml.",
   "modules": [
     "../mods/register.ts"
   ],
@@ -52,6 +52,58 @@
             "type": "command",
             "if": "Bash(*gh pr*)",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "if": "Bash(*wrangler*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*fly*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*railway*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*firebase*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*supabase*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 600
+          },
+          {
+            "type": "command",
+            "if": "Bash(*mep*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 30
+          },
+          {
+            "type": "command",
+            "if": "Bash(*MEP_*)",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-bash",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs\" hook pre-edit",
             "timeout": 30
           }
         ]

@@ -76,6 +76,8 @@ export type Item = {
   how: string
   verify: Check[]
   references?: string[]
+  /** Groups of catalog/sensitive.yaml a security report must always cover. */
+  sensitive?: string[]
 }
 
 export type StackRule = {
@@ -106,6 +108,7 @@ export type Catalog = {
   items: Item[]
   stackRules: StackRule[]
   presets: Record<string, Partial<Profile>>
+  sensitiveGroups: Record<string, string[]>
   sensitivePaths: string[]
 }
 
