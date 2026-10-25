@@ -47,7 +47,7 @@ mep/
 ├── hooks/
 │   └── hooks.json        # declara el módulo de mods y los hooks de respaldo
 ├── mods/                 # código TypeScript que corre dentro de Claude Code
-│   └── register.ts       # gate + commands + status en un solo módulo (Claude Code sigue `$` solo dentro de un archivo)
+│   └── register.tsx      # gate + commands + status en un solo módulo (Claude Code sigue `$` solo dentro de un archivo)
 ├── engine/               # evaluador determinista en TypeScript/Node, sin LLM; se publica como paquete npm `@engelbertgm/mep`
 │   ├── src/evaluate.ts   # perfil + catálogo → ítems aplicables, diff, stack
 │   ├── src/verify.ts     # ejecuta las verificaciones de cada ítem

@@ -8765,12 +8765,12 @@ function grep(root, check) {
     lines.forEach((line3, i) => {
       if (re.test(line3)) hits.push(`${file}:${i + 1}`);
     });
-    if (hits.length >= 20) break;
+    if (hits.length >= 200) break;
   }
   if ((check.expect ?? "present") === "present") {
     return hits.length ? { ok: true, detail: `encontrado en ${hits[0]}` } : { ok: false, detail: `no se encontr\xF3 /${check.pattern}/ en ${check.glob}` };
   }
-  return hits.length ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(", ")}${hits.length > 5 ? " \u2026" : ""}` } : { ok: true, detail: "sin coincidencias" };
+  return hits.length ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(", ")}${hits.length > 5 ? " \u2026" : ""}`, all: hits } : { ok: true, detail: "sin coincidencias" };
 }
 function runCheck(root, check, profile, itemId, mode) {
   switch (check.type) {
@@ -8815,7 +8815,7 @@ function runCheck(root, check, profile, itemId, mode) {
       return checkSql(root, check);
     case "maps": {
       const errors = check.rule === "registry" ? checkRegistry(root) : checkCodemap(root);
-      return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : "") } : { ok: true, detail: `${check.rule} al d\xEDa` };
+      return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : ""), all: errors } : { ok: true, detail: `${check.rule} al d\xEDa` };
     }
     case "quality":
       return checkThresholds(root, profile);
@@ -8889,7 +8889,7 @@ function gate(root, catalog, kind, env = process.env) {
   if (block) {
     parts.push(`mep bloquea ${label}: ${blockers.length} \u{1F534} pendiente(s).`);
     if (locked.length) parts.push("\xCDtems locked violados (no aceptan MEP_BYPASS):");
-    parts.push(formatItems(blockers));
+    parts.push(formatItems(blockers, kind === "stop" ? 5 : 15));
   } else if (bypassed) parts.push(`MEP_BYPASS=1: ${blockers.length} \u{1F534} omitidos para ${label} (registrado en .mep/log).`);
   if (info.length) parts.push(`Pendientes de ${profile.phase.active} (a\xFAn no bloquean):
 ${formatItems(info, 5)}`);
@@ -9172,6 +9172,29 @@ function counts(results) {
   return {
     required: pending.filter((r) => r.level === "required").length,
     recommended: pending.filter((r) => r.level === "recommended").length
+  };
+}
+function panelData(results, profile, catalog) {
+  return {
+    phases: catalog.dimensions.phases,
+    active: profile.phase.active,
+    closed: profile.phase.closed,
+    counts: counts(results),
+    items: results.filter((r) => r.state !== "offered").map((r) => ({
+      id: r.item.id,
+      title: r.item.title,
+      level: r.level,
+      phase: r.item.phase,
+      state: r.state,
+      status: r.status,
+      category: r.item.category,
+      locked: Boolean(r.item.locked),
+      manual: r.item.verify.some((c) => c.type === "manual"),
+      why: r.item.why,
+      how: r.item.how,
+      detail: r.state === "active" ? failingDetail(r) : r.reason ?? "",
+      all: r.checks.flatMap((c) => c.result.ok === true ? [] : c.result.all ?? [])
+    }))
   };
 }
 
@@ -10245,7 +10268,6 @@ function runHook(event, root, catalog) {
     case "stop": {
       const result = gate(cwd, catalog, "stop");
       if (result.block && !input.stop_hook_active) json({ decision: "block", reason: result.message });
-      else if (result.message) json({ systemMessage: result.message });
       return;
     }
     case "pre-bash": {
@@ -10364,6 +10386,7 @@ ${impact}`);
       const mode = args.flags.fast ? "fast" : "full";
       const results = verifyItems(root, profile, evaluate(profile, catalog), mode);
       const signals = missingSignals(root, profile, catalog);
+      if (args.flags.json && args.flags.detail) return json(panelData(results, profile, catalog));
       if (args.flags.json) return json({ counts: counts(results), results: results.map((r) => ({ id: r.item.id, level: r.level, state: r.state, status: r.status, phase: r.item.phase })), signals });
       const parts = [formatCheck(results, profile, catalog, { verbose: Boolean(args.flags.all) })];
       const c = counts(results);
@@ -10693,7 +10716,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  evaluate [--from perfil.yaml] [--preset x] [--json]   \xEDtems que aplican",
           "  init --from perfil.yaml [--preset x]                  crea perfil, BRIEF.md, ADRs, CLAUDE.md y CI",
           "  add --from cambio.yaml [--apply]                      diff del checklist",
-          "  check [--fast] [--all] [--json]                       verificaci\xF3n por sub-etapa",
+          "  check [--fast] [--all] [--json [--detail]]            verificaci\xF3n por sub-etapa (--detail: datos del panel)",
           "  verify [--prod] [--pr]                                gate para CI (sale con 1 si bloquea; --pr exige la revisi\xF3n de la rama)",
           "  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)",
           "  phase [close <sub-etapa>]",

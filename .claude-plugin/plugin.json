@@ -15,5 +15,6 @@
     "security",
     "accessibility",
     "brief"
-  ]
+  ],
+  "types": "./types/index.d.ts"
 }

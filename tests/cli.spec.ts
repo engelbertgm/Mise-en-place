@@ -153,8 +153,8 @@ describe('classic hooks', () => {
     const out = JSON.parse(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root })).out)
     assert.equal(out.decision, 'block')
     assert.match(out.reason, /mep bloquea cerrar el trabajo: \d+ 🔴/)
-    const again = JSON.parse(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root, stop_hook_active: true })).out)
-    assert.equal(again.decision, undefined)
+    // The second Stop in a row lets the turn end, and says nothing more (the panel and the status line have it).
+    assert.equal(mep(root, ['hook', 'stop'], JSON.stringify({ cwd: root, stop_hook_active: true })).out, '')
   })
 
   test('pre-bash denies a production deploy with pending required items, ignores other commands', () => {

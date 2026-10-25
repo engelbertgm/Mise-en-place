@@ -98,6 +98,7 @@ Then, in a new or existing project folder:
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` runs the security audit and quality review, then closes it |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |
 | `/mep:override <id> <reason>` | Turns off a 🔴 item; rejects 🔒 items. Only you type it: the agent cannot |
+| `/mep:panel` | Panel beside the chat: pending items by sub-phase; press one to see what it asks, why and everything that fails, and to confirm, skip or turn it off |
 | `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Your actions, never the agent's: confirm a manual item (recorded with your git user), relax a quality threshold, re-seal state changed outside the CLI |
 | `/mep:audit [scope]` | For an existing repo: starts from the project's scope, compares it with what the code shows (code-only vs scope-only), and reports the gap with only the rules that scope activates. Changes nothing until you adopt the brief |
 | `/mep:update` | Brings new catalog items that apply to your profile. Items that land in a closed sub-phase get a grace period |
@@ -215,7 +216,7 @@ Mise-en-place/
 ├── hooks/
 │   └── hooks.json             # mods module + fallback hooks (SessionStart, Stop, PreToolUse, PostToolUse)
 ├── mods/
-│   ├── register.ts            # gate, instant commands and status line, inside Claude Code
+│   ├── register.tsx           # gate, guard, panel, instant commands and status line
 │   └── register.test.ts       # mod tests (claude plugin test .)
 ├── engine/
 │   ├── src/                   # deterministic engine in TypeScript, no LLM
@@ -279,7 +280,7 @@ your-project/
 ## Under the hood
 
 - **Engine** ([`engine/src`](engine/src)): TypeScript, no LLM. Same profile, same items, same result. Bundled to [`engine/dist/mep.mjs`](engine/dist/mep.mjs) with no runtime dependencies, and published as `@engelbertgm/mep` for CI.
-- **Mods** ([`mods/register.ts`](mods/register.ts)): run inside Claude Code. `/mep:check` and `/mep:phase` answer instantly, without a Claude turn; deploys wait for the engine's gate; the status line shows the active sub-phase and pending 🔴/🟡.
+- **Mods** ([`mods/register.tsx`](mods/register.tsx)): run inside Claude Code. `/mep:check` and `/mep:phase` answer instantly, without a Claude turn; deploys wait for the engine's gate; the status line shows the active sub-phase and pending 🔴/🟡.
 - **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse and PostToolUse, as the fallback where mods are not available.
 - **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): installed by `/mep:scope`. Runs gitleaks, `pnpm audit`, the build and `mep verify --prod`.
 - **Maps**: `mep codemap` and `mep registry` generate `CODEMAP.md` and `REGISTRY.md` from the code. "What for" and "Do not use for" are written in each export's doc comment; an export without an entry blocks once its sub-phase is closed.

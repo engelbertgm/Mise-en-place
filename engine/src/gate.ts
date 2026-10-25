@@ -62,7 +62,7 @@ export function gate(root: string, catalog: Catalog, kind: GateKind, env = proce
   if (block) {
     parts.push(`mep bloquea ${label}: ${blockers.length} 🔴 pendiente(s).`)
     if (locked.length) parts.push('Ítems locked violados (no aceptan MEP_BYPASS):')
-    parts.push(formatItems(blockers))
+    parts.push(formatItems(blockers, kind === 'stop' ? 5 : 15))
   } else if (bypassed) parts.push(`MEP_BYPASS=1: ${blockers.length} 🔴 omitidos para ${label} (registrado en .mep/log).`)
   if (info.length) parts.push(`Pendientes de ${profile.phase.active} (aún no bloquean):\n${formatItems(info, 5)}`)
   return { block, blockers, info, bypassed, message: parts.join('\n') }

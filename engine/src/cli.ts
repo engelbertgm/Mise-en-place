@@ -10,7 +10,7 @@ import { matchFiles } from './files.ts'
 import { cachedGate, closePhase, formatItems, gate, prReviewGate } from './gate.ts'
 import { hasProfile, loadProfile, log, normalizeProfile, saveProfile, today } from './profile.ts'
 import { linkClaudeMd, renderBrief, writeBrief, writeStackAdrs } from './render.ts'
-import { counts, formatCheck, formatProposal } from './report.ts'
+import { counts, formatCheck, formatProposal, panelData } from './report.ts'
 import { PR_REVIEW, ponytailInstalled, recordReview, reviewState } from './review.ts'
 import type { ReviewTool } from './review.ts'
 import { recordReport, reportState } from './security.ts'
@@ -187,9 +187,9 @@ function runHook(event: string, root: string, catalog: Catalog): void {
       return
     }
     case 'stop': {
+      // Silent unless something blocks: pending items of the active sub-phase live in the status line and the panel.
       const result = gate(cwd, catalog, 'stop')
       if (result.block && !input.stop_hook_active) json({ decision: 'block', reason: result.message })
-      else if (result.message) json({ systemMessage: result.message })
       return
     }
     case 'pre-bash': {
@@ -309,6 +309,7 @@ function main(): void {
       const mode = args.flags.fast ? 'fast' : 'full'
       const results = verifyItems(root, profile, evaluate(profile, catalog), mode)
       const signals = missingSignals(root, profile, catalog)
+      if (args.flags.json && args.flags.detail) return json(panelData(results, profile, catalog))
       if (args.flags.json) return json({ counts: counts(results), results: results.map(r => ({ id: r.item.id, level: r.level, state: r.state, status: r.status, phase: r.item.phase })), signals })
       const parts = [formatCheck(results, profile, catalog, { verbose: Boolean(args.flags.all) })]
       const c = counts(results)
@@ -629,7 +630,7 @@ function main(): void {
           '  evaluate [--from perfil.yaml] [--preset x] [--json]   ítems que aplican',
           '  init --from perfil.yaml [--preset x]                  crea perfil, BRIEF.md, ADRs, CLAUDE.md y CI',
           '  add --from cambio.yaml [--apply]                      diff del checklist',
-          '  check [--fast] [--all] [--json]                       verificación por sub-etapa',
+          '  check [--fast] [--all] [--json [--detail]]            verificación por sub-etapa (--detail: datos del panel)',
           '  verify [--prod] [--pr]                                gate para CI (sale con 1 si bloquea; --pr exige la revisión de la rama)',
           '  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)',
           '  phase [close <sub-etapa>]',

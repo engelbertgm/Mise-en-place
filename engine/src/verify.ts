@@ -28,13 +28,13 @@ function grep(root: string, check: Extract<Check, { type: 'grep' }>): CheckResul
     lines.forEach((line, i) => {
       if (re.test(line)) hits.push(`${file}:${i + 1}`)
     })
-    if (hits.length >= 20) break
+    if (hits.length >= 200) break
   }
   if ((check.expect ?? 'present') === 'present') {
     return hits.length ? { ok: true, detail: `encontrado en ${hits[0]}` } : { ok: false, detail: `no se encontró /${check.pattern}/ en ${check.glob}` }
   }
   return hits.length
-    ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(', ')}${hits.length > 5 ? ' …' : ''}` }
+    ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(', ')}${hits.length > 5 ? ' …' : ''}`, all: hits }
     : { ok: true, detail: 'sin coincidencias' }
 }
 
@@ -81,7 +81,7 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkSql(root, check)
     case 'maps': {
       const errors = check.rule === 'registry' ? checkRegistry(root) : checkCodemap(root)
-      return errors.length ? { ok: false, detail: errors.slice(0, 5).join('; ') + (errors.length > 5 ? ` (+${errors.length - 5})` : '') } : { ok: true, detail: `${check.rule} al día` }
+      return errors.length ? { ok: false, detail: errors.slice(0, 5).join('; ') + (errors.length > 5 ? ` (+${errors.length - 5})` : ''), all: errors } : { ok: true, detail: `${check.rule} al día` }
     }
     case 'quality':
       return checkThresholds(root, profile)

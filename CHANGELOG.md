@@ -16,6 +16,14 @@ Hardening: mep's blocks now hold against the agent's own shortcuts. Nothing on t
 - Review and report hashes normalize line endings (CRLF), so a review recorded on Windows stays valid in CI. Existing reviews and reports expire once after the upgrade.
 - Build: the bundle banner works on Windows (the hashbang lives in `cli.ts`).
 
+Quiet chat, full panel:
+
+- **The chat only hears from mep when something blocks.** The Stop hook no longer lists the active sub-phase's pending items after every message; a block lists at most five. Pending counts stay in the status line.
+- **New panel** beside the chat (`/mep:panel`; opens by itself where the terminal is wide enough): pending items by sub-phase (the active one and regressions open, later ones folded to a count). A press on an item shows what it asks, why, how to meet it and every finding, not the first five. From there the person confirms a manual item, skips a 🟡 with a reason, or turns off a 🔴 with a reason and a second press. "Verificar todo" runs the command and build checks the per-turn quick check leaves as ❔.
+- New `mep check --json --detail` (the panel's data). Check results carry `all`, the full list behind a shortened detail.
+- Human commands answer only when the engine stamps the person's own gesture (`origin.kind` `composer` or `bridge`).
+- The mod is `mods/register.tsx` (JSX), with its state contract in `types/index.d.ts`.
+
 Migration: update `.github/workflows/mep.yml` from `templates/ci/mep.yml` (0.2.0, `--pr`, summary step). Before a PR into main, record the branch review with `mep review record --pr`.
 
 ## 0.1.6

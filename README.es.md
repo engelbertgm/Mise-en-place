@@ -98,6 +98,7 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
 | `/mep:override <id> <razón>` | Desactiva un ítem 🔴; rechaza ítems 🔒. Solo lo escribes tú: el agente no puede |
+| `/mep:panel` | Panel junto al chat: pendientes por sub-etapa; un clic en uno muestra qué pide, por qué y todo lo que falla, y permite confirmarlo, omitirlo o desactivarlo |
 | `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Acciones tuyas, nunca del agente: confirmar un ítem manual (con tu usuario de git), relajar un umbral de calidad, re-sellar el estado cambiado fuera de la CLI |
 | `/mep:audit [scope]` | Para un repo existente: parte del scope del proyecto, lo contrasta con lo que muestra el código (lo que sobra y lo que falta) y reporta la brecha solo con las reglas que ese scope activa. No cambia nada hasta que adoptes el brief |
 | `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil. Los que caen en una sub-etapa cerrada tienen periodo de gracia |
@@ -215,7 +216,7 @@ Mise-en-place/
 ├── hooks/
 │   └── hooks.json             # módulo de mods + hooks de respaldo (SessionStart, Stop, PreToolUse, PostToolUse)
 ├── mods/
-│   ├── register.ts            # gate, comandos instantáneos y línea de estado, dentro de Claude Code
+│   ├── register.tsx           # gate, guardia, panel, comandos instantáneos y línea de estado
 │   └── register.test.ts       # tests de los mods (claude plugin test .)
 ├── engine/
 │   ├── src/                   # motor determinista en TypeScript, sin LLM
@@ -279,7 +280,7 @@ tu-proyecto/
 ## Por dentro
 
 - **Motor** ([`engine/src`](engine/src)): TypeScript, sin LLM. Mismo perfil, mismos ítems, mismo resultado. Se empaqueta en [`engine/dist/mep.mjs`](engine/dist/mep.mjs) sin dependencias en tiempo de ejecución y se publica como `@engelbertgm/mep` para el CI.
-- **Mods** ([`mods/register.ts`](mods/register.ts)): corren dentro de Claude Code. `/mep:check` y `/mep:phase` responden al instante, sin turno de Claude; los deploys esperan al gate del motor; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes.
+- **Mods** ([`mods/register.tsx`](mods/register.tsx)): corren dentro de Claude Code. `/mep:check` y `/mep:phase` responden al instante, sin turno de Claude; los deploys esperan al gate del motor; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes.
 - **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse y PostToolUse, como respaldo donde no hay mods.
 - **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod`.
 - **Mapas**: `mep codemap` y `mep registry` generan `CODEMAP.md` y `REGISTRY.md` desde el código. "Para qué" y "No usar para" se escriben en el comentario de cada export; un export sin entrada bloquea cuando su sub-etapa está cerrada.

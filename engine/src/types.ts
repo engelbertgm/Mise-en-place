@@ -151,7 +151,8 @@ export type Evaluated = {
   reason?: string
 }
 
-export type CheckResult = { ok: boolean | null; detail: string; violation?: boolean }
+/** `all`: every finding when `detail` names only the first few (the panel shows the whole list). */
+export type CheckResult = { ok: boolean | null; detail: string; violation?: boolean; all?: string[] }
 
 export type ItemStatus = 'pass' | 'fail' | 'unknown'
 

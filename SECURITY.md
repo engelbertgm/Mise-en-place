@@ -12,7 +12,7 @@ Include what you found, how to reproduce it and the impact. You will get an ackn
 
 ## Scope
 
-mep runs code on your machine and in CI: the engine (`engine/dist/mep.mjs`), the mods (`mods/register.ts`) and the hooks. Relevant reports include:
+mep runs code on your machine and in CI: the engine (`engine/dist/mep.mjs`), the mods (`mods/register.tsx`) and the hooks. Relevant reports include:
 
 - A way to bypass a block: deploying to production or ending a turn with pending 🔴 items without `MEP_BYPASS`, or bypassing a 🔒 locked item at all.
 - The engine running unexpected commands, or `command` checks running from anywhere but the project's own catalog.

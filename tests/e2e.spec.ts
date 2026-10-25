@@ -62,8 +62,9 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
 
   test('3. nothing blocks Stop while foundation.setup is the active sub-phase', () => {
     const out = hook('stop')
+    // Nothing blocks, so the chat hears nothing: pending items live in the status line and the panel.
     assert.equal(out.decision, undefined)
-    assert.match(out.systemMessage ?? '', /Pendientes de foundation\.setup/)
+    assert.equal(out.systemMessage, undefined)
   })
 
   test('4. closing foundation.setup needs the mep-security audit and the manual confirmations', () => {

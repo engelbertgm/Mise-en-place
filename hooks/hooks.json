@@ -1,7 +1,7 @@
 {
   "description": "mep: mods (gate, guardia del estado, comandos instantáneos, estado) y hooks clásicos de respaldo. Ninguno actúa sin .mep/profile.yaml.",
   "modules": [
-    "../mods/register.ts"
+    "../mods/register.tsx"
   ],
   "hooks": {
     "SessionStart": [
