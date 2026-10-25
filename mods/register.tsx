@@ -57,6 +57,14 @@ async function act($: EngineInterface, args: string[]) {
 
 const isPending = (i: PanelItem) => i.state === 'active' && i.status !== 'pass' && i.level !== 'optional'
 
+/** Turning off a 🔴 asks in a dialog of its own: it takes the keys, starts on Cancelar, and Esc cancels. */
+const DIALOG = 'mep-override'
+
+async function askOverride($: EngineInterface, id: string, reason: string) {
+  await update($, pending, () => ({ id, reason }))
+  await $.ui.open({ id: DIALOG, title: 'Desactivar un 🔴', focus: true, closeOnEscape: true, holdToasts: true, rows: 14 })
+}
+
 export const register: Register = on => {
   // ── gate: deploys wait for the engine's gate; mep's state and secrets stay out of the agent's reach ──
   on('tool.call', { tool: 'Bash' }, async ($, e, next) => {
@@ -145,6 +153,47 @@ export const register: Register = on => {
     return result
   })
 
+  on('ui.render', { component: 'Pane', requestId: DIALOG }, async ($, e) => {
+    const { Box, Text, Button } = $.ui.resolve(e)
+    const ask = await read($, pending)
+    const item = ask ? (await read($, panel))?.items.find(i => i.id === ask.id) : undefined
+    if (!ask || !item) return <Text dimColor>Nada que confirmar.</Text>
+    return (
+      <Box flexDirection="column">
+        <Text bold>¿Desactivar {item.id}?</Text>
+        <Text>{item.title}</Text>
+        <Text> </Text>
+        <Text bold>Riesgo que aceptas</Text>
+        <Text>{item.why}</Text>
+        <Text bold>Tu razón</Text>
+        <Text>{ask.reason}</Text>
+        <Text dimColor>Queda en .mep/log, marcado ⚠️ en BRIEF.md y en el resumen del PR.</Text>
+        <Text> </Text>
+        <Box flexDirection="row" gap={2}>
+          <Button key="cancel" role="dismiss" autoFocus onPress={() => $.ui.close({ id: DIALOG })}>
+            Cancelar
+          </Button>
+          <Button
+            key="override"
+            variant="primary"
+            onPress={async () => {
+              await act($, ['override', item.id, ...ask.reason.split(/\s+/), '--yes'])
+              await $.ui.close({ id: DIALOG })
+            }}
+          >
+            Desactivar
+          </Button>
+        </Box>
+      </Box>
+    )
+  })
+
+  // Esc, Cancelar or the close mark: nothing is turned off.
+  on('ui.close', async ($, e, next) => {
+    if (e.id === DIALOG) await update($, pending, () => null)
+    return next(e)
+  })
+
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const els = $.ui.resolve(e)
     const { Box, Text, Button } = els
@@ -195,19 +244,9 @@ export const register: Register = on => {
             <Input key={`skip-${item.id}`} label="Omitir, razón:" submitLabel="omitir" onSubmit={v => (v.trim() ? act($, ['skip', item.id, ...v.trim().split(/\s+/)]) : undefined)} />
           )}
           {Input && item.level === 'required' && item.state === 'active' && !item.locked && !confirming && (
-            <Input key={`override-${item.id}`} label="Desactivar, razón:" submitLabel="siguiente" onSubmit={v => (v.trim() ? update($, pending, () => ({ id: item.id, reason: v.trim() })) : undefined)} />
+            <Input key={`override-${item.id}`} label="Desactivar, razón:" submitLabel="siguiente" onSubmit={v => (v.trim() ? askOverride($, item.id, v.trim()) : undefined)} />
           )}
-          {confirming && confirming.id === item.id && (
-            <Box flexDirection="column">
-              <Text>¿Desactivar {item.id}? Riesgo aceptado: {item.why}</Text>
-              <Button key="override" variant="primary" onPress={() => act($, ['override', item.id, ...confirming.reason.split(/\s+/), '--yes'])}>
-                Desactivar
-              </Button>
-              <Button key="cancel" onPress={() => update($, pending, () => null)}>
-                Cancelar
-              </Button>
-            </Box>
-          )}
+          {confirming && confirming.id === item.id && <Text dimColor>Confirma o cancela en el diálogo.</Text>}
         </Box>
       )
     }
@@ -239,10 +278,17 @@ export const register: Register = on => {
               </Button>
               {shown &&
                 items.map(i => (
-                  <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
-                    {`  ${LEVEL[i.level]} ${i.id} `}
-                    <Text dimColor>{STATUS[i.status]}</Text>
-                  </Button>
+                  // A keyed row is a hover scope: its card shows the why without opening the item.
+                  <Box key={`row-${i.id}`} flexDirection="column">
+                    <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
+                      {`  ${LEVEL[i.level]} ${i.id} `}
+                      <Text dimColor>{STATUS[i.status]}</Text>
+                    </Button>
+                    <Box position="absolute" top={1} left={4} display="none" hover={{ display: 'flex' }} borderStyle="round" backgroundColor="background" paddingX={1} flexDirection="column">
+                      <Text>{i.why}</Text>
+                      <Text dimColor>clic para ver el detalle</Text>
+                    </Box>
+                  </Box>
                 ))}
             </Box>
           )

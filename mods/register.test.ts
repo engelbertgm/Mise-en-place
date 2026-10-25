@@ -1,4 +1,5 @@
 import type { CommandRunInput, On } from 'claude-code'
+import type { TestBody } from 'claude-code/testing'
 import { describe, expect, test } from 'claude-code/testing'
 
 
@@ -129,9 +130,12 @@ describe('commands', () => {
 const PANE = { plugin: 'mep', component: 'Pane', requestId: 'mep', props: { title: 'mep', isFocused: true, bodyColumns: 50, placement: 'dock', scroll: { offset: 0, bodyRows: 40 }, view: {} } } as const
 
 describe('panel', () => {
-  async function opened($: Parameters<Parameters<typeof test>[1]>[0], on: On) {
+  const opens: string[] = []
+  const closes: string[] = []
+  async function opened($: Parameters<TestBody>[0], on: On) {
     const calls = repo(on)
-    on('ui.open', () => ({ value: { isPlaced: true } }))
+    on('ui.open', (_, e) => (opens.push(e.id), { value: { isPlaced: true } }))
+    on('ui.close', (_, e) => (closes.push(e.id), { value: undefined }))
     on('session.start', (_, e) => ({ cwd: e.cwd }))
     await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
     return calls
@@ -160,15 +164,39 @@ describe('panel', () => {
     await ui.unmount()
   })
 
-  test('turning off a 🔴 takes a reason and a second press', async ($, on) => {
+  test('turning off a 🔴 takes a reason, then a dialog that shows the risk and starts on Cancelar', async ($, on) => {
     const calls = await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
     await ui.press({ key: 'code-maps' })
-    await ui.input({ key: 'override-code-maps', text: 'proyecto legado', submit: true })
+    await ui.input({ key: 'override-code-maps', text: 'proyecto legado', kind: 'submit' })
     expect(calls.some(a => a.includes('override'))).toBe(false)
-    expect((await ui.find({ type: 'Text', text: /¿Desactivar code-maps\?/ }))?.text).toMatch(/¿Desactivar code-maps\?/)
-    await ui.press({ key: 'override' })
+    expect(opens).toContain('mep-override')
+    const dialog = await $.ui.mount({ ...PANE, requestId: 'mep-override', surface: 'terminal' })
+    expect((await dialog.find({ type: 'Text', text: /¿Desactivar code-maps\?/ }))?.text).toMatch(/¿Desactivar code-maps\?/)
+    expect((await dialog.find({ type: 'Text', text: /Saber dónde está cada cosa/ }))?.text).toMatch(/Saber dónde/)
+    await dialog.press({ key: 'override' })
     expect(calls.some(a => a.includes('override') && a.includes('legado') && a.includes('--yes') && a.includes('--human'))).toBe(true)
+    expect(closes).toContain('mep-override')
+    await dialog.unmount()
+    await ui.unmount()
+  })
+
+  test('Cancelar in the dialog turns nothing off', async ($, on) => {
+    const calls = await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await ui.press({ key: 'code-maps' })
+    await ui.input({ key: 'override-code-maps', text: 'x', kind: 'submit' })
+    const dialog = await $.ui.mount({ ...PANE, requestId: 'mep-override', surface: 'terminal' })
+    await dialog.press({ key: 'cancel' })
+    expect(calls.some(a => a.includes('override'))).toBe(false)
+    await dialog.unmount()
+    await ui.unmount()
+  })
+
+  test('each row carries a hover card with its why', async ($, on) => {
+    await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
+    expect((await ui.find({ type: 'Text', text: /Nadie empuja a main/ }))?.text).toMatch(/Nadie empuja a main/)
     await ui.unmount()
   })
 })
