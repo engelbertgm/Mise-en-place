@@ -21,6 +21,10 @@ Solo valores de `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml`:
 
 Presets de partida: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace` (`catalog/presets/`). Si el usuario no elige, sugiere el más cercano.
 
+## Las reglas se activan por el scope
+
+Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o no según el scope del proyecto, nunca por defecto. Una landing sin cuentas no recibe reglas de RLS; un sitio sin cookies no recibe banner. `explain <id>` muestra la condición con ✓/✗ y por qué una regla aplica o no. En un repo existente, el scope lo da el usuario y el código es solo evidencia (`/mep:audit`).
+
 ## Cómo interpretar un scope
 
 1. Elige `type` y preset por lo que el producto *es*, no por cómo se construye.

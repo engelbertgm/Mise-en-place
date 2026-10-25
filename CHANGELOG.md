@@ -2,6 +2,12 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.1.4
+
+- `/mep:audit` is scope-driven: it asks for (or reads) the project's scope first, uses the code only as evidence, and reports where they disagree — in the code but not in the scope, and in the scope but not yet in the code.
+- The gap report counts how many rules the scope activates (🔴 / 🟡 / ⚪) and how many do not apply.
+- New `mep explain <id>`: the rule's condition with ✓/✗ per part, its level and why.
+
 ## 0.1.3
 
 - Catalog 2026.10.6: things to avoid are now checked — empty view-source / Vite + React SPA without SSR, missing structured data, no llms.txt, robots.txt blocking AI crawlers, public source maps, console errors, oversized JS bundles.

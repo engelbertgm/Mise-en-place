@@ -359,11 +359,12 @@ Desactiva un 🔴 con confirmación explícita. Rechaza ítems `locked`.
 Sin argumentos: muestra en qué sub-etapa está el proyecto y qué falta para cerrarla. Con `close`: cierra la sub-etapa si sus 🔴 están cumplidos.
 
 ### `/mep:audit`
-Para repos que ya existen:
-1. Infiere el perfil desde el código (framework, dependencias, rutas, DB, auth, pagos).
-2. Propone el perfil para que el usuario lo confirme o corrija.
-3. Corre todas las verificaciones y genera un reporte de brecha, ordenado por sub-etapa y nivel.
-4. No bloquea nada hasta que el usuario adopte el brief.
+Para repos que ya existen. El scope decide qué reglas aplican; el código es evidencia:
+1. Obtiene el scope del usuario (o de README/BRIEF, confirmado con él). Sin scope no hay audit.
+2. Infiere desde el código lo que muestra (framework, dependencias, rutas, DB, auth, pagos) como evidencia.
+3. Arma el perfil desde el scope y pregunta donde scope y código no coinciden (lo que sobra en el código, lo que el scope pide y aún no existe).
+4. Reporta cuántas reglas activa ese scope y cuántas no, las diferencias scope vs código y la brecha por sub-etapa y nivel. `mep explain <id>` dice por qué una regla aplica o no.
+5. No bloquea nada hasta que el usuario adopte el brief.
 
 ### `/mep:update`
 Cuando la lista maestra crece:

@@ -6,7 +6,7 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.3-informational.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.1.4-informational.svg)](.claude-plugin/plugin.json)
 [![Catalog](https://img.shields.io/badge/catalog-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -98,7 +98,7 @@ Then, in a new or existing project folder:
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` runs the security audit and quality review, then closes it |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |
 | `/mep:override <id> <reason>` | Turns off a 🔴 item after confirmation; rejects 🔒 items |
-| `/mep:audit` | For an existing repo: infers the profile from the code, confirms it with you and reports the gap by sub-phase. Changes nothing until you adopt the brief |
+| `/mep:audit [scope]` | For an existing repo: starts from the project's scope, compares it with what the code shows (code-only vs scope-only), and reports the gap with only the rules that scope activates. Changes nothing until you adopt the brief |
 | `/mep:update` | Brings new catalog items that apply to your profile. Items that land in a closed sub-phase get a grace period |
 | `/mep:quote [--client]` | Quote from the brief. Internal view (hours, rate, margins) or client view (price and estimated weeks per phase, extras, recurring costs, maintenance plans) |
 | `/mep:export [--lang es]` | Client brief as .docx and .pdf, in the client's language, versioned, with what changed since the last version |
@@ -109,6 +109,8 @@ Code quality thresholds (complexity 10, 300 lines per file, 50 per function) liv
 The quote runs by itself only when the scope is defined (`/mep:scope`) or changes (`/mep:add`, which shows the impact in hours and price before you accept). Rates, real hours and internal quotes live in `~/.config/mep-check/`, never in the repo.
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
+
+Every rule is activated by the project's scope (type, capabilities, markets, audience, context, signals), never by default: a landing without accounts gets no RLS rules, a site without cookies gets no consent banner. `mep explain <id>` shows the rule's condition with ✓/✗ and why it applies or not.
 
 <details>
 <summary><b>Project profile</b> (<code>.mep/profile.yaml</code>, the source of truth)</summary>

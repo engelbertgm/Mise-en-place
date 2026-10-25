@@ -12,6 +12,7 @@ import { evaluate, stack } from '../engine/src/evaluate.ts'
 import { inferProfile } from '../engine/src/audit.ts'
 import { checkBuild, checkRobots } from '../engine/src/build.ts'
 import { checkHtml } from '../engine/src/html.ts'
+import { applicability, explainItem } from '../engine/src/explain.ts'
 import { marketLocales } from '../engine/src/profile.ts'
 import { checkThresholds } from '../engine/src/quality.ts'
 import { formatClient, quote } from '../engine/src/quote.ts'
@@ -252,5 +253,40 @@ describe('10. things to avoid: empty source, SPA without SSR, AI blocked, source
     const internal = new Map(evaluate(profile(real, { type: 'internal-app' }), real).map(e => [e.item.id, e.level]))
     assert.equal(internal.has('llms-txt'), false)
     assert.equal(internal.has('server-rendered-content'), false)
+  })
+})
+
+describe('11. the scope decides what applies; the code is evidence', () => {
+  test('explain shows each part of the condition and the level change', () => {
+    const p = profile(real, { type: 'saas', capabilities: ['auth'], markets: ['MX'] })
+    const rls = explainItem(real.items.find(i => i.id === 'rls-all-tables')!, p)
+    assert.match(rls, /No aplica a este scope/)
+    assert.match(rls, /✓ has_db = true/)
+    assert.match(rls, /✗ db_client_access = true/)
+    const exp = explainItem(real.items.find(i => i.id === 'data-export')!, profile(real, { type: 'saas', capabilities: ['auth'], markets: ['EU:DE'] }))
+    assert.match(exp, /Aplica a este scope/)
+    assert.match(exp, /Nivel: required \(base recommended, sube por el scope\)/)
+  })
+
+  test('applicability counts what the scope activates, and a landing activates far less than a SaaS', () => {
+    const landing = applicability(profile(real, { type: 'landing' }), real)
+    const saas = applicability(profile(real, { type: 'saas', capabilities: ['auth', 'subscriptions'], markets: ['MX', 'EU:DE'] }), real)
+    assert.equal(landing.applies + landing.notApplying.length, real.items.length)
+    assert.ok(landing.applies < saas.applies)
+    assert.ok(landing.notApplying.includes('rls-all-tables'))
+  })
+
+  test('audit --from compares the scope with the code and reports only what the scope activates', () => {
+    const root = makeRepo({
+      'package.json': '{"dependencies":{"next":"15","stripe":"17"}}',
+      'app/api/checkout/route.ts': 'await stripe.checkout.sessions.create({})',
+      'scope.yaml': 'project: x\ntype: landing\ncapabilities: [newsletter]\n',
+    })
+    const out = spawnSync('node', [CLI, 'audit', '--from', 'scope.yaml'], { cwd: root, encoding: 'utf8', env: { ...process.env, MEP_CONFIG_DIR: tempDir() } }).stdout
+    assert.match(out, /Aplican \d+ de \d+ reglas/)
+    assert.match(out, /En el código pero no en el scope.*capacidad payments/)
+    assert.match(out, /En el scope pero aún no en el código.*capacidad newsletter/)
+    assert.doesNotMatch(out, /webhook-signature/)
+    assert.ok(!existsSync(join(root, '.mep')))
   })
 })

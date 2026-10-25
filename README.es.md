@@ -6,7 +6,7 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.1.3-informational.svg)](.claude-plugin/plugin.json)
+[![Versión](https://img.shields.io/badge/versión-0.1.4-informational.svg)](.claude-plugin/plugin.json)
 [![Catálogo](https://img.shields.io/badge/catálogo-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -98,7 +98,7 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
 | `/mep:override <id> <razón>` | Desactiva un ítem 🔴 tras confirmar; rechaza ítems 🔒 |
-| `/mep:audit` | Para un repo existente: infiere el perfil desde el código, lo confirma contigo y reporta la brecha por sub-etapa. No cambia nada hasta que adoptes el brief |
+| `/mep:audit [scope]` | Para un repo existente: parte del scope del proyecto, lo contrasta con lo que muestra el código (lo que sobra y lo que falta) y reporta la brecha solo con las reglas que ese scope activa. No cambia nada hasta que adoptes el brief |
 | `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil. Los que caen en una sub-etapa cerrada tienen periodo de gracia |
 | `/mep:quote [--client]` | Cotización desde el brief. Vista interna (horas, tarifa, márgenes) o vista cliente (precio y semanas estimadas por fase, extras, costos recurrentes, planes de mantenimiento) |
 | `/mep:export [--lang es]` | Brief para el cliente en .docx y .pdf, en su idioma, con versión y cambios respecto a la anterior |
@@ -109,6 +109,8 @@ Los umbrales de calidad de código (complejidad 10, 300 líneas por archivo, 50 
 La cotización corre sola solo al definir el scope (`/mep:scope`) y cuando cambia (`/mep:add`, que muestra el impacto en horas y precio antes de aceptar). Tarifas, horas reales y cotizaciones internas viven en `~/.config/mep-check/`, nunca en el repo.
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
+
+Cada regla se activa por el scope del proyecto (tipo, capacidades, mercados, audiencia, contexto, señales), nunca por defecto: una landing sin cuentas no recibe reglas de RLS, un sitio sin cookies no recibe banner. `mep explain <id>` muestra la condición de la regla con ✓/✗ y por qué aplica o no.
 
 <details>
 <summary><b>Perfil del proyecto</b> (<code>.mep/profile.yaml</code>, la fuente de verdad)</summary>

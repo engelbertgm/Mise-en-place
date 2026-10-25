@@ -1,6 +1,6 @@
 {
   "name": "@engelbertgm/mep",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "description": "Mise en place: brief, checklist y verificación determinista para websites y webapps.",
   "type": "module",
   "bin": {

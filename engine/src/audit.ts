@@ -80,3 +80,23 @@ export function inferProfile(root: string, catalog: Catalog): Inference {
 export function gapReport(root: string, profile: Profile, catalog: Catalog): ItemResult[] {
   return verifyItems(root, profile, evaluate(profile, catalog), 'full').filter(r => r.state === 'active')
 }
+
+export type ScopeVsCode = {
+  /** In the code but not in the scope: maybe leftovers, maybe a scope that is missing something. */
+  codeOnly: string[]
+  /** In the scope but not yet in the code: work to do, not a mistake. */
+  scopeOnly: string[]
+  typeDiffers?: { scope: string; code: string }
+}
+
+/** The scope decides what applies; the code is evidence. This lists where they disagree. */
+export function compareScopeAndCode(scope: Profile, code: Profile): ScopeVsCode {
+  const flags = (p: Profile) => new Set([...p.capabilities.map(c => `capacidad ${c}`), ...Object.entries(p.signals).filter(([, v]) => v === true).map(([k]) => `señal ${k}`)])
+  const s = flags(scope)
+  const c = flags(code)
+  return {
+    codeOnly: [...c].filter(x => !s.has(x)).sort(),
+    scopeOnly: [...s].filter(x => !c.has(x)).sort(),
+    typeDiffers: scope.type !== code.type ? { scope: scope.type, code: code.type } : undefined,
+  }
+}

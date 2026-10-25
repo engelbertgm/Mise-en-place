@@ -9105,6 +9105,61 @@ function inferProfile(root, catalog) {
 function gapReport(root, profile, catalog) {
   return verifyItems(root, profile, evaluate(profile, catalog), "full").filter((r) => r.state === "active");
 }
+function compareScopeAndCode(scope, code) {
+  const flags = (p) => /* @__PURE__ */ new Set([...p.capabilities.map((c2) => `capacidad ${c2}`), ...Object.entries(p.signals).filter(([, v]) => v === true).map(([k]) => `se\xF1al ${k}`)]);
+  const s = flags(scope);
+  const c = flags(code);
+  return {
+    codeOnly: [...c].filter((x) => !s.has(x)).sort(),
+    scopeOnly: [...s].filter((x) => !c.has(x)).sort(),
+    typeDiffers: scope.type !== code.type ? { scope: scope.type, code: code.type } : void 0
+  };
+}
+
+// engine/src/explain.ts
+var DIM_LABEL = { type: "tipo", capabilities: "capacidades", markets: "mercados", audience: "audiencia", context: "contexto", signals: "se\xF1ales" };
+function matcherText(m) {
+  if (typeof m === "string") return m;
+  if (Array.isArray(m)) return m.join(" y ");
+  return [m.all && `todas de [${m.all.join(", ")}]`, m.any && `alguna de [${m.any.join(", ")}]`, m.none && `ninguna de [${m.none.join(", ")}]`].filter(Boolean).join(", ");
+}
+function leafText(leaf) {
+  return Object.entries(leaf).map(([k, v]) => k === "signals" ? Object.entries(v).map(([s, val]) => `${s} = ${val}`).join(", ") : `${DIM_LABEL[k] ?? k}: ${matcherText(v)}`).join(" \xB7 ");
+}
+function explainCondition(cond, profile, depth = 0) {
+  const pad = "  ".repeat(depth);
+  const mark = matches(cond, profile) ? "\u2713" : "\u2717";
+  if ("all" in cond && Array.isArray(cond.all)) return [`${pad}${mark} todas:`, ...cond.all.flatMap((c) => explainCondition(c, profile, depth + 1))];
+  if ("any" in cond && Array.isArray(cond.any)) return [`${pad}${mark} alguna:`, ...cond.any.flatMap((c) => explainCondition(c, profile, depth + 1))];
+  if ("not" in cond) return [`${pad}${mark} no:`, ...explainCondition(cond.not, profile, depth + 1)];
+  const parts = Object.entries(cond).flatMap(
+    ([k, v]) => k === "signals" ? Object.entries(v).map(([s, val]) => ({ signals: { [s]: val } })) : [{ [k]: v }]
+  );
+  if (parts.length === 1) return [`${pad}${mark} ${leafText(cond)}`];
+  return [`${pad}${mark} todas:`, ...parts.map((p) => `${pad}  ${matches(p, profile) ? "\u2713" : "\u2717"} ${leafText(p)}`)];
+}
+function explainItem(item, profile) {
+  const applies = matches(item.when, profile);
+  const lines = [`${item.id} \u2014 ${item.title}`, "", applies ? "\u2705 Aplica a este scope." : "\u2796 No aplica a este scope."];
+  lines.push(item.when ? "Condici\xF3n:" : "Condici\xF3n: ninguna (aplica a todo proyecto).");
+  if (item.when) lines.push(...explainCondition(item.when, profile, 1));
+  if (applies) {
+    const level = effectiveLevel(item, profile);
+    lines.push("", `Nivel: ${level}${level !== item.level ? ` (base ${item.level}, sube por el scope)` : ""}`);
+    for (const o of item.level_overrides ?? []) lines.push(`  ${matches(o.when, profile) ? "\u2713" : "\u2717"} \u2192 ${o.level} si ${explainCondition(o.when, profile).join(" ").replace(/\s+/g, " ").trim()}`);
+  }
+  lines.push("", `Por qu\xE9: ${item.why}`);
+  return lines.join("\n");
+}
+function applicability(profile, catalog) {
+  const byLevel = { required: 0, recommended: 0, optional: 0 };
+  const notApplying = [];
+  for (const item of catalog.items) {
+    if (matches(item.when, profile)) byLevel[effectiveLevel(item, profile)]++;
+    else notApplying.push(item.id);
+  }
+  return { applies: catalog.items.length - notApplying.length, byLevel, notApplying, total: catalog.items.length };
+}
 
 // engine/src/docs.ts
 import { deflateSync } from "node:zlib";
@@ -10113,25 +10168,46 @@ ${formatItems(pending)}` : `
         const { profile: profile2, evidence } = inferProfile(root, catalog);
         if (args.flags.json) return json({ profile: profile2, evidence });
         const { phase, selections, version, catalog_version, ...shown } = profile2;
-        return print(`${(0, import_yaml7.stringify)(shown, { lineWidth: 0 }).trim()}
+        return print(`Lo que muestra el c\xF3digo (evidencia, no el scope: conf\xEDrmalo contra lo que el proyecto debe ser)
+
+${(0, import_yaml7.stringify)(shown, { lineWidth: 0 }).trim()}
 
 Evidencia:
 ${Object.entries(evidence).map(([k, v]) => `  ${k}: ${v}`).join("\n")}`);
       }
       const profile = proposedProfile(args, catalog);
+      const vs = compareScopeAndCode(profile, inferProfile(root, catalog).profile);
       const results = gapReport(root, profile, catalog);
       const c = counts(results);
-      if (args.flags.json) return json({ counts: c, results: results.map((r) => ({ id: r.item.id, level: r.level, phase: r.item.phase, status: r.status })) });
+      const app = applicability(profile, catalog);
+      if (args.flags.json) return json({ counts: c, applicability: app, scopeVsCode: vs, results: results.map((r) => ({ id: r.item.id, level: r.level, phase: r.item.phase, status: r.status })) });
       const passing = catalog.dimensions.phases.filter((p) => results.every((r) => r.item.phase !== p || r.level !== "required" || r.status === "pass"));
+      const differences = [
+        vs.typeDiffers ? `  tipo: el scope dice ${vs.typeDiffers.scope}, el c\xF3digo parece ${vs.typeDiffers.code}` : "",
+        vs.codeOnly.length ? `  En el c\xF3digo pero no en el scope (\xBFsobrante o falta en el scope?): ${vs.codeOnly.join(", ")}` : "",
+        vs.scopeOnly.length ? `  En el scope pero a\xFAn no en el c\xF3digo (trabajo pendiente): ${vs.scopeOnly.join(", ")}` : ""
+      ].filter(Boolean);
       return print(
         [
-          `Reporte de brecha (nada se bloquea hasta adoptar el brief)`,
+          `Reporte de brecha seg\xFAn el scope (nada se bloquea hasta adoptar el brief)`,
+          `Aplican ${app.applies} de ${app.total} reglas: \u{1F534} ${app.byLevel.required} \xB7 \u{1F7E1} ${app.byLevel.recommended} \xB7 \u26AA ${app.byLevel.optional}. Las otras ${app.notApplying.length} no aplican a este scope (mep explain <id> dice por qu\xE9).`,
+          differences.length ? `
+Scope vs c\xF3digo:
+${differences.join("\n")}` : "\nScope y c\xF3digo coinciden.",
+          "",
           formatCheck(results, profile, catalog),
           `
 Pendientes: \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended}`,
           passing.length ? `Sub-etapas que ya cumplen sus \u{1F534}: ${passing.join(", ")}` : ""
         ].filter(Boolean).join("\n")
       );
+    }
+    case "explain": {
+      const [id] = rest;
+      const item = catalog.items.find((i) => i.id === id);
+      if (!item) fail(`Uso: mep explain <id> [--from perfil.yaml] \u2014 ${id ? `${id} no est\xE1 en el cat\xE1logo` : "falta el id"}`);
+      const profile = args.flags.from ? proposedProfile(args, catalog) : requireProfile(root, catalog);
+      return print(explainItem(item, profile));
     }
     case "update": {
       const profile = requireProfile(root, catalog);
@@ -10245,7 +10321,8 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> --by <nombre>",
           "  threshold <complexity|max_lines|max_function_lines> <valor> [raz\xF3n --yes]",
           "  security [record --id --result --files --notes]",
-          "  audit [--from perfil.yaml]                            infiere el perfil / reporte de brecha (no escribe nada)",
+          "  audit [--from scope.yaml]                             evidencia del c\xF3digo / brecha seg\xFAn el scope (no escribe nada)",
+          "  explain <id> [--from perfil.yaml]                     por qu\xE9 una regla aplica o no a este scope",
           "  update [--apply]                                      \xEDtems nuevos del cat\xE1logo que aplican",
           "  registry [--check] \xB7 codemap [--check]                mapas de referencia",
           "  quote [--client] [--save] \xB7 log-time <id> <horas> \xB7 calibrate",

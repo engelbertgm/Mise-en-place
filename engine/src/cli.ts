@@ -14,7 +14,8 @@ import { recordReport, reportState } from './security.ts'
 import { missingSignals } from './signals.ts'
 import { globToRegExp } from './files.ts'
 import { verifyItems } from './verify.ts'
-import { gapReport, inferProfile } from './audit.ts'
+import { compareScopeAndCode, gapReport, inferProfile } from './audit.ts'
+import { applicability, explainItem } from './explain.ts'
 import { parseMarkdown, toDocx, toPdf } from './docs.ts'
 import { exportData, recordExport } from './export.ts'
 import { checkCodemap, checkRegistry, writeCodemap, writeRegistry } from './maps.ts'
@@ -424,21 +425,32 @@ function main(): void {
       return print(ids.map(id => `${reportState(root, id).valid ? '✅' : '❌'} ${id} — ${reportState(root, id).detail}`).join('\n'))
     }
     case 'audit': {
-      // Step 1: infer the profile. Step 3 (with --from): gap report against the confirmed profile. Writes nothing.
+      // Without --from: what the code shows (evidence, not the scope). With --from: the gap report for the scope. Writes nothing.
       if (!args.flags.from) {
         const { profile, evidence } = inferProfile(root, catalog)
         if (args.flags.json) return json({ profile, evidence })
         const { phase, selections, version, catalog_version, ...shown } = profile
-        return print(`${stringify(shown, { lineWidth: 0 }).trim()}\n\nEvidencia:\n${Object.entries(evidence).map(([k, v]) => `  ${k}: ${v}`).join('\n')}`)
+        return print(`Lo que muestra el código (evidencia, no el scope: confírmalo contra lo que el proyecto debe ser)\n\n${stringify(shown, { lineWidth: 0 }).trim()}\n\nEvidencia:\n${Object.entries(evidence).map(([k, v]) => `  ${k}: ${v}`).join('\n')}`)
       }
+      // The scope (confirmed by the person) decides what applies; the code is evidence to compare against.
       const profile = proposedProfile(args, catalog)
+      const vs = compareScopeAndCode(profile, inferProfile(root, catalog).profile)
       const results = gapReport(root, profile, catalog)
       const c = counts(results)
-      if (args.flags.json) return json({ counts: c, results: results.map(r => ({ id: r.item.id, level: r.level, phase: r.item.phase, status: r.status })) })
+      const app = applicability(profile, catalog)
+      if (args.flags.json) return json({ counts: c, applicability: app, scopeVsCode: vs, results: results.map(r => ({ id: r.item.id, level: r.level, phase: r.item.phase, status: r.status })) })
       const passing = catalog.dimensions.phases.filter(p => results.every(r => r.item.phase !== p || r.level !== 'required' || r.status === 'pass'))
+      const differences = [
+        vs.typeDiffers ? `  tipo: el scope dice ${vs.typeDiffers.scope}, el código parece ${vs.typeDiffers.code}` : '',
+        vs.codeOnly.length ? `  En el código pero no en el scope (¿sobrante o falta en el scope?): ${vs.codeOnly.join(', ')}` : '',
+        vs.scopeOnly.length ? `  En el scope pero aún no en el código (trabajo pendiente): ${vs.scopeOnly.join(', ')}` : '',
+      ].filter(Boolean)
       return print(
         [
-          `Reporte de brecha (nada se bloquea hasta adoptar el brief)`,
+          `Reporte de brecha según el scope (nada se bloquea hasta adoptar el brief)`,
+          `Aplican ${app.applies} de ${app.total} reglas: 🔴 ${app.byLevel.required} · 🟡 ${app.byLevel.recommended} · ⚪ ${app.byLevel.optional}. Las otras ${app.notApplying.length} no aplican a este scope (mep explain <id> dice por qué).`,
+          differences.length ? `\nScope vs código:\n${differences.join('\n')}` : '\nScope y código coinciden.',
+          '',
           formatCheck(results, profile, catalog),
           `\nPendientes: 🔴 ${c.required} · 🟡 ${c.recommended}`,
           passing.length ? `Sub-etapas que ya cumplen sus 🔴: ${passing.join(', ')}` : '',
@@ -446,6 +458,13 @@ function main(): void {
           .filter(Boolean)
           .join('\n'),
       )
+    }
+    case 'explain': {
+      const [id] = rest
+      const item = catalog.items.find(i => i.id === id)
+      if (!item) fail(`Uso: mep explain <id> [--from perfil.yaml] — ${id ? `${id} no está en el catálogo` : 'falta el id'}`)
+      const profile = args.flags.from ? proposedProfile(args, catalog) : requireProfile(root, catalog)
+      return print(explainItem(item, profile))
     }
     case 'update': {
       const profile = requireProfile(root, catalog)
@@ -558,7 +577,8 @@ function main(): void {
           '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> --by <nombre>',
           '  threshold <complexity|max_lines|max_function_lines> <valor> [razón --yes]',
           '  security [record --id --result --files --notes]',
-          '  audit [--from perfil.yaml]                            infiere el perfil / reporte de brecha (no escribe nada)',
+          '  audit [--from scope.yaml]                             evidencia del código / brecha según el scope (no escribe nada)',
+          '  explain <id> [--from perfil.yaml]                     por qué una regla aplica o no a este scope',
           '  update [--apply]                                      ítems nuevos del catálogo que aplican',
           '  registry [--check] · codemap [--check]                mapas de referencia',
           '  quote [--client] [--save] · log-time <id> <horas> · calibrate',
