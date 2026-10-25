@@ -14,16 +14,19 @@
     - { type: manual, prompt: "Cada sección pública abre directo desde su URL" }
 
 - id: server-rendered-content
-  title: Contenido público renderizado en el HTML (SSR/SSG)
+  title: "Contenido público renderizado en el HTML (SSR/SSG): \"ver código fuente\" nunca vacío"
   category: seo
   level: required
   phase: build.features
   since: "2026.10.1"
+  updated: "2026.10.6"
   when: { not: { type: internal-app } }
   effort: { size: M, hours: [3, 8] }
-  why: "Los buscadores y las redes leen el HTML inicial; el contenido que solo pinta JavaScript se indexa tarde o nunca."
-  how: "Páginas públicas como Server Components / SSG; datos del cliente solo en zonas privadas."
+  why: "Buscadores, redes y asistentes de IA leen el HTML inicial; una SPA de Vite + React sin SSR entrega una página vacía que se indexa tarde o nunca."
+  how: "Next.js o Astro con Server Components / SSG; Vite + React solo con SSR/SSG (Vike, React Router framework) o con una razón escrita (/mep:override). Datos del cliente solo en zonas privadas."
   verify:
+    - { type: build, rule: server_rendered }
+    - { type: html, rule: has_text }
     - { type: html, rule: single_h1 }
 
 - id: heading-hierarchy
@@ -160,15 +163,15 @@
     - { type: file_exists, path: ["**/opengraph-image.{tsx,ts,js,jsx}"] }
 
 - id: json-ld-base
-  title: "JSON-LD: Organization + WebSite (y Product / Article / LocalBusiness según tipo)"
+  title: "Datos estructurados JSON-LD: Organization + WebSite (y Product / Article / LocalBusiness según tipo)"
   category: seo
-  level: recommended
+  level: required
   phase: launch.seo
   since: "2026.10.1"
-  level_overrides:
-    - { when: { type: local-business }, level: required }
+  updated: "2026.10.6"
+  when: { not: { type: internal-app } }
   effort: { size: S, hours: [1, 3] }
-  why: "Datos estructurados habilitan resultados enriquecidos (logo, precio, estrellas, horario)."
+  why: "Sin datos estructurados, buscadores y asistentes de IA tienen que adivinar quién eres y qué ofreces; con ellos hay resultados enriquecidos (logo, precio, estrellas, horario)."
   how: "<script type=\"application/ld+json\"> en el layout con Organization y WebSite; el tipo propio en cada plantilla."
   verify:
     - { type: grep, pattern: "application/ld\\+json", glob: "**/*.{tsx,jsx,ts,js,astro,html}" }
@@ -211,3 +214,31 @@
   verify:
     - { type: file_exists, path: ["{app,src/app}/[locale]/**/*", "{app,src/app}/[lang]/**/*", "src/pages/{es,en,fr,pt,de}/**/*"] }
     - { type: grep, pattern: "hreflang|alternates:\\s*\\{[^}]*languages|languages:\\s*\\{", glob: "**/*.{tsx,jsx,ts,js,astro}" }
+
+- id: llms-txt
+  title: "llms.txt con el resumen del sitio para asistentes de IA"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.6"
+  when: { not: { type: internal-app } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Los asistentes de IA leen /llms.txt para entender rápido qué es el sitio y cuáles son sus páginas clave."
+  how: "Archivo /llms.txt en Markdown: nombre, descripción corta y enlaces a las páginas principales (generado desde las mismas rutas del sitemap)."
+  verify:
+    - { type: route_exists, path: /llms.txt }
+  references: ["https://llmstxt.org/"]
+
+- id: robots-allows-ai
+  title: "robots.txt no bloquea buscadores ni asistentes de IA"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.6"
+  depends_on: [robots-txt]
+  when: { not: { type: internal-app } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un Disallow: / para GPTBot, ClaudeBot, PerplexityBot o Google-Extended saca al sitio de las respuestas de IA, que cada vez traen más visitas."
+  how: "Permitir a los crawlers de búsqueda y de IA; si el cliente decide bloquear el entrenamiento, que sea una decisión escrita (/mep:override con razón)."
+  verify:
+    - { type: robots, rule: allows_ai }

@@ -106,6 +106,15 @@ const PAGE_RULES: Record<string, PageRule> = {
     const first = p.html.match(/<body[^>]*>[\s\S]*?<(a|button|input|select|textarea)\b[^>]*>/i)?.[0] ?? ''
     return /<a\b[^>]*href=["']#[\w-]+["'][^>]*>$/i.test(first.slice(first.lastIndexOf('<'))) ? undefined : 'el primer elemento enfocable no es un skip link (<a href="#main">)'
   },
+  has_text: p => {
+    const text = p.html
+      .replace(/<(script|style|noscript|template|svg)[\s\S]*?<\/\1>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/&[a-z#0-9]+;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    return text.length >= 80 ? undefined : `HTML casi vacío (${text.length} caracteres de texto): el contenido lo pinta JavaScript`
+  },
   img_alt: p => {
     const bad = tags(p.html, 'img').filter(t => !/\salt\s*=/.test(t))
     return bad.length ? `${bad.length} <img> sin alt` : undefined

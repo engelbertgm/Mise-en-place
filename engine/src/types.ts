@@ -32,6 +32,8 @@ export type Check =
   | { type: 'maps'; rule: 'registry' | 'codemap' }
   | { type: 'quality'; rule: 'thresholds' }
   | { type: 'design'; rule: 'font_families' | 'font_weights'; max: number }
+  | { type: 'build'; rule: 'max_js_chunk' | 'no_source_maps' | 'server_rendered'; max_kb?: number }
+  | { type: 'robots'; rule: 'allows_ai' }
   | { type: 'manual'; prompt: string }
 
 export type HtmlRule =
@@ -50,6 +52,7 @@ export type HtmlRule =
   | 'input_labels'
   | 'iframe_title'
   | 'skip_link'
+  | 'has_text'
 
 export type Size = 'XS' | 'S' | 'M' | 'L' | 'XL'
 export type ScaleDim = 'pages' | 'entities' | 'languages' | 'markets' | 'integrations'

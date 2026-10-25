@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.10.5, 341 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.10.6, 345 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---

@@ -30,6 +30,10 @@ function describeCheck(c: Check): string {
       return c.rule === 'registry' ? 'REGISTRY.md al día (mep registry --check)' : 'CODEMAP.md al día'
     case 'quality':
       return 'umbrales de complejidad y largo en la config del linter'
+    case 'build':
+      return { max_js_chunk: `JS por archivo ≤ ${c.max_kb ?? 200} KB gzip`, no_source_maps: 'sin source maps públicos', server_rendered: 'HTML renderizado en servidor o build' }[c.rule]
+    case 'robots':
+      return 'robots.txt no bloquea buscadores ni asistentes de IA'
     case 'design':
       return `${c.rule === 'font_families' ? 'familias tipográficas' : 'pesos de texto'} ≤ ${c.max}`
     case 'manual':

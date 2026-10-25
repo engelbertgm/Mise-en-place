@@ -6,8 +6,8 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.2-informational.svg)](.claude-plugin/plugin.json)
-[![Catalog](https://img.shields.io/badge/catalog-2026.10.5-informational.svg)](catalog/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.1.3-informational.svg)](.claude-plugin/plugin.json)
+[![Catalog](https://img.shields.io/badge/catalog-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Works with batuta](https://img.shields.io/badge/works_with-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
@@ -279,7 +279,7 @@ your-project/
 - **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): installed by `/mep:scope`. Runs gitleaks, `pnpm audit`, the build and `mep verify --prod`.
 - **Maps**: `mep codemap` and `mep registry` generate `CODEMAP.md` and `REGISTRY.md` from the code. "What for" and "Do not use for" are written in each export's doc comment; an export without an entry blocks once its sub-phase is closed.
 - **Export**: a small Markdown subset becomes .docx and .pdf with no dependencies, so it works on any machine.
-- **Catalog** ([`catalog/`](catalog)): 341 items across accessibility, design system, UX, content, forms, data, responsive, security, privacy, legal, performance, i18n, code quality, deploy, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source.
+- **Catalog** ([`catalog/`](catalog)): 345 items across accessibility, design system, UX, content, forms, data, responsive, security, privacy, legal, performance, i18n, code quality, deploy, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source.
 
 ### Test project
 

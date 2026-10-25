@@ -7369,8 +7369,8 @@ var require_dist = __commonJS({
 // engine/src/cli.ts
 var import_yaml7 = __toESM(require_dist(), 1);
 import { execSync as execSync3 } from "node:child_process";
-import { existsSync as existsSync11, mkdirSync as mkdirSync7, readFileSync as readFileSync10, writeFileSync as writeFileSync8 } from "node:fs";
-import { basename, dirname as dirname3, join as join12, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync12, mkdirSync as mkdirSync7, readFileSync as readFileSync11, writeFileSync as writeFileSync8 } from "node:fs";
+import { basename, dirname as dirname3, join as join13, resolve as resolve2 } from "node:path";
 
 // engine/src/catalog.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7380,7 +7380,7 @@ import { fileURLToPath } from "node:url";
 var LEVELS = ["required", "recommended", "optional"];
 var SIZES = ["XS", "S", "M", "L", "XL"];
 var SCALES = ["pages", "entities", "languages", "markets", "integrations"];
-var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "manual"];
+var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "build", "robots", "manual"];
 function defaultCatalogDir() {
   if (process.env.MEP_CATALOG) return resolve(process.env.MEP_CATALOG);
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -7466,6 +7466,8 @@ function validateCheck(check, where) {
     maps: ["rule"],
     quality: ["rule"],
     design: ["rule", "max"],
+    build: ["rule"],
+    robots: ["rule"],
     manual: ["prompt"]
   };
   const errors = required[check.type].filter((f) => check[f] === void 0).map((f) => `${where}: verify ${check.type} needs "${f}"`);
@@ -7821,8 +7823,8 @@ function parseJsonc(text) {
 // engine/src/gate.ts
 import { execSync as execSync2 } from "node:child_process";
 import { createHash as createHash2 } from "node:crypto";
-import { existsSync as existsSync6, mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join7 } from "node:path";
+import { existsSync as existsSync7, mkdirSync as mkdirSync3, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join8 } from "node:path";
 
 // engine/src/profile.ts
 var import_yaml2 = __toESM(require_dist(), 1);
@@ -8105,6 +8107,10 @@ var PAGE_RULES = {
   skip_link: (p) => {
     const first = p.html.match(/<body[^>]*>[\s\S]*?<(a|button|input|select|textarea)\b[^>]*>/i)?.[0] ?? "";
     return /<a\b[^>]*href=["']#[\w-]+["'][^>]*>$/i.test(first.slice(first.lastIndexOf("<"))) ? void 0 : 'el primer elemento enfocable no es un skip link (<a href="#main">)';
+  },
+  has_text: (p) => {
+    const text = p.html.replace(/<(script|style|noscript|template|svg)[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]+>/g, " ").replace(/&[a-z#0-9]+;/gi, " ").replace(/\s+/g, " ").trim();
+    return text.length >= 80 ? void 0 : `HTML casi vac\xEDo (${text.length} caracteres de texto): el contenido lo pinta JavaScript`;
   },
   img_alt: (p) => {
     const bad = tags(p.html, "img").filter((t) => !/\salt\s*=/.test(t));
@@ -8455,11 +8461,80 @@ function checkDesign(root, check) {
   return found.length <= check.max ? { ok: true, detail: `${found.length} ${label}${found.length ? `: ${found.join(", ")}` : ""}` } : { ok: false, detail: `${found.length} ${label} (m\xE1ximo ${check.max}): ${found.join(", ")}` };
 }
 
+// engine/src/build.ts
+import { existsSync as existsSync6, readFileSync as readFileSync5, statSync as statSync3 } from "node:fs";
+import { join as join6 } from "node:path";
+import { gzipSync } from "node:zlib";
+var JS_DIRS = [".next/static", "out/_next/static", "dist/assets", "dist/_astro", "build/static/js", ".vercel/output/static"];
+var PUBLIC_DIRS = ["out", "dist", "build", ".next/static", ".vercel/output/static"];
+function filesUnder(root, dirs, ext) {
+  return dirs.filter((d) => existsSync6(join6(root, d))).flatMap((d) => listFiles(join6(root, d), { includeIgnored: true }).filter((f) => ext.test(f)).map((f) => `${d}/${f}`));
+}
+var VITE_SSR = ["vike", "vite-plugin-ssr", "@react-router/dev", "@tanstack/react-start", "@remix-run/dev", "waku", "vite-react-ssg", "react-snap"];
+function serverRendered(root) {
+  const framework = detectFramework(root);
+  if (framework !== "vite-react") return { ok: true, detail: `${framework}: genera HTML en el servidor o en el build` };
+  const deps = dependencies(root);
+  const ssr = VITE_SSR.find((d) => deps.has(d));
+  return ssr ? { ok: true, detail: `Vite + React con ${ssr}` } : { ok: false, detail: 'SPA de Vite + React sin SSR/SSG: "ver c\xF3digo fuente" llega vac\xEDo. Usa Next.js o Astro, agrega SSR/SSG, o justifica la excepci\xF3n con /mep:override.' };
+}
+function maxJsChunk(root, maxKb) {
+  const files = filesUnder(root, JS_DIRS, /\.m?js$/);
+  if (!files.length) return { ok: null, detail: "sin salida de build con JavaScript (corre el build primero)" };
+  const sizes = files.filter((f) => statSync3(join6(root, f)).size < 2e7).map((f) => ({ f, kb: Math.round(gzipSync(readFileSync5(join6(root, f))).length / 1024) })).sort((a, b) => b.kb - a.kb);
+  const big = sizes.filter((s) => s.kb > maxKb);
+  return big.length ? { ok: false, detail: `${big.length} archivo(s) JS sobre ${maxKb} KB gzip: ${big.slice(0, 3).map((s) => `${s.f} (${s.kb} KB)`).join(", ")}` } : { ok: true, detail: `el m\xE1s grande: ${sizes[0].f} (${sizes[0].kb} KB gzip)` };
+}
+function noSourceMaps(root) {
+  const maps = filesUnder(root, PUBLIC_DIRS, /\.(js|css|mjs)\.map$/);
+  return maps.length ? { ok: false, violation: true, detail: `source maps p\xFAblicos: ${maps.slice(0, 3).join(", ")}${maps.length > 3 ? ` (+${maps.length - 3})` : ""}` } : { ok: true, detail: "sin source maps en la salida p\xFAblica" };
+}
+function checkBuild(root, check) {
+  if (check.rule === "server_rendered") return serverRendered(root);
+  if (check.rule === "max_js_chunk") return maxJsChunk(root, check.max_kb ?? 200);
+  return noSourceMaps(root);
+}
+var AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai", "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot", "Bytespider", "meta-externalagent"];
+function blockedInTxt(text) {
+  const blocked = [];
+  let agents = [];
+  let inRules = false;
+  for (const raw of text.split("\n")) {
+    const line3 = raw.replace(/#.*/, "").trim();
+    const [key, ...rest] = line3.split(":");
+    const value = rest.join(":").trim();
+    if (/^user-agent$/i.test(key)) {
+      if (inRules) agents = [];
+      agents.push(value);
+      inRules = false;
+    } else if (/^(dis)?allow$/i.test(key)) {
+      inRules = true;
+      if (/^disallow$/i.test(key) && value === "/") {
+        for (const a of agents) if (a === "*" || AI_BOTS.some((b) => b.toLowerCase() === a.toLowerCase())) blocked.push(a);
+      }
+    }
+  }
+  return blocked;
+}
+function checkRobots(root) {
+  const txt = ["public/robots.txt", "static/robots.txt", "out/robots.txt", "dist/robots.txt", ".next/server/app/robots.txt.body"].find((f) => existsSync6(join6(root, f)));
+  if (txt) {
+    const blocked2 = [...new Set(blockedInTxt(readText(root, txt) ?? ""))];
+    return blocked2.length ? { ok: false, detail: `${txt} bloquea el sitio a: ${blocked2.join(", ")}` } : { ok: true, detail: `${txt}: buscadores y asistentes de IA pueden leer el sitio` };
+  }
+  const source = matchFiles(root, "{app,src/app}/robots.{ts,js}")[0];
+  if (!source) return { ok: null, detail: "sin robots.txt" };
+  const text = readText(root, source) ?? "";
+  const rules = text.match(/\{[^{}]*userAgent[^{}]*\}/g) ?? [];
+  const blocked = rules.filter((r) => /disallow:\s*(\[\s*)?["'`]\/["'`]\s*(\]|,|\n|\})/.test(r)).flatMap((r) => [...r.matchAll(/["'`]([\w*-]+)["'`]/g)].map((m) => m[1])).filter((a) => a === "*" || AI_BOTS.some((b) => b.toLowerCase() === a.toLowerCase()));
+  return blocked.length ? { ok: false, detail: `${source} bloquea el sitio a: ${[...new Set(blocked)].join(", ")}` } : { ok: true, detail: `${source}: buscadores y asistentes de IA pueden leer el sitio` };
+}
+
 // engine/src/security.ts
 import { createHash } from "node:crypto";
 import { mkdirSync as mkdirSync2, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join6 } from "node:path";
-var SECURITY_DIR = join6(MEP_DIR, "security");
+import { join as join7 } from "node:path";
+var SECURITY_DIR = join7(MEP_DIR, "security");
 function hashFiles(root, files) {
   const h = createHash("sha256");
   for (const f of [...files].sort()) {
@@ -8468,7 +8543,7 @@ function hashFiles(root, files) {
   return h.digest("hex");
 }
 function readReport(root, id) {
-  const text = readText(root, join6(SECURITY_DIR, `${id}.json`));
+  const text = readText(root, join7(SECURITY_DIR, `${id}.json`));
   if (!text) return void 0;
   try {
     return JSON.parse(text);
@@ -8485,8 +8560,8 @@ function reportState(root, id) {
 }
 function recordReport(root, input) {
   const report = { ...input, hash: hashFiles(root, input.files), date: today(), by: "mep-security" };
-  mkdirSync2(join6(root, SECURITY_DIR), { recursive: true });
-  writeFileSync3(join6(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
+  mkdirSync2(join7(root, SECURITY_DIR), { recursive: true });
+  writeFileSync3(join7(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
   return report;
 }
 
@@ -8558,6 +8633,11 @@ function runCheck(root, check, profile, itemId, mode) {
       return checkThresholds(root, profile);
     case "design":
       return checkDesign(root, check);
+    case "build":
+      if (mode === "fast" && check.rule !== "server_rendered") return { ok: null, detail: "se verifica sobre el build en /mep:check" };
+      return checkBuild(root, check);
+    case "robots":
+      return checkRobots(root);
     case "manual": {
       const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
@@ -8660,16 +8740,16 @@ function gitState(root) {
 }
 function cachedGate(root, catalog, kind, env = process.env) {
   if (!hasProfile(root)) return PASS;
-  const key = createHash2("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync5(join7(root, MEP_DIR, "profile.yaml"), "utf8")}`).digest("hex");
-  const dir = join7(root, MEP_DIR, ".cache");
-  const file = join7(dir, `gate-${kind}.json`);
-  if (existsSync6(file)) {
-    const cached = JSON.parse(readFileSync5(file, "utf8"));
+  const key = createHash2("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync6(join8(root, MEP_DIR, "profile.yaml"), "utf8")}`).digest("hex");
+  const dir = join8(root, MEP_DIR, ".cache");
+  const file = join8(dir, `gate-${kind}.json`);
+  if (existsSync7(file)) {
+    const cached = JSON.parse(readFileSync6(file, "utf8"));
     if (cached.key === key && Date.now() - cached.time < CACHE_TTL_MS) return cached;
   }
   const { block, message } = gate(root, catalog, kind, env);
   mkdirSync3(dir, { recursive: true });
-  writeFileSync4(join7(root, MEP_DIR, ".gitignore"), ".cache/\n");
+  writeFileSync4(join8(root, MEP_DIR, ".gitignore"), ".cache/\n");
   writeFileSync4(file, JSON.stringify({ key, time: Date.now(), block, message }));
   return { block, message };
 }
@@ -8680,11 +8760,11 @@ function prReviewGate(root) {
     sha = execSync2("git rev-parse HEAD", { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
   } catch {
   }
-  const dir = join7(root, MEP_DIR, ".cache");
-  const marker = join7(dir, `pr-review-${sha}`);
-  if (existsSync6(marker)) return { block: false, message: "" };
+  const dir = join8(root, MEP_DIR, ".cache");
+  const marker = join8(dir, `pr-review-${sha}`);
+  if (existsSync7(marker)) return { block: false, message: "" };
   mkdirSync3(dir, { recursive: true });
-  writeFileSync4(join7(root, MEP_DIR, ".gitignore"), ".cache/\n");
+  writeFileSync4(join8(root, MEP_DIR, ".gitignore"), ".cache/\n");
   writeFileSync4(marker, (/* @__PURE__ */ new Date()).toISOString());
   log(root, "pr-review", sha);
   return {
@@ -8699,8 +8779,8 @@ function prReviewGate(root) {
 }
 
 // engine/src/render.ts
-import { existsSync as existsSync7, mkdirSync as mkdirSync4, readdirSync as readdirSync4, readFileSync as readFileSync6, writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join8 } from "node:path";
+import { existsSync as existsSync8, mkdirSync as mkdirSync4, readdirSync as readdirSync4, readFileSync as readFileSync7, writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join9 } from "node:path";
 var BRIEF_FILE = "BRIEF.md";
 var ADR_DIR = "docs/decisions";
 var LEGAL_NOTE = "> Checklist orientativo, no sustituye asesor\xEDa legal.";
@@ -8724,6 +8804,10 @@ function describeCheck(c) {
       return c.rule === "registry" ? "REGISTRY.md al d\xEDa (mep registry --check)" : "CODEMAP.md al d\xEDa";
     case "quality":
       return "umbrales de complejidad y largo en la config del linter";
+    case "build":
+      return { max_js_chunk: `JS por archivo \u2264 ${c.max_kb ?? 200} KB gzip`, no_source_maps: "sin source maps p\xFAblicos", server_rendered: "HTML renderizado en servidor o build" }[c.rule];
+    case "robots":
+      return "robots.txt no bloquea buscadores ni asistentes de IA";
     case "design":
       return `${c.rule === "font_families" ? "familias tipogr\xE1ficas" : "pesos de texto"} \u2264 ${c.max}`;
     case "manual":
@@ -8800,13 +8884,13 @@ function renderBrief(profile, evaluated, catalog, results) {
   return out.join("\n") + "\n";
 }
 function writeBrief(root, content) {
-  writeFileSync5(join8(root, BRIEF_FILE), content);
+  writeFileSync5(join9(root, BRIEF_FILE), content);
 }
 function slug(s) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
 function writeStackAdrs(root, profile, catalog) {
-  const dir = join8(root, ADR_DIR);
+  const dir = join9(root, ADR_DIR);
   mkdirSync4(dir, { recursive: true });
   const existing = readdirSync4(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
   const written = [];
@@ -8815,12 +8899,12 @@ function writeStackAdrs(root, profile, catalog) {
     const decision = g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ");
     const base = `stack-${slug(g.rule)}`;
     const previous = existing.filter((f) => f.slice(5).startsWith(base)).pop();
-    if (previous && readFileSync6(join8(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
+    if (previous && readFileSync7(join9(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
 `)) continue;
     const file = `${String(next++).padStart(4, "0")}-${base}.md`;
     const alternatives = catalog.stackRules.find((r) => r.id === g.rule)?.alternatives ?? [];
     writeFileSync5(
-      join8(dir, file),
+      join9(dir, file),
       [
         `# Stack: ${decision}`,
         "",
@@ -8849,8 +8933,8 @@ function writeStackAdrs(root, profile, catalog) {
 }
 var CLAUDE_MARKER = "<!-- mep -->";
 function linkClaudeMd(root, template) {
-  const file = join8(root, "CLAUDE.md");
-  const current = existsSync7(file) ? readFileSync6(file, "utf8") : "";
+  const file = join9(root, "CLAUDE.md");
+  const current = existsSync8(file) ? readFileSync7(file, "utf8") : "";
   if (current.includes(CLAUDE_MARKER)) return false;
   const block = `${CLAUDE_MARKER}
 ${template.trim()}
@@ -8916,11 +9000,11 @@ function counts(results) {
 
 // engine/src/signals.ts
 var import_yaml4 = __toESM(require_dist(), 1);
-import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
-import { join as join9 } from "node:path";
+import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
+import { join as join10 } from "node:path";
 function loadDetectors(catalog, name = "signals.yaml") {
-  const file = join9(catalog.dir, name);
-  return existsSync8(file) ? (0, import_yaml4.parse)(readFileSync7(file, "utf8")) : {};
+  const file = join10(catalog.dir, name);
+  return existsSync9(file) ? (0, import_yaml4.parse)(readFileSync8(file, "utf8")) : {};
 }
 function fires(root, d, deps) {
   if ("dependency" in d) return d.dependency.find((dep) => deps.has(dep));
@@ -9363,12 +9447,12 @@ function toPdf(blocks) {
 
 // engine/src/export.ts
 var import_yaml5 = __toESM(require_dist(), 1);
-import { existsSync as existsSync9, mkdirSync as mkdirSync5, readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
-import { dirname as dirname2, join as join10 } from "node:path";
-var EXPORTS_FILE = join10(MEP_DIR, "exports.yaml");
+import { existsSync as existsSync10, mkdirSync as mkdirSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
+import { dirname as dirname2, join as join11 } from "node:path";
+var EXPORTS_FILE = join11(MEP_DIR, "exports.yaml");
 function exportHistory(root) {
-  const file = join10(root, EXPORTS_FILE);
-  return existsSync9(file) ? (0, import_yaml5.parse)(readFileSync8(file, "utf8")) ?? [] : [];
+  const file = join11(root, EXPORTS_FILE);
+  return existsSync10(file) ? (0, import_yaml5.parse)(readFileSync9(file, "utf8")) ?? [] : [];
 }
 function exportData(root, profile, catalog, lang, q, priced = q !== void 0) {
   const evaluated = evaluate(profile, catalog);
@@ -9420,18 +9504,18 @@ function recordExport(root, profile, catalog, lang, files, total, version) {
     total,
     files
   };
-  mkdirSync5(dirname2(join10(root, EXPORTS_FILE)), { recursive: true });
-  writeFileSync6(join10(root, EXPORTS_FILE), (0, import_yaml5.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
+  mkdirSync5(dirname2(join11(root, EXPORTS_FILE)), { recursive: true });
+  writeFileSync6(join11(root, EXPORTS_FILE), (0, import_yaml5.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
   return record;
 }
 
 // engine/src/quote.ts
 var import_yaml6 = __toESM(require_dist(), 1);
-import { existsSync as existsSync10, mkdirSync as mkdirSync6, readFileSync as readFileSync9, readdirSync as readdirSync5, writeFileSync as writeFileSync7, appendFileSync as appendFileSync2 } from "node:fs";
+import { existsSync as existsSync11, mkdirSync as mkdirSync6, readFileSync as readFileSync10, readdirSync as readdirSync5, writeFileSync as writeFileSync7, appendFileSync as appendFileSync2 } from "node:fs";
 import { homedir } from "node:os";
-import { join as join11 } from "node:path";
+import { join as join12 } from "node:path";
 function configDir(env = process.env) {
-  return env.MEP_CONFIG_DIR ?? join11(homedir(), ".config", "mep-check");
+  return env.MEP_CONFIG_DIR ?? join12(homedir(), ".config", "mep-check");
 }
 var SIZE_HOURS = { XS: [0.5, 1], S: [1, 3], M: [3, 8], L: [8, 20], XL: [20, 40] };
 var DEFAULT_RATES = {
@@ -9456,14 +9540,14 @@ maintenance_plans:    # precio mensual; horas incluidas por mes
   premium:  { price: 0, hours: 0 }   # + monitoreo y soporte prioritario
 `;
 function loadRates(env = process.env) {
-  const file = join11(configDir(env), "rates.yaml");
+  const file = join12(configDir(env), "rates.yaml");
   let created = false;
-  if (!existsSync10(file)) {
+  if (!existsSync11(file)) {
     mkdirSync6(configDir(env), { recursive: true });
     writeFileSync7(file, RATES_TEMPLATE);
     created = true;
   }
-  const raw = (0, import_yaml6.parse)(readFileSync9(file, "utf8")) ?? {};
+  const raw = (0, import_yaml6.parse)(readFileSync10(file, "utf8")) ?? {};
   const rates = { ...DEFAULT_RATES, ...raw, maintenance_plans: { ...DEFAULT_RATES.maintenance_plans, ...raw.maintenance_plans } };
   return { rates, created, configured: rates.hourly_rate > 0 };
 }
@@ -9488,9 +9572,9 @@ function loaded(hours, rates) {
   return scale(hours, (1 + rates.pm_overhead) * (1 + rates.risk_buffer));
 }
 function recurringCosts(profile, catalog) {
-  const file = join11(catalog.dir, "costs.yaml");
-  if (!existsSync10(file)) return [];
-  const table = (0, import_yaml6.parse)(readFileSync9(file, "utf8"));
+  const file = join12(catalog.dir, "costs.yaml");
+  if (!existsSync11(file)) return [];
+  const table = (0, import_yaml6.parse)(readFileSync10(file, "utf8"));
   const out = Object.entries(table.always ?? {}).map(([key, c]) => ({ key, ...c }));
   for (const d of stack(profile, catalog)) {
     const cost = table.stack?.[`${d.key}.${d.value}`];
@@ -9583,25 +9667,25 @@ function projectKey(profile) {
   return (profile.project || "proyecto").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "proyecto";
 }
 function saveQuote(profile, q, rates, env = process.env) {
-  const dir = join11(configDir(env), "quotes", projectKey(profile));
+  const dir = join12(configDir(env), "quotes", projectKey(profile));
   mkdirSync6(dir, { recursive: true });
-  const file = join11(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
+  const file = join12(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
   writeFileSync7(file, (0, import_yaml6.stringify)({ profile: profile.project, catalog_version: profile.catalog_version, rates, quote: q }, { lineWidth: 0 }));
   return file;
 }
 function logTime(profile, id, hours, env = process.env) {
-  const dir = join11(configDir(env), "actuals");
+  const dir = join12(configDir(env), "actuals");
   mkdirSync6(dir, { recursive: true });
-  const file = join11(dir, `${projectKey(profile)}.yaml`);
+  const file = join12(dir, `${projectKey(profile)}.yaml`);
   appendFileSync2(file, (0, import_yaml6.stringify)([{ id, hours, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), catalog_version: profile.catalog_version }]));
   return file;
 }
 function calibrate(catalog, env = process.env, minSamples = 3) {
-  const dir = join11(configDir(env), "actuals");
-  if (!existsSync10(dir)) return [];
+  const dir = join12(configDir(env), "actuals");
+  if (!existsSync11(dir)) return [];
   const byId = /* @__PURE__ */ new Map();
   for (const f of readdirSync5(dir).filter((f2) => f2.endsWith(".yaml"))) {
-    for (const row of (0, import_yaml6.parse)(readFileSync9(join11(dir, f), "utf8")) ?? []) {
+    for (const row of (0, import_yaml6.parse)(readFileSync10(join12(dir, f), "utf8")) ?? []) {
       byId.set(row.id, [...byId.get(row.id) ?? [], row.hours]);
     }
   }
@@ -9660,8 +9744,8 @@ function parseArgs(argv) {
   return out;
 }
 function readInput(source) {
-  if (source === void 0 || source === true || source === "-") return readFileSync10(0, "utf8");
-  return readFileSync10(source, "utf8");
+  if (source === void 0 || source === true || source === "-") return readFileSync11(0, "utf8");
+  return readFileSync11(source, "utf8");
 }
 function proposedProfile(args, catalog) {
   const raw = (0, import_yaml7.parse)(readInput(args.flags.from)) ?? {};
@@ -9712,7 +9796,7 @@ function currentBranch(root) {
 }
 function hookInput() {
   try {
-    return JSON.parse(readFileSync10(0, "utf8") || "{}");
+    return JSON.parse(readFileSync11(0, "utf8") || "{}");
   } catch {
     return {};
   }
@@ -9739,13 +9823,13 @@ function closePassingPhases(root, catalog) {
   return closed;
 }
 function installResponsiveTest(root, catalog) {
-  const target = join12(root, "tests", "responsive.spec.ts");
-  if (existsSync11(target)) return void 0;
+  const target = join13(root, "tests", "responsive.spec.ts");
+  if (existsSync12(target)) return void 0;
   mkdirSync7(dirname3(target), { recursive: true });
-  writeFileSync8(target, readFileSync10(join12(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
-  const pkgFile = join12(root, "package.json");
-  if (existsSync11(pkgFile)) {
-    const text = readFileSync10(pkgFile, "utf8");
+  writeFileSync8(target, readFileSync11(join13(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
+  const pkgFile = join13(root, "package.json");
+  if (existsSync12(pkgFile)) {
+    const text = readFileSync11(pkgFile, "utf8");
     const pkg = JSON.parse(text);
     if (!pkg.scripts?.["test:responsive"]) {
       pkg.scripts = { ...pkg.scripts, "test:responsive": "playwright test tests/responsive.spec.ts" };
@@ -9829,11 +9913,11 @@ function main() {
       saveProfile(root, profile);
       regenerate(root, profile, catalog);
       const adrs = writeStackAdrs(root, profile, catalog);
-      const linked = linkClaudeMd(root, readFileSync10(join12(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
-      const ci = join12(root, ".github", "workflows", "mep.yml");
-      if (!existsSync11(ci)) {
+      const linked = linkClaudeMd(root, readFileSync11(join13(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
+      const ci = join13(root, ".github", "workflows", "mep.yml");
+      if (!existsSync12(ci)) {
         mkdirSync7(dirname3(ci), { recursive: true });
-        writeFileSync8(ci, readFileSync10(join12(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
+        writeFileSync8(ci, readFileSync11(join13(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
       }
       const responsive = installResponsiveTest(root, catalog);
       log(root, "init", `${profile.type} (${profile.capabilities.join(",")})`);
@@ -10015,7 +10099,7 @@ ${formatItems(pending)}` : `
         if (!id || !["pass", "fail", "risk"].includes(result)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."');
         if (!catalog.items.some((i) => i.id === id && i.category === "security")) fail(`${id} no es un \xEDtem de seguridad`);
         const files = String(args.flags.files ?? "").split(",").map((f) => f.trim()).filter(Boolean);
-        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync11(join12(root, f)));
+        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync12(join13(root, f)));
         if (missing.length) fail(`archivos inexistentes: ${missing.join(", ")}`);
         recordReport(root, { id, result, files, notes: String(args.flags.notes ?? "") });
         return print(`reporte de ${id}: ${result}`);
@@ -10120,10 +10204,10 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
     case "export": {
       const profile = requireProfile(root, catalog);
       const input = args.flags.in;
-      if (!input || !existsSync11(join12(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
+      if (!input || !existsSync12(join13(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
       const format = String(args.flags.format ?? "both");
-      const blocks = parseMarkdown(readFileSync10(join12(root, input), "utf8"));
-      const base = join12(root, dirname3(input), basename(input).replace(/\.md$/, ""));
+      const blocks = parseMarkdown(readFileSync11(join13(root, input), "utf8"));
+      const base = join13(root, dirname3(input), basename(input).replace(/\.md$/, ""));
       const files = [];
       if (format === "docx" || format === "both") {
         writeFileSync8(`${base}.docx`, toDocx(blocks));

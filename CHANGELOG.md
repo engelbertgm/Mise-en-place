@@ -2,6 +2,12 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.1.3
+
+- Catalog 2026.10.6: things to avoid are now checked — empty view-source / Vite + React SPA without SSR, missing structured data, no llms.txt, robots.txt blocking AI crawlers, public source maps, console errors, oversized JS bundles.
+- New engine checks: `build` (server_rendered, max_js_chunk, no_source_maps), `robots` (allows_ai) and the `has_text` HTML rule.
+- Fix: JS files over 1 MB were measured as empty.
+
 ## 0.1.2
 
 - Catalog 2026.10.5: 11 new launch rules (marketing consent, data subject requests, DPAs, third-party disclosure, breach procedure, intellectual property, open source licenses, CTA above the fold, sticky mobile CTA, thank-you page, analytics installed).

@@ -2,6 +2,19 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.6
+
+Cosas a evitar, ahora verificadas:
+
+- **"Ver código fuente" vacío / todo en Vite + React**: `server-rendered-content` falla con una SPA de Vite + React sin SSR/SSG (salvo override con razón) y con HTML casi sin texto (regla `has_text`).
+- **Datos sin estructura**: `json-ld-base` pasa a 🔴 en todo sitio público.
+- **Sin llms.txt**: nuevo `llms-txt`.
+- **robots.txt bloqueando IA**: nuevo `robots-allows-ai` (GPTBot, ClaudeBot, PerplexityBot, Google-Extended, CCBot…).
+- **Source maps públicos**: nuevo `no-public-source-maps` (config y salida del build).
+- **Errores de consola**: nuevo `no-console-errors`; el test responsive falla con console.error o excepciones.
+- **bundle.js gigante**: `bundle-budget` pasa a 🔴 y mide cada archivo JS del build (≤ 200 KB gzip).
+- Ya cubiertos: mismo título, sin meta description, varios H1 o ninguno, sin canonical, sin favicon, sin sitemap, sin lang, sin alt.
+
 ## 2026.10.5
 
 Reglas nuevas para lanzar (11):

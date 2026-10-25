@@ -6,6 +6,7 @@ import { checkCodemap, checkRegistry } from './maps.ts'
 import { checkSql } from './sql.ts'
 import { checkThresholds } from './quality.ts'
 import { checkDesign } from './design.ts'
+import { checkBuild, checkRobots } from './build.ts'
 import { reportState } from './security.ts'
 import type { Check, CheckResult, Evaluated, ItemResult, ItemStatus, Profile } from './types.ts'
 
@@ -86,6 +87,12 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkThresholds(root, profile)
     case 'design':
       return checkDesign(root, check)
+    case 'build':
+      // Build output checks need a build; the framework check reads package.json and runs anywhere.
+      if (mode === 'fast' && check.rule !== 'server_rendered') return { ok: null, detail: 'se verifica sobre el build en /mep:check' }
+      return checkBuild(root, check)
+    case 'robots':
+      return checkRobots(root)
     case 'manual': {
       const confirmed = profile.selections.manual_confirmed.find(c => c.id === itemId)
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` }

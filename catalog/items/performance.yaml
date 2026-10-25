@@ -74,13 +74,14 @@
     - { type: grep, pattern: "@lhci|lighthouse|@vercel/speed-insights", glob: "{package.json,.github/workflows/*.{yml,yaml},lighthouserc*}" }
 
 - id: bundle-budget
-  title: "Presupuesto de tamaño de bundle JS y preconnect a dominios críticos"
+  title: "Sin bundle JS gigante: ningún archivo sobre 200 KB gzip"
   category: performance
-  level: recommended
+  level: required
   phase: launch.seo
   since: "2026.10.2"
-  effort: { size: S, hours: [1, 3] }
-  why: "El JavaScript es el recurso más caro en móviles; sin presupuesto crece sin que nadie lo note."
-  how: "size-limit o el análisis del build en CI; <link rel=\"preconnect\"> a los orígenes críticos."
+  updated: "2026.10.6"
+  effort: { size: S, hours: [1, 4] }
+  why: "El JavaScript es el recurso más caro en móviles: un bundle.js enorme retrasa cada interacción y crece sin que nadie lo note."
+  how: "Server Components y carga diferida (dynamic import) para lo pesado; revisar con @next/bundle-analyzer; preconnect a los orígenes críticos."
   verify:
-    - { type: grep, pattern: "size-limit|bundlesize|@next/bundle-analyzer", glob: "package.json" }
+    - { type: build, rule: max_js_chunk, max_kb: 200 }

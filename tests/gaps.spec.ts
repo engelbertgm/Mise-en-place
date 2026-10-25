@@ -10,6 +10,8 @@ import { checkDesign, fontFamilies, fontWeights } from '../engine/src/design.ts'
 import { prReviewGate } from '../engine/src/gate.ts'
 import { evaluate, stack } from '../engine/src/evaluate.ts'
 import { inferProfile } from '../engine/src/audit.ts'
+import { checkBuild, checkRobots } from '../engine/src/build.ts'
+import { checkHtml } from '../engine/src/html.ts'
 import { marketLocales } from '../engine/src/profile.ts'
 import { checkThresholds } from '../engine/src/quality.ts'
 import { formatClient, quote } from '../engine/src/quote.ts'
@@ -206,5 +208,49 @@ describe('9. launch rules: legal, privacy and conversion', () => {
     const levels = new Map(evaluate(mx, real).map(e => [e.item.id, e.level]))
     assert.equal(levels.get('data-processing-agreements'), 'recommended')
     assert.equal(levels.get('sticky-mobile-cta'), 'recommended')
+  })
+})
+
+describe('10. things to avoid: empty source, SPA without SSR, AI blocked, source maps, giant bundle', () => {
+  test('a Vite + React SPA without SSR fails; Next.js or Vite with SSR pass', () => {
+    const spa = makeRepo({ 'package.json': '{"dependencies":{"vite":"6","react":"19"}}' })
+    assert.equal(checkBuild(spa, { type: 'build', rule: 'server_rendered' }).ok, false)
+    assert.equal(checkBuild(makeRepo({ 'package.json': '{"dependencies":{"vite":"6","react":"19","vike":"0.4"}}' }), { type: 'build', rule: 'server_rendered' }).ok, true)
+    assert.equal(checkBuild(makeRepo({ 'package.json': '{"dependencies":{"next":"15"}}' }), { type: 'build', rule: 'server_rendered' }).ok, true)
+  })
+
+  test('an empty HTML shell fails has_text', () => {
+    const shell = makeRepo({ 'dist/index.html': '<html lang="es"><body><div id="root"></div><script src="/assets/index.js"></script></body></html>' })
+    assert.match(checkHtml(shell, { type: 'html', rule: 'has_text' }).detail, /HTML casi vacío/)
+    const full = makeRepo({ 'out/index.html': `<html><body><main><h1>Clases de danza</h1><p>${'Contenido real del sitio. '.repeat(5)}</p></main></body></html>` })
+    assert.equal(checkHtml(full, { type: 'html', rule: 'has_text' }).ok, true)
+  })
+
+  test('robots.txt that blocks everyone or an AI crawler fails; partial blocks pass', () => {
+    const blocked = makeRepo({ 'public/robots.txt': 'User-agent: *\nAllow: /\n\nUser-agent: GPTBot\nUser-agent: ClaudeBot\nDisallow: /\n' })
+    assert.match(checkRobots(blocked).detail, /GPTBot, ClaudeBot/)
+    assert.equal(checkRobots(makeRepo({ 'public/robots.txt': 'User-agent: *\nDisallow: /admin\n' })).ok, true)
+    assert.equal(checkRobots(makeRepo({ 'public/robots.txt': 'User-agent: *\nDisallow: /\n' })).ok, false)
+    const ts = makeRepo({ 'app/robots.ts': "export default () => ({ rules: [{ userAgent: '*', allow: '/' }, { userAgent: ['GPTBot', 'CCBot'], disallow: '/' }] })" })
+    assert.match(checkRobots(ts).detail, /GPTBot, CCBot/)
+    assert.equal(checkRobots(makeRepo()).ok, null)
+  })
+
+  test('public source maps and oversized JS chunks fail', () => {
+    const root = makeRepo({ 'out/_next/static/chunks/main.js': 'console.log(1)', 'out/_next/static/chunks/main.js.map': '{}' })
+    assert.equal(checkBuild(root, { type: 'build', rule: 'no_source_maps' }).ok, false)
+    assert.equal(checkBuild(root, { type: 'build', rule: 'max_js_chunk', max_kb: 200 }).ok, true)
+    const big = Array.from({ length: 60000 }, (_, i) => `var v${i}=${Math.random()};`).join('')
+    const heavy = makeRepo({ 'dist/assets/index.js': big })
+    assert.match(checkBuild(heavy, { type: 'build', rule: 'max_js_chunk', max_kb: 200 }).detail, /sobre 200 KB gzip/)
+    assert.equal(checkBuild(makeRepo(), { type: 'build', rule: 'max_js_chunk', max_kb: 200 }).ok, null)
+  })
+
+  test('the catalog asks for llms.txt, structured data, no source maps and no console errors on public sites', () => {
+    const levels = new Map(evaluate(profile(real, { type: 'landing' }), real).map(e => [e.item.id, e.level]))
+    for (const id of ['llms-txt', 'robots-allows-ai', 'json-ld-base', 'no-public-source-maps', 'no-console-errors', 'bundle-budget', 'server-rendered-content']) assert.equal(levels.get(id), 'required', id)
+    const internal = new Map(evaluate(profile(real, { type: 'internal-app' }), real).map(e => [e.item.id, e.level]))
+    assert.equal(internal.has('llms-txt'), false)
+    assert.equal(internal.has('server-rendered-content'), false)
   })
 })

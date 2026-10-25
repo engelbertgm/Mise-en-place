@@ -8,7 +8,13 @@ const WIDTHS = [360, 768, 1280, 1920, 2560]
 
 for (const path of PAGES) {
   for (const width of WIDTHS) {
-    test(`${path} a ${width}px: sin scroll horizontal ni elementos encimados`, async ({ page }) => {
+    test(`${path} a ${width}px: sin scroll horizontal, elementos encimados ni errores de consola`, async ({ page }) => {
+      // Ítem no-console-errors: any console.error or uncaught exception fails the page.
+      const errors: string[] = []
+      page.on('console', msg => {
+        if (msg.type() === 'error') errors.push(msg.text())
+      })
+      page.on('pageerror', err => errors.push(err.message))
       await page.setViewportSize({ width, height: 900 })
       await page.goto(BASE_URL + path, { waitUntil: 'networkidle' })
 
@@ -45,6 +51,8 @@ for (const path of PAGES) {
         expect(box, 'CTA principal visible').not.toBeNull()
         expect(box!.y + box!.height, 'CTA principal sobre el pliegue (px)').toBeLessThanOrEqual(900)
       }
+
+      expect(errors, 'errores de consola').toEqual([])
 
       const name = path === '/' ? 'inicio' : path.replace(/\W+/g, '-').replace(/^-|-$/g, '')
       await page.screenshot({ path: `test-results/responsive/${name}-${width}.png`, fullPage: true })
