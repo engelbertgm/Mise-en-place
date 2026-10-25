@@ -1,4 +1,4 @@
-Este proyecto se rige por BRIEF.md. Los ítems 🔴 son requisitos no negociables.
+Este proyecto se rige por BRIEF.md (checklist) y SCOPE.md (qué es y qué no incluye). Los ítems 🔴 son requisitos no negociables.
 
 Mantra de código: claro, simple, bonito y reutilizado.
 - Para encontrar algo, consulta primero CODEMAP.md y REGISTRY.md; no busques archivo por archivo.

@@ -14,6 +14,7 @@ import { checkBuild, checkRobots } from '../engine/src/build.ts'
 import { checkHtml } from '../engine/src/html.ts'
 import { applicability, explainItem } from '../engine/src/explain.ts'
 import { marketLocales } from '../engine/src/profile.ts'
+import { renderScope } from '../engine/src/scope.ts'
 import { checkThresholds } from '../engine/src/quality.ts'
 import { formatClient, quote } from '../engine/src/quote.ts'
 import { detectSignals } from '../engine/src/signals.ts'
@@ -288,5 +289,29 @@ describe('11. the scope decides what applies; the code is evidence', () => {
     assert.match(out, /En el scope pero aún no en el código.*capacidad newsletter/)
     assert.doesNotMatch(out, /webhook-signature/)
     assert.ok(!existsSync(join(root, '.mep')))
+  })
+})
+
+describe('12. SCOPE.md: the scope in plain words', () => {
+  test('says what is in, what is out, the stack and how many rules apply', () => {
+    const p = { ...profile(real, { type: 'landing', capabilities: ['payment-links'], markets: ['MX'] }), summary: 'Landing para vender un curso.' }
+    const md = renderScope(p, evaluate(p, real), real)
+    assert.match(md, /No editar a mano/)
+    assert.match(md, /Landing para vender un curso\./)
+    assert.match(md, /## Qué incluye/)
+    assert.match(md, /## Qué no incluye[\s\S]*Base de datos propia/)
+    assert.match(md, /Aplican \*\*\d+ de \d+\*\* reglas/)
+    assert.doesNotMatch(md, /\b1 opcionales|\b1 páginas/)
+  })
+
+  test('init creates it and /mep:add regenerates it', () => {
+    const root = makeRepo({ 'scope.yaml': 'project: curso\ntype: landing\nsummary: Landing para un curso.\ncapabilities: [payment-links]\nmarkets: [MX]\n' })
+    const env = { ...process.env, MEP_CONFIG_DIR: tempDir() }
+    assert.equal(spawnSync('node', [CLI, 'init', '--from', 'scope.yaml'], { cwd: root, encoding: 'utf8', env }).status, 0)
+    assert.match(readFileSync(join(root, 'SCOPE.md'), 'utf8'), /Landing para un curso\./)
+    assert.match(readFileSync(join(root, 'BRIEF.md'), 'utf8'), /\[SCOPE\.md\]/)
+    writeFileSync(join(root, 'change.yaml'), 'capabilities: [payment-links, newsletter]\n')
+    assert.equal(spawnSync('node', [CLI, 'add', '--from', 'change.yaml', '--apply'], { cwd: root, encoding: 'utf8', env }).status, 0)
+    assert.match(readFileSync(join(root, 'SCOPE.md'), 'utf8'), /## Qué incluye[\s\S]*ewsletter[\s\S]*## Qué no incluye/)
   })
 })

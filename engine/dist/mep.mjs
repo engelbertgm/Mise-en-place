@@ -7266,7 +7266,7 @@ var require_public_api = __commonJS({
       }
       return doc;
     }
-    function parse8(src, reviver, options) {
+    function parse9(src, reviver, options) {
       let _reviver = void 0;
       if (typeof reviver === "function") {
         _reviver = reviver;
@@ -7307,7 +7307,7 @@ var require_public_api = __commonJS({
         return value.toString(options);
       return new Document.Document(value, _replacer, options).toString(options);
     }
-    exports.parse = parse8;
+    exports.parse = parse9;
     exports.parseAllDocuments = parseAllDocuments;
     exports.parseDocument = parseDocument;
     exports.stringify = stringify5;
@@ -7367,10 +7367,10 @@ var require_dist = __commonJS({
 });
 
 // engine/src/cli.ts
-var import_yaml7 = __toESM(require_dist(), 1);
+var import_yaml8 = __toESM(require_dist(), 1);
 import { execSync as execSync3 } from "node:child_process";
-import { existsSync as existsSync12, mkdirSync as mkdirSync7, readFileSync as readFileSync11, writeFileSync as writeFileSync8 } from "node:fs";
-import { basename, dirname as dirname3, join as join13, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync13, mkdirSync as mkdirSync7, readFileSync as readFileSync12, writeFileSync as writeFileSync9 } from "node:fs";
+import { basename, dirname as dirname3, join as join14, resolve as resolve2 } from "node:path";
 
 // engine/src/catalog.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7877,9 +7877,9 @@ function normalizeProfile(raw, catalog) {
 function marketLocales(profile, catalog) {
   const table = catalog.dimensions.market_languages ?? {};
   const out = /* @__PURE__ */ new Set();
-  for (const market of profile.markets) {
-    const parent = market.split(":")[0];
-    for (const l of table[market] ?? table[parent] ?? []) out.add(l);
+  for (const market2 of profile.markets) {
+    const parent = market2.split(":")[0];
+    for (const l of table[market2] ?? table[parent] ?? []) out.add(l);
   }
   return [...out].sort();
 }
@@ -8845,6 +8845,8 @@ function renderBrief(profile, evaluated, catalog, results) {
     `<!-- Generado por mep desde .mep/profile.yaml (cat\xE1logo ${profile.catalog_version}). No editar a mano: usa /mep:add, /mep:skip, /mep:override. -->`,
     `# Brief \u2014 ${profile.project}`,
     "",
+    "> El resumen del scope en lenguaje claro est\xE1 en [SCOPE.md](SCOPE.md).",
+    "",
     "## Perfil",
     profileSection(profile, marketLocales(profile, catalog)),
     "",
@@ -9159,6 +9161,100 @@ function applicability(profile, catalog) {
     else notApplying.push(item.id);
   }
   return { applies: catalog.items.length - notApplying.length, byLevel, notApplying, total: catalog.items.length };
+}
+
+// engine/src/scope.ts
+var import_yaml5 = __toESM(require_dist(), 1);
+import { existsSync as existsSync10, readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
+import { join as join11 } from "node:path";
+var SCOPE_FILE = "SCOPE.md";
+function labels(catalog) {
+  const file = join11(catalog.dir, "labels.yaml");
+  return existsSync10(file) ? (0, import_yaml5.parse)(readFileSync9(file, "utf8")) : {};
+}
+function market(m, l) {
+  const [parent, sub] = m.split(":");
+  return sub ? `${l.markets?.[parent] ?? parent} \xB7 ${sub}` : l.markets?.[m] ?? m;
+}
+var bullets = (xs, empty = "\u2014") => xs.length ? xs.map((x) => `- ${x}`).join("\n") : empty;
+var OFTEN_ASSUMED = {
+  landing: ["auth", "payments", "payment-links", "cms", "i18n", "newsletter", "analytics"],
+  corporate: ["cms", "i18n", "auth", "newsletter", "search"],
+  "local-business": ["payments", "payment-links", "cms", "i18n"],
+  blog: ["cms", "newsletter", "search", "i18n"],
+  portfolio: ["cms", "i18n"],
+  ecommerce: ["subscriptions", "search", "i18n", "ugc", "notifications"],
+  saas: ["admin-panel", "notifications", "i18n", "api-public", "ai-features"],
+  marketplace: ["subscriptions", "realtime", "i18n"],
+  "internal-app": ["notifications", "search", "realtime"],
+  directory: ["search", "ugc", "maps", "payments"],
+  booking: ["payments", "payment-links", "notifications", "i18n"]
+};
+function renderScope(profile, evaluated, catalog) {
+  const l = labels(catalog);
+  const app = applicability(profile, catalog);
+  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && k !== "db_client_access" || k === "db_client_access" && v === true);
+  const notIncluded = (OFTEN_ASSUMED[profile.type] ?? []).filter((c) => !profile.capabilities.includes(c));
+  const offered = evaluated.filter((e) => e.state === "offered").map((e) => e.item.title);
+  const chosen = evaluated.filter((e) => e.state === "active" && e.level === "optional").map((e) => e.item.title);
+  const locales = marketLocales(profile, catalog);
+  const counts2 = profile.counts;
+  const missing = [
+    !profile.markets.length && "mercados (definen idiomas, legales y moneda)",
+    !profile.audience.length && "audiencia (consumidores, empresas, menores, datos sensibles)",
+    counts2.pages === void 0 && "n\xFAmero aproximado de p\xE1ginas"
+  ].filter(Boolean);
+  const required = evaluated.filter((e) => e.state === "active" && e.level === "required");
+  const legal = required.filter((e) => e.item.category === "legal").map((e) => e.item.title);
+  const out = [
+    `<!-- Generado por mep desde .mep/profile.yaml. No editar a mano: el scope se cambia con /mep:add. -->`,
+    `# Scope \u2014 ${profile.project}`,
+    "",
+    profile.summary ? `${profile.summary}
+` : "",
+    "## Qu\xE9 es",
+    `- **Tipo:** ${l.type?.[profile.type] ?? profile.type}`,
+    `- **Para qui\xE9n:** ${profile.audience.map((a) => l.audience?.[a] ?? a).join(", ") || "por definir"}`,
+    `- **Contexto:** ${l.context?.[profile.context] ?? profile.context}`,
+    `- **Mercados:** ${profile.markets.map((m) => market(m, l)).join(", ") || "por definir"}${locales.length ? ` \xB7 idiomas: ${locales.join(", ")}` : ""}`,
+    `- **Tama\xF1o:** ${[counts2.pages && `~${plural(counts2.pages, "p\xE1gina", "p\xE1ginas")}`, counts2.entities && plural(counts2.entities, "tipo de datos", "tipos de datos"), counts2.integrations && plural(counts2.integrations, "integraci\xF3n", "integraciones")].filter(Boolean).join(" \xB7 ") || "por definir"}`,
+    "",
+    "## Qu\xE9 incluye",
+    bullets(profile.capabilities.map((c) => l.capabilities?.[c] ?? c), "- Sitio informativo, sin funcionalidades adicionales"),
+    ...profile.custom_work?.length ? ["", "**Trabajo a la medida:**", bullets(profile.custom_work.map((c) => c.title))] : [],
+    ...chosen.length ? ["", "**Opcionales elegidos:**", bullets(chosen)] : [],
+    "",
+    "## Hechos del proyecto",
+    bullets(signals.map(([k]) => l.signals?.[k] ?? k)),
+    "",
+    "## Qu\xE9 no incluye",
+    bullets([
+      ...notIncluded.map((c) => l.capabilities?.[c] ?? c),
+      ...profile.signals.has_db ? [] : ["Base de datos propia (no hay datos que guardar)"]
+    ]),
+    ...offered.length ? ["", `**Opcionales disponibles, no elegidos:** ${offered.length} (ver BRIEF.md).`] : [],
+    "",
+    "## Tecnolog\xEDa",
+    bullets(stackGroups(stack(profile, catalog)).map((g) => `${g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ")} \u2014 ${g.why}`)),
+    "",
+    "## Lo que exige este scope",
+    `Aplican **${app.applies} de ${app.total}** reglas de mep: \u{1F534} ${plural(app.byLevel.required, "obligatoria", "obligatorias")} \xB7 \u{1F7E1} ${plural(app.byLevel.recommended, "recomendada", "recomendadas")} \xB7 \u26AA ${plural(app.byLevel.optional, "opcional", "opcionales")}. ${app.notApplying.length === 1 ? "La otra no aplica" : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qu\xE9). El detalle est\xE1 en BRIEF.md.`,
+    ...legal.length ? ["", "**Legales y de cumplimiento obligatorios:**", bullets(legal)] : [],
+    "",
+    "## Fase actual",
+    `${profile.phase.active}${profile.phase.closed.length ? ` (cerradas: ${profile.phase.closed.join(", ")})` : ""}`,
+    ...missing.length ? ["", "## Por definir", bullets(missing)] : [],
+    "",
+    "> Checklist orientativo, no sustituye asesor\xEDa legal.",
+    ""
+  ];
+  return out.filter((line3, i, all) => !(line3 === "" && all[i - 1] === "")).join("\n");
+}
+function writeScope(root, content) {
+  writeFileSync6(join11(root, SCOPE_FILE), content);
+}
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 // engine/src/docs.ts
@@ -9501,13 +9597,13 @@ function toPdf(blocks) {
 }
 
 // engine/src/export.ts
-var import_yaml5 = __toESM(require_dist(), 1);
-import { existsSync as existsSync10, mkdirSync as mkdirSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
-import { dirname as dirname2, join as join11 } from "node:path";
-var EXPORTS_FILE = join11(MEP_DIR, "exports.yaml");
+var import_yaml6 = __toESM(require_dist(), 1);
+import { existsSync as existsSync11, mkdirSync as mkdirSync5, readFileSync as readFileSync10, writeFileSync as writeFileSync7 } from "node:fs";
+import { dirname as dirname2, join as join12 } from "node:path";
+var EXPORTS_FILE = join12(MEP_DIR, "exports.yaml");
 function exportHistory(root) {
-  const file = join11(root, EXPORTS_FILE);
-  return existsSync10(file) ? (0, import_yaml5.parse)(readFileSync9(file, "utf8")) ?? [] : [];
+  const file = join12(root, EXPORTS_FILE);
+  return existsSync11(file) ? (0, import_yaml6.parse)(readFileSync10(file, "utf8")) ?? [] : [];
 }
 function exportData(root, profile, catalog, lang, q, priced = q !== void 0) {
   const evaluated = evaluate(profile, catalog);
@@ -9559,18 +9655,18 @@ function recordExport(root, profile, catalog, lang, files, total, version) {
     total,
     files
   };
-  mkdirSync5(dirname2(join11(root, EXPORTS_FILE)), { recursive: true });
-  writeFileSync6(join11(root, EXPORTS_FILE), (0, import_yaml5.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
+  mkdirSync5(dirname2(join12(root, EXPORTS_FILE)), { recursive: true });
+  writeFileSync7(join12(root, EXPORTS_FILE), (0, import_yaml6.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
   return record;
 }
 
 // engine/src/quote.ts
-var import_yaml6 = __toESM(require_dist(), 1);
-import { existsSync as existsSync11, mkdirSync as mkdirSync6, readFileSync as readFileSync10, readdirSync as readdirSync5, writeFileSync as writeFileSync7, appendFileSync as appendFileSync2 } from "node:fs";
+var import_yaml7 = __toESM(require_dist(), 1);
+import { existsSync as existsSync12, mkdirSync as mkdirSync6, readFileSync as readFileSync11, readdirSync as readdirSync5, writeFileSync as writeFileSync8, appendFileSync as appendFileSync2 } from "node:fs";
 import { homedir } from "node:os";
-import { join as join12 } from "node:path";
+import { join as join13 } from "node:path";
 function configDir(env = process.env) {
-  return env.MEP_CONFIG_DIR ?? join12(homedir(), ".config", "mep-check");
+  return env.MEP_CONFIG_DIR ?? join13(homedir(), ".config", "mep-check");
 }
 var SIZE_HOURS = { XS: [0.5, 1], S: [1, 3], M: [3, 8], L: [8, 20], XL: [20, 40] };
 var DEFAULT_RATES = {
@@ -9595,14 +9691,14 @@ maintenance_plans:    # precio mensual; horas incluidas por mes
   premium:  { price: 0, hours: 0 }   # + monitoreo y soporte prioritario
 `;
 function loadRates(env = process.env) {
-  const file = join12(configDir(env), "rates.yaml");
+  const file = join13(configDir(env), "rates.yaml");
   let created = false;
-  if (!existsSync11(file)) {
+  if (!existsSync12(file)) {
     mkdirSync6(configDir(env), { recursive: true });
-    writeFileSync7(file, RATES_TEMPLATE);
+    writeFileSync8(file, RATES_TEMPLATE);
     created = true;
   }
-  const raw = (0, import_yaml6.parse)(readFileSync10(file, "utf8")) ?? {};
+  const raw = (0, import_yaml7.parse)(readFileSync11(file, "utf8")) ?? {};
   const rates = { ...DEFAULT_RATES, ...raw, maintenance_plans: { ...DEFAULT_RATES.maintenance_plans, ...raw.maintenance_plans } };
   return { rates, created, configured: rates.hourly_rate > 0 };
 }
@@ -9627,9 +9723,9 @@ function loaded(hours, rates) {
   return scale(hours, (1 + rates.pm_overhead) * (1 + rates.risk_buffer));
 }
 function recurringCosts(profile, catalog) {
-  const file = join12(catalog.dir, "costs.yaml");
-  if (!existsSync11(file)) return [];
-  const table = (0, import_yaml6.parse)(readFileSync10(file, "utf8"));
+  const file = join13(catalog.dir, "costs.yaml");
+  if (!existsSync12(file)) return [];
+  const table = (0, import_yaml7.parse)(readFileSync11(file, "utf8"));
   const out = Object.entries(table.always ?? {}).map(([key, c]) => ({ key, ...c }));
   for (const d of stack(profile, catalog)) {
     const cost = table.stack?.[`${d.key}.${d.value}`];
@@ -9722,25 +9818,25 @@ function projectKey(profile) {
   return (profile.project || "proyecto").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "proyecto";
 }
 function saveQuote(profile, q, rates, env = process.env) {
-  const dir = join12(configDir(env), "quotes", projectKey(profile));
+  const dir = join13(configDir(env), "quotes", projectKey(profile));
   mkdirSync6(dir, { recursive: true });
-  const file = join12(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
-  writeFileSync7(file, (0, import_yaml6.stringify)({ profile: profile.project, catalog_version: profile.catalog_version, rates, quote: q }, { lineWidth: 0 }));
+  const file = join13(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
+  writeFileSync8(file, (0, import_yaml7.stringify)({ profile: profile.project, catalog_version: profile.catalog_version, rates, quote: q }, { lineWidth: 0 }));
   return file;
 }
 function logTime(profile, id, hours, env = process.env) {
-  const dir = join12(configDir(env), "actuals");
+  const dir = join13(configDir(env), "actuals");
   mkdirSync6(dir, { recursive: true });
-  const file = join12(dir, `${projectKey(profile)}.yaml`);
-  appendFileSync2(file, (0, import_yaml6.stringify)([{ id, hours, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), catalog_version: profile.catalog_version }]));
+  const file = join13(dir, `${projectKey(profile)}.yaml`);
+  appendFileSync2(file, (0, import_yaml7.stringify)([{ id, hours, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), catalog_version: profile.catalog_version }]));
   return file;
 }
 function calibrate(catalog, env = process.env, minSamples = 3) {
-  const dir = join12(configDir(env), "actuals");
-  if (!existsSync11(dir)) return [];
+  const dir = join13(configDir(env), "actuals");
+  if (!existsSync12(dir)) return [];
   const byId = /* @__PURE__ */ new Map();
   for (const f of readdirSync5(dir).filter((f2) => f2.endsWith(".yaml"))) {
-    for (const row of (0, import_yaml6.parse)(readFileSync10(join12(dir, f), "utf8")) ?? []) {
+    for (const row of (0, import_yaml7.parse)(readFileSync11(join13(dir, f), "utf8")) ?? []) {
       byId.set(row.id, [...byId.get(row.id) ?? [], row.hours]);
     }
   }
@@ -9799,11 +9895,11 @@ function parseArgs(argv) {
   return out;
 }
 function readInput(source) {
-  if (source === void 0 || source === true || source === "-") return readFileSync11(0, "utf8");
-  return readFileSync11(source, "utf8");
+  if (source === void 0 || source === true || source === "-") return readFileSync12(0, "utf8");
+  return readFileSync12(source, "utf8");
 }
 function proposedProfile(args, catalog) {
-  const raw = (0, import_yaml7.parse)(readInput(args.flags.from)) ?? {};
+  const raw = (0, import_yaml8.parse)(readInput(args.flags.from)) ?? {};
   const presetName = args.flags.preset ?? raw.preset;
   const preset = presetName ? catalog.presets[presetName] : {};
   if (presetName && !preset) fail(`preset desconocido: ${presetName}. Disponibles: ${Object.keys(catalog.presets).join(", ")}`);
@@ -9841,6 +9937,7 @@ function regenerate(root, profile, catalog) {
   const evaluated = evaluate(profile, catalog);
   const results = verifyItems(root, profile, evaluated, "fast");
   writeBrief(root, renderBrief(profile, evaluated, catalog, results));
+  writeScope(root, renderScope(profile, evaluated, catalog));
 }
 function currentBranch(root) {
   try {
@@ -9851,7 +9948,7 @@ function currentBranch(root) {
 }
 function hookInput() {
   try {
-    return JSON.parse(readFileSync11(0, "utf8") || "{}");
+    return JSON.parse(readFileSync12(0, "utf8") || "{}");
   } catch {
     return {};
   }
@@ -9878,18 +9975,18 @@ function closePassingPhases(root, catalog) {
   return closed;
 }
 function installResponsiveTest(root, catalog) {
-  const target = join13(root, "tests", "responsive.spec.ts");
-  if (existsSync12(target)) return void 0;
+  const target = join14(root, "tests", "responsive.spec.ts");
+  if (existsSync13(target)) return void 0;
   mkdirSync7(dirname3(target), { recursive: true });
-  writeFileSync8(target, readFileSync11(join13(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
-  const pkgFile = join13(root, "package.json");
-  if (existsSync12(pkgFile)) {
-    const text = readFileSync11(pkgFile, "utf8");
+  writeFileSync9(target, readFileSync12(join14(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
+  const pkgFile = join14(root, "package.json");
+  if (existsSync13(pkgFile)) {
+    const text = readFileSync12(pkgFile, "utf8");
     const pkg = JSON.parse(text);
     if (!pkg.scripts?.["test:responsive"]) {
       pkg.scripts = { ...pkg.scripts, "test:responsive": "playwright test tests/responsive.spec.ts" };
       const indent = text.match(/^\{\n([ \t]+)/)?.[1] ?? "  ";
-      writeFileSync8(pkgFile, JSON.stringify(pkg, null, indent) + "\n");
+      writeFileSync9(pkgFile, JSON.stringify(pkg, null, indent) + "\n");
     }
   }
   return "tests/responsive.spec.ts";
@@ -9968,11 +10065,11 @@ function main() {
       saveProfile(root, profile);
       regenerate(root, profile, catalog);
       const adrs = writeStackAdrs(root, profile, catalog);
-      const linked = linkClaudeMd(root, readFileSync11(join13(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
-      const ci = join13(root, ".github", "workflows", "mep.yml");
-      if (!existsSync12(ci)) {
+      const linked = linkClaudeMd(root, readFileSync12(join14(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
+      const ci = join14(root, ".github", "workflows", "mep.yml");
+      if (!existsSync13(ci)) {
         mkdirSync7(dirname3(ci), { recursive: true });
-        writeFileSync8(ci, readFileSync11(join13(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
+        writeFileSync9(ci, readFileSync12(join14(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
       }
       const responsive = installResponsiveTest(root, catalog);
       log(root, "init", `${profile.type} (${profile.capabilities.join(",")})`);
@@ -9980,7 +10077,7 @@ function main() {
       if (closed.length) regenerate(root, loadProfile(root, catalog), catalog);
       return print(
         [
-          `\u2705 .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? "enlazado" : "ya estaba enlazado"}. CI: .github/workflows/mep.yml.`,
+          `\u2705 .mep/profile.yaml, SCOPE.md y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? "enlazado" : "ya estaba enlazado"}. CI: .github/workflows/mep.yml.`,
           responsive ? `Test responsive: ${responsive} (requiere @playwright/test; edita PAGES con las rutas clave).` : "",
           closed.length ? `Sub-etapas ya cumplidas y cerradas: ${closed.join(", ")}.` : "",
           quoteOnScopeChange(loadProfile(root, catalog), catalog)
@@ -9991,18 +10088,18 @@ function main() {
       const profile = requireProfile(root, catalog);
       regenerate(root, profile, catalog);
       const adrs = writeStackAdrs(root, profile, catalog);
-      return print(`BRIEF.md regenerado.${adrs.length ? ` ADRs nuevos: ${adrs.join(", ")}` : ""}`);
+      return print(`SCOPE.md y BRIEF.md regenerados.${adrs.length ? ` ADRs nuevos: ${adrs.join(", ")}` : ""}`);
     }
     case "add": {
       const before = requireProfile(root, catalog);
-      const proposed = (0, import_yaml7.parse)(readInput(args.flags.from)) ?? {};
+      const proposed = (0, import_yaml8.parse)(readInput(args.flags.from)) ?? {};
       const after = normalizeProfile({ ...before, ...proposed, phase: before.phase, selections: before.selections }, catalog);
       const errors = validateProfile(after, catalog);
       if (errors.length) fail(`perfil inv\xE1lido:
 - ${errors.join("\n- ")}`);
       const changes = diff(before, after, catalog);
-      const labels = { new: "\uFF0B nuevo", raised: "\u2191 sube", lowered: "\u2193 baja", removed: "\uFF0D deja de aplicar" };
-      const text = changes.length ? changes.map((c) => `${labels[c.change]}  ${c.id} \u2014 ${c.title}${c.from ? ` (${c.from}${c.to ? ` \u2192 ${c.to}` : ""})` : c.to ? ` (${c.to})` : ""}`).join("\n") : "Sin cambios en el checklist.";
+      const labels2 = { new: "\uFF0B nuevo", raised: "\u2191 sube", lowered: "\u2193 baja", removed: "\uFF0D deja de aplicar" };
+      const text = changes.length ? changes.map((c) => `${labels2[c.change]}  ${c.id} \u2014 ${c.title}${c.from ? ` (${c.from}${c.to ? ` \u2192 ${c.to}` : ""})` : c.to ? ` (${c.to})` : ""}`).join("\n") : "Sin cambios en el checklist.";
       if (args.flags.json) return json(changes);
       const { rates, configured } = loadRates();
       const qa = quote(before, catalog, rates);
@@ -10154,7 +10251,7 @@ ${formatItems(pending)}` : `
         if (!id || !["pass", "fail", "risk"].includes(result)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."');
         if (!catalog.items.some((i) => i.id === id && i.category === "security")) fail(`${id} no es un \xEDtem de seguridad`);
         const files = String(args.flags.files ?? "").split(",").map((f) => f.trim()).filter(Boolean);
-        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync12(join13(root, f)));
+        const missing = files.filter((f) => !matchFiles(root, f).length && !existsSync13(join14(root, f)));
         if (missing.length) fail(`archivos inexistentes: ${missing.join(", ")}`);
         recordReport(root, { id, result, files, notes: String(args.flags.notes ?? "") });
         return print(`reporte de ${id}: ${result}`);
@@ -10170,7 +10267,7 @@ ${formatItems(pending)}` : `
         const { phase, selections, version, catalog_version, ...shown } = profile2;
         return print(`Lo que muestra el c\xF3digo (evidencia, no el scope: conf\xEDrmalo contra lo que el proyecto debe ser)
 
-${(0, import_yaml7.stringify)(shown, { lineWidth: 0 }).trim()}
+${(0, import_yaml8.stringify)(shown, { lineWidth: 0 }).trim()}
 
 Evidencia:
 ${Object.entries(evidence).map(([k, v]) => `  ${k}: ${v}`).join("\n")}`);
@@ -10280,17 +10377,17 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
     case "export": {
       const profile = requireProfile(root, catalog);
       const input = args.flags.in;
-      if (!input || !existsSync12(join13(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
+      if (!input || !existsSync13(join14(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
       const format = String(args.flags.format ?? "both");
-      const blocks = parseMarkdown(readFileSync11(join13(root, input), "utf8"));
-      const base = join13(root, dirname3(input), basename(input).replace(/\.md$/, ""));
+      const blocks = parseMarkdown(readFileSync12(join14(root, input), "utf8"));
+      const base = join14(root, dirname3(input), basename(input).replace(/\.md$/, ""));
       const files = [];
       if (format === "docx" || format === "both") {
-        writeFileSync8(`${base}.docx`, toDocx(blocks));
+        writeFileSync9(`${base}.docx`, toDocx(blocks));
         files.push(`${base}.docx`.slice(root.length + 1));
       }
       if (format === "pdf" || format === "both") {
-        writeFileSync8(`${base}.pdf`, toPdf(blocks));
+        writeFileSync9(`${base}.pdf`, toPdf(blocks));
         files.push(`${base}.pdf`.slice(root.length + 1));
       }
       const { rates, configured } = loadRates();

@@ -133,6 +133,8 @@ export type Profile = {
   stack: { decided: Record<string, string> }
   /** Features of the scope that are not in the catalog; Claude sizes them and they show as "estimación a revisar". */
   custom_work?: { title: string; size: Size; phase?: string }[]
+  /** One paragraph, in the person's words: what the project is, for whom and what it must achieve. Shown at the top of SCOPE.md. */
+  summary?: string
   /** Code quality thresholds (complexity, max_lines, max_function_lines). Laxer than the defaults needs a reason. */
   quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines', number>>
 }

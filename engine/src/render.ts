@@ -80,6 +80,8 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
     `<!-- Generado por mep desde .mep/profile.yaml (catálogo ${profile.catalog_version}). No editar a mano: usa /mep:add, /mep:skip, /mep:override. -->`,
     `# Brief — ${profile.project}`,
     '',
+    '> El resumen del scope en lenguaje claro está en [SCOPE.md](SCOPE.md).',
+    '',
     '## Perfil',
     profileSection(profile, marketLocales(profile, catalog)),
     '',

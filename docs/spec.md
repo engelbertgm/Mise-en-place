@@ -328,7 +328,7 @@ Reglas:
 2. Hace preguntas **solo** si falta algo que cambia ítems obligatorios (ej. mercados, si hay menores) o los `counts` del cotizador (páginas, entidades, idiomas, integraciones).
 3. Corre `evaluate` y muestra: 🔴 obligatorios, 🟡 recomendados, ⚪ opcionales, agrupados por categoría.
 4. El usuario elige opcionales y confirma.
-5. Escribe `.mep/profile.yaml` y genera `BRIEF.md`.
+5. Escribe `.mep/profile.yaml` y genera `SCOPE.md` (resumen del scope en lenguaje claro: qué es, qué incluye, qué no incluye, tecnología, cuántas reglas aplican y qué falta definir) y `BRIEF.md`. Ambos se regeneran con cada `/mep:add`; no se editan a mano.
 6. Agrega a `CLAUDE.md` (sin borrar lo existente):
    ```
    Este proyecto se rige por BRIEF.md. Los ítems 🔴 son requisitos no negociables.

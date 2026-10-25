@@ -16,6 +16,7 @@ import { globToRegExp } from './files.ts'
 import { verifyItems } from './verify.ts'
 import { compareScopeAndCode, gapReport, inferProfile } from './audit.ts'
 import { applicability, explainItem } from './explain.ts'
+import { renderScope, writeScope } from './scope.ts'
 import { parseMarkdown, toDocx, toPdf } from './docs.ts'
 import { exportData, recordExport } from './export.ts'
 import { checkCodemap, checkRegistry, writeCodemap, writeRegistry } from './maps.ts'
@@ -90,6 +91,7 @@ function regenerate(root: string, profile: Profile, catalog: Catalog): void {
   const evaluated = evaluate(profile, catalog)
   const results = verifyItems(root, profile, evaluated, 'fast')
   writeBrief(root, renderBrief(profile, evaluated, catalog, results))
+  writeScope(root, renderScope(profile, evaluated, catalog))
 }
 
 function currentBranch(root: string): string | undefined {
@@ -248,7 +250,7 @@ function main(): void {
       if (closed.length) regenerate(root, loadProfile(root, catalog), catalog)
       return print(
         [
-          `✅ .mep/profile.yaml y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? 'enlazado' : 'ya estaba enlazado'}. CI: .github/workflows/mep.yml.`,
+          `✅ .mep/profile.yaml, SCOPE.md y BRIEF.md creados. ADRs: ${adrs.length}. CLAUDE.md ${linked ? 'enlazado' : 'ya estaba enlazado'}. CI: .github/workflows/mep.yml.`,
           responsive ? `Test responsive: ${responsive} (requiere @playwright/test; edita PAGES con las rutas clave).` : '',
           closed.length ? `Sub-etapas ya cumplidas y cerradas: ${closed.join(', ')}.` : '',
           quoteOnScopeChange(loadProfile(root, catalog), catalog),
@@ -261,7 +263,7 @@ function main(): void {
       const profile = requireProfile(root, catalog)
       regenerate(root, profile, catalog)
       const adrs = writeStackAdrs(root, profile, catalog)
-      return print(`BRIEF.md regenerado.${adrs.length ? ` ADRs nuevos: ${adrs.join(', ')}` : ''}`)
+      return print(`SCOPE.md y BRIEF.md regenerados.${adrs.length ? ` ADRs nuevos: ${adrs.join(', ')}` : ''}`)
     }
     case 'add': {
       const before = requireProfile(root, catalog)

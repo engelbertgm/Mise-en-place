@@ -19,7 +19,7 @@ Las reglas de mep se activan por el **scope** del proyecto (tipo, capacidades, m
 4. Arma el perfil desde el scope (skill `mep`), usando el código solo como evidencia. Donde no coincidan, pregunta (AskUserQuestion, máximo 4):
    - algo en el código que el scope no menciona (ej. dependencia `stripe` sin cobrar nada): ¿es parte del scope o sobra?
    - algo del scope que el código aún no tiene: va al perfil igual; es trabajo pendiente, no un error.
-   Pregunta también lo que el código no puede decir y cambia 🔴: mercados, audiencia (menores, datos sensibles), contexto (cliente o propio). Escribe el perfil confirmado en `.mep/draft.yaml`.
+   Pregunta también lo que el código no puede decir y cambia 🔴: mercados, audiencia (menores, datos sensibles), contexto (cliente o propio). Escribe el perfil confirmado en `.mep/draft.yaml`, con `summary`: un párrafo en palabras del usuario sobre qué es el proyecto.
 5. Corre `audit --from .mep/draft.yaml`. Muestra tal cual: cuántas reglas aplican por el scope y cuántas no, las diferencias scope vs código, y la brecha por sub-etapa y nivel. Si el usuario pregunta por una regla que no aparece o que sí aparece, `explain <id> --from .mep/draft.yaml` dice por qué.
 6. Si Ponytail está instalado, corre `/ponytail-audit` y agrega su ranking de qué arreglar primero al final del reporte.
 7. Nada se bloquea hasta adoptar el brief. Si el usuario lo adopta: `init --from .mep/draft.yaml --close-passing` (cierra en orden las sub-etapas que ya cumplen sus 🔴) y borra `.mep/draft.yaml`. Si no, borra `.mep/draft.yaml` y no dejes rastro.

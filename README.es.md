@@ -6,7 +6,7 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.1.4-informational.svg)](.claude-plugin/plugin.json)
+[![Versión](https://img.shields.io/badge/versión-0.1.5-informational.svg)](.claude-plugin/plugin.json)
 [![Catálogo](https://img.shields.io/badge/catálogo-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -92,7 +92,7 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 
 | Comando | Qué hace |
 | --- | --- |
-| `/mep:scope [--preset <nombre>] <descripción>` | Pregunta solo lo que cambia ítems 🔴 y escribe `.mep/profile.yaml`, `BRIEF.md`, los ADRs de stack, el bloque de `CLAUDE.md` y el workflow de CI |
+| `/mep:scope [--preset <nombre>] <descripción>` | Pregunta solo lo que cambia ítems 🔴 y escribe `.mep/profile.yaml`, `SCOPE.md` (el scope en palabras simples: qué incluye y qué no), `BRIEF.md`, los ADRs de stack, el bloque de `CLAUDE.md` y el workflow de CI |
 | `/mep:add <cambio>` | Actualiza el scope y muestra **solo el diff**: ítems nuevos, ítems que suben de nivel e ítems que dejan de aplicar |
 | `/mep:check` | Estado por sub-etapa: ✅ cumplido · ❌ pendiente · ⏭️ omitido · ⚠️ desactivado. Avisa si el código muestra señales que el perfil no tiene |
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
@@ -188,7 +188,7 @@ Nada corre en un repo sin `.mep/profile.yaml`. Escape de emergencia: `MEP_BYPASS
 
 | Dentro del repo (versionado) | Fuera del repo (`~/.config/mep-check/`) |
 | --- | --- |
-| `.mep/profile.yaml`, `.mep/log`, `.mep/security/`, `BRIEF.md`, `docs/decisions/` | Tarifas, horas reales, cotizaciones internas |
+| `.mep/profile.yaml`, `.mep/log`, `.mep/security/`, `SCOPE.md`, `BRIEF.md`, `docs/decisions/` | Tarifas, horas reales, cotizaciones internas |
 
 En un `client-project` el repo se entrega al cliente, así que nada interno de tu negocio se queda en él.
 
@@ -222,6 +222,7 @@ Mise-en-place/
 │   │   ├── verify.ts          # corre las verificaciones de cada ítem (html.ts, sql.ts, maps.ts)
 │   │   ├── gate.ts            # reglas de bloqueo y cierre de fases
 │   │   ├── render.ts          # BRIEF.md, ADRs, bloque de CLAUDE.md
+│   │   ├── scope.ts           # SCOPE.md: el scope en palabras simples
 │   │   ├── audit.ts           # infiere el perfil de un repo existente
 │   │   ├── update.ts          # ítems nuevos del catálogo, periodo de gracia
 │   │   ├── quote.ts           # cotización, horas reales, calibración
@@ -257,6 +258,7 @@ tu-proyecto/
 │   ├── log                    # overrides, bypass y cambios de fase
 │   ├── security/<id>.json     # reportes de auditoría de mep-security
 │   └── exports.yaml           # versiones del brief para el cliente
+├── SCOPE.md                   # generado: qué es y qué no es el proyecto, en palabras simples
 ├── BRIEF.md                   # brief generado: perfil, stack, checklist por sub-etapa
 ├── CLAUDE.md                  # + el bloque de mep (se conserva lo que había)
 ├── CODEMAP.md                 # dónde está qué

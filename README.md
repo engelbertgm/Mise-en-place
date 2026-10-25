@@ -6,7 +6,7 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.4-informational.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.1.5-informational.svg)](.claude-plugin/plugin.json)
 [![Catalog](https://img.shields.io/badge/catalog-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -92,7 +92,7 @@ Then, in a new or existing project folder:
 
 | Command | What it does |
 | --- | --- |
-| `/mep:scope [--preset <name>] <description>` | Asks only what changes 🔴 items, then writes `.mep/profile.yaml`, `BRIEF.md`, stack ADRs, the `CLAUDE.md` block and the CI workflow |
+| `/mep:scope [--preset <name>] <description>` | Asks only what changes 🔴 items, then writes `.mep/profile.yaml`, `SCOPE.md` (the scope in plain words: what is in, what is out), `BRIEF.md`, stack ADRs, the `CLAUDE.md` block and the CI workflow |
 | `/mep:add <change>` | Updates the scope and shows **only the diff**: new items, items that move up a level, items that no longer apply |
 | `/mep:check` | Status by sub-phase: ✅ done · ❌ pending · ⏭️ skipped · ⚠️ overridden. Warns about signals in the code the profile does not have |
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` runs the security audit and quality review, then closes it |
@@ -188,7 +188,7 @@ Nothing runs in a repo without `.mep/profile.yaml`. Emergency escape: `MEP_BYPAS
 
 | In the repo (versioned) | Outside the repo (`~/.config/mep-check/`) |
 | --- | --- |
-| `.mep/profile.yaml`, `.mep/log`, `.mep/security/`, `BRIEF.md`, `docs/decisions/` | Rates, real hours, internal quotes |
+| `.mep/profile.yaml`, `.mep/log`, `.mep/security/`, `SCOPE.md`, `BRIEF.md`, `docs/decisions/` | Rates, real hours, internal quotes |
 
 In a `client-project` the repo is handed to the client, so nothing internal to your business stays in it.
 
@@ -222,6 +222,7 @@ Mise-en-place/
 │   │   ├── verify.ts          # runs each item's checks (html.ts, sql.ts, maps.ts)
 │   │   ├── gate.ts            # blocking rules and phase close
 │   │   ├── render.ts          # BRIEF.md, ADRs, CLAUDE.md block
+│   │   ├── scope.ts           # SCOPE.md: the scope in plain words
 │   │   ├── audit.ts           # infers a profile from an existing repo
 │   │   ├── update.ts          # new catalog items, grace period
 │   │   ├── quote.ts           # quote, log-time, calibration
@@ -257,6 +258,7 @@ your-project/
 │   ├── log                    # overrides, bypasses, phase changes
 │   ├── security/<id>.json     # mep-security audit reports
 │   └── exports.yaml           # client brief versions
+├── SCOPE.md                   # generated: what the project is and is not, in plain words
 ├── BRIEF.md                   # generated brief: profile, stack, checklist by sub-phase
 ├── CLAUDE.md                  # + the mep block (what was there is kept)
 ├── CODEMAP.md                 # where things are
