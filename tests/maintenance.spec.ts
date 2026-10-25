@@ -8,6 +8,7 @@ import { loadCatalog } from '../engine/src/catalog.ts'
 import { parseMarkdown, toDocx, toPdf } from '../engine/src/docs.ts'
 import { exportData, recordExport } from '../engine/src/export.ts'
 import { closePhase, gate } from '../engine/src/gate.ts'
+import { recordReview } from '../engine/src/review.ts'
 import { checkCodemap, checkRegistry, writeCodemap, writeRegistry } from '../engine/src/maps.ts'
 import { loadProfile, saveProfile } from '../engine/src/profile.ts'
 import { calibrate, formatClient, loadRates, logTime, quote } from '../engine/src/quote.ts'
@@ -51,7 +52,8 @@ describe('/mep:update', () => {
     assert.equal(close.closed, false)
     assert.ok(close.pending.some(r => r.item.id === 'new-closed'))
     addFiles(root, { 'new-closed.txt': '' })
-    assert.equal(closePhase(root, catalog, 'foundation.design').closed, true)
+    recordReview(root, { sub: 'foundation.design', tool: 'mep', must_fix: 0, notes: '' })
+    assert.equal(closePhase(root, catalog, 'foundation.design', { env: { MEP_PONYTAIL: '0' } }).closed, true)
     assert.deepEqual(loadProfile(root, catalog).selections.grace, [])
   })
 })

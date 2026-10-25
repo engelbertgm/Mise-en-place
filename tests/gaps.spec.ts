@@ -19,7 +19,7 @@ import { checkThresholds } from '../engine/src/quality.ts'
 import { formatClient, quote } from '../engine/src/quote.ts'
 import { detectSignals } from '../engine/src/signals.ts'
 import type { Rates } from '../engine/src/quote.ts'
-import { CLI, makeRepo, profile, tempDir, withProfile } from './helpers.ts'
+import { CLI, addFiles, makeRepo, profile, tempDir, withProfile } from './helpers.ts'
 
 const real = loadCatalog()
 
@@ -142,12 +142,14 @@ describe('7. review before a PR into main', () => {
     spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'a'], { cwd: root })
     assert.equal(prReviewGate(root).block, false)
     withProfile(root, real)
-    const first = prReviewGate(root)
+    const first = prReviewGate(root, { MEP_PONYTAIL: '1' })
     assert.equal(first.block, true)
     assert.match(first.message, /ponytail-review branch/)
     assert.equal(prReviewGate(root).block, false)
     spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'b'], { cwd: root })
-    assert.equal(prReviewGate(root).block, true)
+    const second = prReviewGate(root, { MEP_PONYTAIL: '0' })
+    assert.equal(second.block, true)
+    assert.match(second.message, /Ponytail no está instalado: revisa duplicados/)
     const hook = spawnSync('node', [CLI, 'hook', 'pre-bash'], { cwd: root, encoding: 'utf8', input: JSON.stringify({ cwd: root, tool_input: { command: 'gh pr create --fill' } }) })
     assert.equal(hook.stdout, '')
     assert.ok(existsSync(join(root, '.mep/.gitignore')))
@@ -313,5 +315,23 @@ describe('12. SCOPE.md: the scope in plain words', () => {
     writeFileSync(join(root, 'change.yaml'), 'capabilities: [payment-links, newsletter]\n')
     assert.equal(spawnSync('node', [CLI, 'add', '--from', 'change.yaml', '--apply'], { cwd: root, encoding: 'utf8', env }).status, 0)
     assert.match(readFileSync(join(root, 'SCOPE.md'), 'utf8'), /## Qué incluye[\s\S]*ewsletter[\s\S]*## Qué no incluye/)
+  })
+})
+
+describe('13. Ponytail is detected from the Claude Code settings', () => {
+  test('enabled in project settings, disabled explicitly, or only installed', async () => {
+    const { ponytailInstalled } = await import('../engine/src/review.ts')
+    const claude = tempDir()
+    const env = { CLAUDE_CONFIG_DIR: claude }
+    const root = makeRepo()
+    assert.equal(ponytailInstalled(root, env), false)
+    addFiles(root, { '.claude/settings.json': '{"enabledPlugins":{"ponytail@ponytail":true}}' })
+    assert.equal(ponytailInstalled(root, env), true)
+    addFiles(root, { '.claude/settings.local.json': '{"enabledPlugins":{"ponytail@ponytail":false}}' })
+    assert.equal(ponytailInstalled(root, env), false)
+    const other = makeRepo()
+    addFiles(claude, { 'plugins/installed_plugins.json': '{"plugins":{"ponytail@ponytail":[{}]}}' })
+    assert.equal(ponytailInstalled(other, env), true)
+    assert.equal(ponytailInstalled(other, { ...env, MEP_PONYTAIL: '0' }), false)
   })
 })

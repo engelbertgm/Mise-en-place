@@ -5,6 +5,7 @@ import { describe, test } from 'node:test'
 import { deployKind } from '../engine/src/deploy.ts'
 import { closePhase, gate } from '../engine/src/gate.ts'
 import { loadProfile } from '../engine/src/profile.ts'
+import { recordReview } from '../engine/src/review.ts'
 import { findSecret } from '../engine/src/secrets.ts'
 import { addFiles, item, makeRepo, testCatalog, withProfile } from './helpers.ts'
 
@@ -86,7 +87,9 @@ describe('phase close', () => {
     assert.equal(fail.closed, false)
     assert.deepEqual(ids(fail.pending), ['setup-a'])
     addFiles(root, { 'setup-a.txt': '' })
-    const ok = closePhase(root, catalog, 'foundation.setup')
+    assert.match(closePhase(root, catalog, 'foundation.setup', { env: { MEP_PONYTAIL: '0' } }).message, /sin revisión de calidad/)
+    recordReview(root, { sub: 'foundation.setup', tool: 'mep', must_fix: 0, notes: '' })
+    const ok = closePhase(root, catalog, 'foundation.setup', { env: { MEP_PONYTAIL: '0' } })
     assert.equal(ok.closed, true)
     const p = loadProfile(root, catalog)
     assert.deepEqual(p.phase.closed, ['foundation.setup'])

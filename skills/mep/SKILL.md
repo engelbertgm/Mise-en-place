@@ -41,6 +41,7 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
 - Seguridad: la implementa o la audita el agente `mep-security`. Un ítem de seguridad solo cuenta como cumplido con su reporte en `.mep/security/`.
 - Para encontrar código usa el agente `mep-locator`. Mantén los mapas al día: `codemap` regenera `CODEMAP.md` (respeta "Notas manuales") y `registry` regenera `REGISTRY.md` desde los exports; "Para qué", "No usar para", "Variantes" y `@example` se escriben en el comentario `/** */` de cada export, nunca en el registro.
 - Antes de abrir o fusionar un PR a `main`, mep pide una revisión de calidad (una vez por commit): `/ponytail-review branch` si Ponytail está instalado; si no, revisa duplicados, nombres, complejidad y reutilización contra `REGISTRY.md`. Luego reintenta el comando.
+- Para cerrar una sub-etapa, el motor exige una revisión de calidad registrada (`review record`), sin "must fix" y sobre el código actual: `/ponytail-review` si Ponytail está instalado, si no la revisión propia. `review` dice cuál.
 - Umbrales de calidad (complexity, max_lines, max_function_lines) en `quality` del perfil; relajarlos solo con `threshold … --yes` y razón del usuario.
 - Features fuera del catálogo van en `custom_work` del perfil, con talla; el cotizador las marca "estimación a revisar".
 - Cotización: solo corre sola al definir el scope y en cambios de scope. No la calcules en otros momentos salvo que el usuario la pida (`/mep:quote`).

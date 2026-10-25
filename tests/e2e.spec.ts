@@ -16,7 +16,7 @@ function mep(args: string[], opts: { input?: string; env?: Record<string, string
     cwd: root,
     input: opts.input,
     encoding: 'utf8',
-    env: { ...process.env, MEP_BYPASS: '', MEP_CONFIG_DIR: config, ...opts.env },
+    env: { ...process.env, MEP_BYPASS: '', MEP_CONFIG_DIR: config, MEP_PONYTAIL: '1', ...opts.env },
   })
   return { code: r.status, out: r.stdout, err: r.stderr }
 }
@@ -84,6 +84,16 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
       const files = { 'dependency-scan-ci': '.github/workflows/ci.yml', 'env-gitignored': '.gitignore,.env.example', 'lockfile-committed': 'pnpm-lock.yaml', 'no-secrets-in-repo': '.env.example,lib/auth.ts,lib/billing.ts', 'public-env-prefix': '.env.example', 'secrets-scan-ci': '.github/workflows/ci.yml,.husky/pre-commit' }[id]!
       assert.equal(mep(['security', 'record', '--id', id, '--result', 'pass', '--files', files, '--notes', 'revisado en el e2e']).code, 0, id)
     }
+    // Ponytail is installed: the close needs /ponytail-review recorded, without "must fix", on the current code.
+    assert.match(mep(['phase', 'close', 'foundation.setup']).out, /corre \/ponytail-review/)
+    assert.equal(mep(['review', 'record', '--tool', 'mep', '--must-fix', '0']).code, 1)
+    mep(['review', 'record', '--must-fix', '2', '--notes', 'duplicado en lib/billing.ts'])
+    assert.match(mep(['phase', 'close', 'foundation.setup']).out, /2 "must fix" pendiente/)
+    mep(['review', 'record', '--must-fix', '0'])
+    writeFileSync(join(root, 'lib/extra.ts'), 'export const x = 1\n')
+    assert.match(mep(['phase', 'close', 'foundation.setup']).out, /revisión vencida/)
+    rmSync(join(root, 'lib/extra.ts'))
+    assert.match(mep(['review']).out, /✅ foundation\.setup — revisado con ponytail/)
     const ok = mep(['phase', 'close', 'foundation.setup'])
     assert.equal(ok.code, 0, ok.out + ok.err)
     assert.equal(profileFile().phase.active, 'foundation.design')
@@ -183,6 +193,6 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
 
   test('13. the log has every override, bypass and phase change', () => {
     const log = readFileSync(join(root, '.mep/log'), 'utf8')
-    for (const e of ['init', 'override no-critical-vulnerabilities', 'phase-close foundation.setup', 'bypass stop', 'add ', 'update ']) assert.match(log, new RegExp(e))
+    for (const e of ['init', 'override no-critical-vulnerabilities', 'review foundation.setup ponytail', 'phase-close foundation.setup', 'bypass stop', 'add ', 'update ']) assert.match(log, new RegExp(e))
   })
 })

@@ -134,7 +134,7 @@
   since: "2026.10.2"
   effort: { size: S, hours: [1, 2] }
   why: "Detecta duplicados, nombres confusos y oportunidades de reutilizar antes de que se acumulen."
-  how: "/ponytail-review al cerrar (sus \"must fix\" bloquean); sin Ponytail, la revisión propia de /mep:phase close."
+  how: "mep phase close la exige: /ponytail-review si Ponytail está instalado (sus \"must fix\" bloquean), si no la revisión propia; se registra con mep review record y vence si el código cambia."
   verify:
     - { type: manual, prompt: "Revisión de calidad hecha al cerrar la última sub-etapa" }
 

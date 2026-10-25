@@ -337,7 +337,7 @@ Reglas:
    - Para encontrar algo, consulta primero CODEMAP.md y REGISTRY.md; no busques archivo por archivo.
    - Antes de crear algo, revisa REGISTRY.md y reutiliza lo que exista.
    - Todo lo relacionado con seguridad lo hace o lo audita el agente mep-security.
-   - Ponytail está activo: sigue su escalera (¿hace falta? → ¿ya existe aquí? → librería estándar → función nativa → dependencia instalada → mínimo que funciona). Su paso "¿ya existe aquí?" se resuelve con REGISTRY.md.
+   - Si Ponytail está instalado: sigue su escalera (¿hace falta? → ¿ya existe aquí? → librería estándar → función nativa → dependencia instalada → mínimo que funciona). Su paso "¿ya existe aquí?" se resuelve con REGISTRY.md.
    - La solución más simple que funcione; nada "por si acaso".
    - Nombres que explican; comentarios solo para el porqué.
    - Cada cambio deja el código igual o más limpio que antes.
@@ -1212,7 +1212,7 @@ Ponytail (`DietrichGebert/ponytail`) es un plugin siempre activo que hace que el
 | Momento | Comando de Ponytail | Rol en Mise en place |
 |---|---|---|
 | Siempre | `/ponytail` (nivel `full` por defecto) | Aplica el mantra de código en cada cambio |
-| Cerrar una sub-etapa | `/ponytail-review` | Reemplaza la "revisión de calidad" 🟡; sus hallazgos "must fix" bloquean el cierre |
+| Cerrar una sub-etapa | `/ponytail-review` | Reemplaza la revisión de calidad propia. El motor exige la revisión registrada (`mep review record`), sin "must fix" y sobre el código actual (hash); si Ponytail está instalado, solo cuenta `/ponytail-review` |
 | PR a `main` | `/ponytail-review branch` | Revisión antes del merge |
 | `/mep:audit` en repos existentes | `/ponytail-audit` | Aporta el ranking de qué arreglar primero al reporte de brecha |
 | Antes de `launch` | `/ponytail-debt` | Revisa los atajos diferidos; los que afectan ítems 🔴 se resuelven antes de lanzar |
@@ -1220,6 +1220,7 @@ Ponytail (`DietrichGebert/ponytail`) es un plugin siempre activo que hace que el
 Reglas de convivencia:
 - Los comentarios `shortcut:` de Ponytail **están permitidos** (no cuentan como `TODO` sin referencia), porque Ponytail los recolecta en su ledger.
 - Seguridad: Ponytail no recorta seguridad, pero la responsabilidad sigue siendo de `mep-security`.
+- Detección: `enabledPlugins` en `.claude/settings.local.json`, `.claude/settings.json` o `~/.claude/settings.json`, o `~/.claude/plugins/installed_plugins.json`. `MEP_PONYTAIL=1|0` lo fuerza.
 - Si Ponytail no está instalado, `/mep:scope` lo sugiere una vez; el plugin funciona igual sin él, usando la revisión de calidad propia.
 
 Notas de implementación:

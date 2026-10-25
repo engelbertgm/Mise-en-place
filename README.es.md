@@ -6,7 +6,7 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.1.5-informational.svg)](.claude-plugin/plugin.json)
+[![Versión](https://img.shields.io/badge/versión-0.1.6-informational.svg)](.claude-plugin/plugin.json)
 [![Catálogo](https://img.shields.io/badge/catálogo-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -60,7 +60,7 @@ Las sub-etapas van en orden: `foundation.setup → foundation.design → build.d
 
 | Plugin | Cómo se complementan |
 | --- | --- |
-| [ponytail](https://github.com/DietrichGebert/ponytail) | Aplica el mantra de código en cada cambio. `/ponytail-review` reemplaza la revisión de calidad de mep al cerrar una sub-etapa, y sus hallazgos "must fix" bloquean el cierre |
+| [ponytail](https://github.com/DietrichGebert/ponytail) | Aplica el mantra de código en cada cambio. `/ponytail-review` reemplaza la revisión de calidad de mep al cerrar una sub-etapa. El motor detecta Ponytail y exige la revisión registrada (`mep review record`), sin "must fix" y sobre el código actual, antes de cerrar |
 | [batuta](https://github.com/engelbertgm/Batuta) | Envía cada tarea al modelo adecuado (Opus decide, Sonnet ejecuta, Haiku lee). Los dos agentes de mep son excepciones fijas: localizar código siempre va a `mep-locator` y seguridad siempre a `mep-security` |
 
 Los dos son opcionales. mep funciona solo.

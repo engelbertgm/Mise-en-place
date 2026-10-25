@@ -10,6 +10,8 @@ import { cachedGate, closePhase, formatItems, gate, prReviewGate } from './gate.
 import { hasProfile, loadProfile, log, normalizeProfile, saveProfile, today } from './profile.ts'
 import { linkClaudeMd, renderBrief, writeBrief, writeStackAdrs } from './render.ts'
 import { counts, formatCheck, formatProposal } from './report.ts'
+import { ponytailInstalled, recordReview, reviewState } from './review.ts'
+import type { ReviewTool } from './review.ts'
 import { recordReport, reportState } from './security.ts'
 import { missingSignals } from './signals.ts'
 import { globToRegExp } from './files.ts'
@@ -133,7 +135,7 @@ function quoteOnScopeChange(profile: Profile, catalog: Catalog): string {
 function closePassingPhases(root: string, catalog: Catalog): string[] {
   const closed: string[] = []
   for (const sub of catalog.dimensions.phases) {
-    const r = closePhase(root, catalog, sub)
+    const r = closePhase(root, catalog, sub, { review: false })
     if (!r.closed) break
     closed.push(sub)
   }
@@ -409,6 +411,24 @@ function main(): void {
       regenerate(root, profile, catalog)
       return print(`✅ ${id} confirmado por ${by}`)
     }
+    case 'review': {
+      const profile = requireProfile(root, catalog)
+      const ponytail = ponytailInstalled(root)
+      if (rest[0] === 'record') {
+        const sub = String(args.flags.sub ?? profile.phase.active)
+        const tool = String(args.flags.tool ?? (ponytail ? 'ponytail' : 'mep')) as ReviewTool
+        const mustFix = Number(args.flags['must-fix'])
+        if (!catalog.dimensions.phases.includes(sub)) fail(`sub-etapa desconocida: ${sub}`)
+        if (!['ponytail', 'mep'].includes(tool) || !Number.isInteger(mustFix) || mustFix < 0) fail('Uso: mep review record --sub <sub-etapa> --tool ponytail|mep --must-fix <n> --notes "..."')
+        if (ponytail && tool !== 'ponytail') fail('Ponytail está instalado: la revisión se hace con /ponytail-review (--tool ponytail).')
+        recordReview(root, { sub, tool, must_fix: mustFix, notes: String(args.flags.notes ?? '') })
+        log(root, 'review', `${sub} ${tool} must_fix=${mustFix}`)
+        return print(mustFix ? `Revisión de ${sub} registrada con ${mustFix} "must fix": bloquean el cierre hasta arreglarlos y volver a revisar.` : `✅ Revisión de ${sub} registrada (${tool}, sin "must fix").`)
+      }
+      const sub = rest[0] ?? profile.phase.active
+      const state = reviewState(root, sub)
+      return print(`Ponytail: ${ponytail ? 'instalado (la revisión es /ponytail-review)' : 'no instalado (revisión propia de mep)'}\n${state.valid ? '✅' : '❌'} ${sub} — ${state.detail}`)
+    }
     case 'security': {
       requireProfile(root, catalog)
       if (rest[0] === 'record') {
@@ -579,6 +599,7 @@ function main(): void {
           '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> --by <nombre>',
           '  threshold <complexity|max_lines|max_function_lines> <valor> [razón --yes]',
           '  security [record --id --result --files --notes]',
+          '  review [<sub-etapa>] · review record --must-fix <n> [--sub] [--tool ponytail|mep] [--notes]   revisión de calidad para cerrar',
           '  audit [--from scope.yaml]                             evidencia del código / brecha según el scope (no escribe nada)',
           '  explain <id> [--from perfil.yaml]                     por qué una regla aplica o no a este scope',
           '  update [--apply]                                      ítems nuevos del catálogo que aplican',

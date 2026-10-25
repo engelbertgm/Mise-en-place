@@ -4,6 +4,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { evaluate } from './evaluate.ts'
 import { MEP_DIR, hasProfile, loadProfile, log, saveProfile } from './profile.ts'
+import { ponytailInstalled, reviewState } from './review.ts'
 import { failingDetail, verifyItems } from './verify.ts'
 import type { Mode } from './verify.ts'
 import type { Catalog, ItemResult, Profile } from './types.ts'
@@ -69,7 +70,11 @@ function uniq<T>(xs: T[]): T[] {
 
 export type PhaseCloseResult = { closed: boolean; message: string; pending: ItemResult[]; profile: Profile }
 
-export function closePhase(root: string, catalog: Catalog, sub: string): PhaseCloseResult {
+/**
+ * Closes a sub-phase when its required items pass and its quality review is recorded, current and without "must fix".
+ * `review: false` only for adopting an existing repo (init --close-passing), and it is logged.
+ */
+export function closePhase(root: string, catalog: Catalog, sub: string, { review = true, env = process.env } = {}): PhaseCloseResult {
   const profile = loadProfile(root, catalog)
   const phases = catalog.dimensions.phases
   if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. Válidas: ${phases.join(', ')}`, pending: [], profile }
@@ -79,18 +84,23 @@ export function closePhase(root: string, catalog: Catalog, sub: string): PhaseCl
   const grace = new Set(profile.selections.grace)
   // Only this sub-phase's items (and graced ones) are verified: closing never runs other phases' commands.
   const relevant = evaluate(profile, catalog).filter(e => e.item.phase === sub || grace.has(e.item.id))
+  // The review is checked before the verification commands run, so files they create do not expire it.
+  const quality = review ? reviewState(root, sub, env) : { valid: true, detail: '' }
   const results = verifyItems(root, profile, relevant, 'full')
   const pending = results.filter(
     r => r.state === 'active' && r.level === 'required' && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass',
   )
-  if (pending.length) {
-    return { closed: false, message: `No se puede cerrar ${sub}: ${pending.length} 🔴 sin cumplir.\n${formatItems(pending)}`, pending, profile }
+  if (pending.length || !quality.valid) {
+    const parts = [`No se puede cerrar ${sub}:`]
+    if (pending.length) parts.push(`${pending.length} 🔴 sin cumplir.\n${formatItems(pending)}`)
+    if (!quality.valid) parts.push(`Revisión de calidad: ${quality.detail}`)
+    return { closed: false, message: parts.join('\n'), pending, profile }
   }
   profile.phase.closed = phases.filter(p => p === sub || profile.phase.closed.includes(p))
   profile.phase.active = phases.find(p => !profile.phase.closed.includes(p)) ?? sub
   profile.selections.grace = []
   saveProfile(root, profile)
-  log(root, 'phase-close', sub)
+  log(root, 'phase-close', review ? sub : `${sub} (adopción, sin revisión de calidad)`)
   return { closed: true, message: `✅ ${sub} cerrada. Sus 🔴 quedan protegidos contra regresiones. Sub-etapa activa: ${profile.phase.active}.`, pending: [], profile }
 }
 
@@ -130,7 +140,7 @@ export function cachedGate(root: string, catalog: Catalog, kind: GateKind, env =
  * Before a PR into main: one quality review per commit (/ponytail-review branch, or mep's own review).
  * The first attempt is held with the instructions; the next one for the same commit goes through.
  */
-export function prReviewGate(root: string): { block: boolean; message: string } {
+export function prReviewGate(root: string, env = process.env): { block: boolean; message: string } {
   if (!hasProfile(root)) return { block: false, message: '' }
   let sha = 'no-git'
   try {
@@ -149,8 +159,9 @@ export function prReviewGate(root: string): { block: boolean; message: string } 
     block: true,
     message: [
       'mep: antes del PR a main, revisión de calidad de la rama.',
-      '- Si Ponytail está instalado: corre /ponytail-review branch y resuelve sus "must fix".',
-      '- Si no: revisa duplicados, nombres, complejidad y oportunidades de reutilizar contra REGISTRY.md.',
+      ponytailInstalled(root, env)
+        ? '- Ponytail está instalado: corre /ponytail-review branch y resuelve sus "must fix".'
+        : '- Ponytail no está instalado: revisa duplicados, nombres, complejidad y oportunidades de reutilizar contra REGISTRY.md.',
       'Después vuelve a ejecutar el mismo comando (la revisión se pide una vez por commit).',
     ].join('\n'),
   }

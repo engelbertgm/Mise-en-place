@@ -30,4 +30,4 @@ jobs:
       - run: pnpm audit --audit-level critical --prod
       # Las verificaciones de HTML (títulos únicos, un h1, og:image…) corren sobre la salida del build.
       - run: pnpm build
-      - run: pnpm dlx @engelbertgm/mep@0.1.5 verify --prod
+      - run: pnpm dlx @engelbertgm/mep@0.1.6 verify --prod
