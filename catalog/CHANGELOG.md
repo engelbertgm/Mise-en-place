@@ -2,6 +2,15 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.5
+
+Reglas nuevas para lanzar (11):
+
+- **Privacidad y legal**: `marketing-consent` (consentimiento de marketing separado y registrado), `data-subject-requests` (acceso, corrección y borrado con plazos por mercado), `data-processing-agreements` (DPA con cada proveedor; 🔴 en EU, UK, BR y CA:QC), `third-party-disclosure` (terceros en la política), `breach-response-plan` (procedimiento ante brechas), `intellectual-property` (© y cesión al cliente), `open-source-licenses` (licencias de dependencias y atribución).
+- **Conversión**: `cta-above-fold` (CTA principal visible sin scroll, verificado por el test responsive), `sticky-mobile-cta` (🔴 en landing, 🟡 en sitios comerciales), `form-thank-you` (página o estado de gracias).
+- **Analítica**: `analytics-installed` (instalada y midiendo en producción).
+- El test responsive comprueba que `[data-cta="primary"]` está sobre el pliegue en los cinco anchos.
+
 ## 2026.10.4
 
 - **Base de datos solo cuando hay algo que guardar.** `payments`, `uploads` y `realtime` ya no implican `has_db`; la implican `auth`, `subscriptions`, `ugc` y `admin-panel`, o el perfil explícitamente. La regla de stack recomienda `db: none` a una landing aunque venda.

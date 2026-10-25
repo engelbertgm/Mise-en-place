@@ -38,6 +38,14 @@ for (const path of PAGES) {
       })
       expect(overlaps, 'elementos encimados').toEqual([])
 
+      // The primary CTA (data-cta="primary") is visible without scrolling (ítem cta-above-fold).
+      const cta = page.locator('[data-cta="primary"]').first()
+      if (await cta.count()) {
+        const box = await cta.boundingBox()
+        expect(box, 'CTA principal visible').not.toBeNull()
+        expect(box!.y + box!.height, 'CTA principal sobre el pliegue (px)').toBeLessThanOrEqual(900)
+      }
+
       const name = path === '/' ? 'inicio' : path.replace(/\W+/g, '-').replace(/^-|-$/g, '')
       await page.screenshot({ path: `test-results/responsive/${name}-${width}.png`, fullPage: true })
     })

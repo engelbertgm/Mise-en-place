@@ -2,6 +2,11 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.1.2
+
+- Catalog 2026.10.5: 11 new launch rules (marketing consent, data subject requests, DPAs, third-party disclosure, breach procedure, intellectual property, open source licenses, CTA above the fold, sticky mobile CTA, thank-you page, analytics installed).
+- The responsive test checks the primary CTA is above the fold.
+
 ## 0.1.1
 
 - `/mep:audit`, `/mep:update`, `/mep:quote`, `/mep:export`, `/mep:log-time`.

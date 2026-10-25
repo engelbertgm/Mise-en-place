@@ -226,3 +226,103 @@
   how: "docs/licencias.md con la fuente y licencia de cada recurso de terceros."
   verify:
     - { type: file_exists, path: ["docs/**/{licencias,licenses,credits,creditos}*.md", "CREDITS.md"] }
+
+# ── Agregados en 2026.10.5: consentimiento de marketing, derechos, encargados, terceros, brechas, PI y licencias ──
+
+- id: marketing-consent
+  title: "Consentimiento de marketing separado, sin marcar y registrado"
+  category: privacy
+  level: required
+  phase: build.features
+  since: "2026.10.5"
+  when: { all: [ { capabilities: [email] }, { not: { capabilities: [newsletter] } } ] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Mandar promociones a quien solo dejó su correo para un trámite es spam ante GDPR, CASL, LGPD y CAN-SPAM; el consentimiento debe ser aparte y demostrable."
+  how: "Casilla \"Quiero recibir novedades\" desmarcada por defecto y separada de la aceptación de términos; guardar fecha, origen y texto aceptado; los emails transaccionales no la necesitan."
+  verify:
+    - { type: grep, pattern: "marketing_consent|marketingConsent|consent_(at|source|text)|accepts_marketing", glob: "**/*.{ts,tsx,sql,prisma}" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj", "https://crtc.gc.ca/eng/internet/anti.htm"]
+
+- id: data-subject-requests
+  title: "Proceso para solicitudes de acceso, corrección y borrado de datos"
+  category: privacy
+  level: required
+  phase: launch.ops
+  since: "2026.10.5"
+  when: { signals: { has_personal_data: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Cualquier persona puede pedir ver, corregir o borrar sus datos (ARCO en MX, GDPR, CCPA, LGPD), con plazos legales: 20 días hábiles en MX, 1 mes en la UE, 45 días en California, 15 días en Brasil."
+  how: "Canal publicado en la privacidad (email o formulario), verificación de identidad, registro de cada solicitud y borrado también en servicios de terceros; con cuentas de usuario, además el botón de borrar cuenta."
+  verify:
+    - { type: grep, pattern: "ARCO|derechos|your rights|tus derechos|solicitud|data request|delete your data|borrar tus datos", glob: "**/{privacidad,privacy,aviso-de-privacidad,datenschutz}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+    - { type: file_exists, path: ["docs/**/{solicitudes,derechos,data-requests,dsar}*.md"] }
+
+- id: data-processing-agreements
+  title: "Contratos de encargo (DPA) con cada proveedor que trata datos personales"
+  category: privacy
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.5"
+  level_overrides:
+    - { when: { markets: { any: [EU, UK, BR, "CA:QC"] } }, level: required }
+  when: { signals: { has_personal_data: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Hosting, base de datos, email y analítica tratan datos en tu nombre; GDPR (art. 28), UK GDPR, LGPD y la Ley 25 exigen un contrato que fije qué pueden hacer con ellos."
+  how: "Aceptar el DPA de cada proveedor (Vercel, Supabase, Resend, Stripe…) y guardar la lista con enlace y fecha en docs/proveedores.md."
+  verify:
+    - { type: file_exists, path: ["docs/**/{proveedores,subprocesadores,subprocessors,vendors,encargados}*.md"] }
+    - { type: manual, prompt: "DPA aceptado con cada proveedor que trata datos personales" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj"]
+
+- id: third-party-disclosure
+  title: "Terceros que reciben datos, listados en la política de privacidad"
+  category: privacy
+  level: required
+  phase: launch.content
+  since: "2026.10.5"
+  when: { signals: { has_personal_data: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "El usuario tiene derecho a saber a quién se envían sus datos y por qué; omitirlo hace incompleto el aviso en todos los mercados."
+  how: "Sección de la privacidad con cada tercero (proveedor, finalidad, país), coherente con docs/proveedores.md y con el inventario de cookies."
+  verify:
+    - { type: grep, pattern: "terceros|third part|transferencias|encargados|subprocessors|proveedores|Empfänger", glob: "**/{privacidad,privacy,aviso-de-privacidad,datenschutz}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
+
+- id: breach-response-plan
+  title: "Procedimiento ante una brecha de datos"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.10.5"
+  when: { signals: { has_personal_data: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Ante una filtración no hay tiempo para improvisar: la UE y el UK exigen avisar a la autoridad en 72 horas; México, California, Brasil y Canadá también exigen avisar a los afectados."
+  how: "docs/incidentes.md: cómo detectar, contener (rotar llaves, cortar accesos), evaluar el alcance, a quién avisar (autoridad, afectados, cliente) y en qué plazo, y registro del incidente."
+  verify:
+    - { type: grep, pattern: "brecha|incidente|breach|incident", glob: "{SECURITY.md,docs/**/*.md}", flags: i }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj", "https://ico.org.uk/for-organisations/report-a-breach/"]
+
+- id: intellectual-property
+  title: "Propiedad intelectual: aviso de derechos, marcas y cesión al cliente"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.5"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Deja claro de quién es el contenido y la marca; en un proyecto para cliente, sin cesión por escrito el código y el diseño pueden no ser legalmente suyos."
+  how: "Aviso © año y titular en el footer; en client-project, cláusula de cesión de derechos (código, diseño, textos) en el contrato y en la entrega."
+  verify:
+    - { type: grep, pattern: "©|&copy;|\\(c\\)\\s*\\d{4}|Copyright", glob: "**/*.{tsx,jsx,astro,html,vue,svelte}" }
+    - { type: manual, prompt: "En proyecto para cliente: cesión de propiedad intelectual firmada" }
+
+- id: open-source-licenses
+  title: "Licencias open source de las dependencias revisadas y con atribución"
+  category: legal
+  level: required
+  phase: launch.ops
+  since: "2026.10.5"
+  effort: { size: S, hours: [1, 2] }
+  why: "Algunas licencias (GPL, AGPL) obligan a publicar tu código; casi todas exigen conservar el aviso de copyright."
+  how: "Revisar licencias en CI (license-checker o similar, falla con GPL/AGPL si el código es privado) y publicar los avisos de terceros (THIRD-PARTY-NOTICES o página de créditos)."
+  verify:
+    - { type: grep, pattern: "license-checker|licensee|license-report|licenses-list|pnpm licenses|@onebeyond/license-checker", glob: "{package.json,.github/workflows/*.{yml,yaml}}" }
+    - { type: file_exists, path: ["THIRD-PARTY-NOTICES*", "THIRD_PARTY_NOTICES*", "docs/**/{licencias,licenses,third-party}*.md", "CREDITS.md"] }

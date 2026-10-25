@@ -189,3 +189,22 @@ describe('8. no database by default; payment links are not an integrated checkou
     assert.ok(inferProfile(checkout, real).profile.capabilities.includes('payments'))
   })
 })
+
+describe('9. launch rules: legal, privacy and conversion', () => {
+  test('a landing that sells by link and collects emails gets every rule it needs', () => {
+    const p = profile(real, { type: 'landing', capabilities: ['payment-links', 'analytics', 'email'], markets: ['MX', 'EU:ES'], signals: { has_forms: true, has_personal_data: true } })
+    const levels = new Map(evaluate(p, real).map(e => [e.item.id, e.level]))
+    const required = ['privacy-policy', 'terms-of-service', 'eu-gdpr', 'marketing-consent', 'data-subject-requests', 'data-retention', 'data-processing-agreements', 'third-party-disclosure', 'breach-response-plan', 'intellectual-property', 'open-source-licenses', 'refund-policy', 'error-pages', 'cta-above-fold', 'unique-title', 'unique-description', 'og-image-default', 'favicon', 'sitemap-xml', 'robots-txt', 'a11y-alt-text', 'mobile-first', 'sticky-mobile-cta', 'a11y-form-errors', 'form-thank-you', 'analytics-installed']
+    for (const id of required) assert.equal(levels.get(id), 'required', id)
+    assert.equal(levels.has('consent-banner'), false)
+    const withCookies = profile(real, { ...p, signals: { ...p.signals, has_nonessential_cookies: true } })
+    assert.ok(evaluate(withCookies, real).some(e => e.item.id === 'consent-banner'))
+  })
+
+  test('outside the EU, DPAs are recommended; sticky CTA is required only on landings', () => {
+    const mx = profile(real, { type: 'corporate', markets: ['MX'], signals: { has_personal_data: true } })
+    const levels = new Map(evaluate(mx, real).map(e => [e.item.id, e.level]))
+    assert.equal(levels.get('data-processing-agreements'), 'recommended')
+    assert.equal(levels.get('sticky-mobile-cta'), 'recommended')
+  })
+})

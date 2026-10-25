@@ -154,3 +154,48 @@
   verify:
     - { type: manual, prompt: "Vistas clave revisadas contra los principios de UI y las heurísticas de Nielsen" }
   references: ["https://www.nngroup.com/articles/ten-usability-heuristics/"]
+
+# ── Agregados en 2026.10.5: conversión ──
+
+- id: cta-above-fold
+  title: "CTA principal visible sin hacer scroll, en móvil y escritorio"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.5"
+  when: { type: { any: [landing, corporate, local-business, ecommerce, saas, marketplace, booking, portfolio] } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Quien llega debe saber qué hacer en el primer vistazo; un CTA escondido bajo el pliegue pierde la mayor parte de la conversión."
+  how: "Un solo CTA principal en el primer viewport (360 y 1280 px), marcado con data-cta=\"primary\"; el test responsive comprueba que está a la vista."
+  verify:
+    - { type: grep, pattern: "data-cta=[\"']primary[\"']", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+    - { type: command, run: "pnpm run test:responsive", timeout: 600 }
+
+- id: sticky-mobile-cta
+  title: "CTA fijo en móvil en páginas largas"
+  category: ux
+  level: recommended
+  phase: build.ux
+  since: "2026.10.5"
+  when: { type: { any: [landing, local-business, ecommerce, booking, corporate] } }
+  level_overrides:
+    - { when: { type: landing }, level: required }
+  effort: { size: S, hours: [1, 2] }
+  why: "En móvil, el CTA del inicio desaparece al bajar; una barra fija lo mantiene a un toque mientras el usuario decide."
+  how: "Barra inferior solo en móvil (md:hidden) con el CTA principal, que aparece tras el primer scroll, respeta env(safe-area-inset-bottom) y no tapa contenido (padding inferior en el body)."
+  verify:
+    - { type: grep, pattern: "data-cta=[\"']sticky[\"']|(fixed|sticky)[^\"']*bottom-0[^\"']*md:hidden|md:hidden[^\"']*(fixed|sticky)[^\"']*bottom-0", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+    - { type: grep, pattern: "safe-area-inset-bottom", glob: "**/*.{tsx,jsx,css,scss,astro}" }
+
+- id: form-thank-you
+  title: "Página o estado de gracias tras enviar un formulario"
+  category: ux
+  level: required
+  phase: build.ux
+  since: "2026.10.5"
+  when: { signals: { has_forms: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Confirma que el envío llegó, dice qué sigue (\"te respondemos en 24 h\") y es el punto donde se mide la conversión."
+  how: "Ruta /gracias (o estado de éxito en la misma vista) con mensaje, siguiente paso y evento de conversión en analytics."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/**/{gracias,thank-you,thanks,obrigado,merci,danke}/page.{tsx,jsx,mdx}", "src/pages/{gracias,thank-you,thanks}.{astro,md,mdx,tsx}"] }

@@ -358,3 +358,17 @@
   how: "docs/manual.md con las tareas comunes; invitación del cliente a la herramienta de analítica."
   verify:
     - { type: file_exists, path: ["docs/**/manual*.md", "docs/**/guia*.md"] }
+
+- id: analytics-installed
+  title: "Analítica instalada y midiendo en producción"
+  category: analytics
+  level: required
+  phase: launch.ops
+  since: "2026.10.5"
+  when: { any: [ { capabilities: [analytics] }, { type: { any: [landing, ecommerce, saas, marketplace] } } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin datos desde el día uno no se sabe si el sitio funciona ni de dónde llega la gente."
+  how: "Vercel Analytics, Plausible o PostHog (sin cookies donde se pueda); si usa cookies, carga solo con consentimiento. Verificar que llegan visitas reales tras el deploy."
+  verify:
+    - { type: grep, pattern: "\"(@vercel/analytics|posthog-js|plausible-tracker|@plausible/analytics|mixpanel-browser|@segment/analytics-next|react-ga4|@next/third-parties|umami)\"|plausible\\.io/js|googletagmanager\\.com|cloud\\.umami\\.is", glob: "{package.json,**/*.{tsx,jsx,astro,html}}" }
+    - { type: manual, prompt: "La herramienta de analítica registra visitas reales de producción" }
