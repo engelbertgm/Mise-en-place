@@ -1,4 +1,4 @@
-# Ítems por tipo de proyecto: reservas y SEO local.
+# Ítems por tipo de proyecto: reservas, SEO local, blog, directorio, portafolio y aplicación interna.
 
 - id: booking-no-double
   title: "Sin dobles reservas: bloqueo a nivel de base de datos"
@@ -132,3 +132,172 @@
   how: "Perfil verificado con enlace al sitio; /sucursales/<ciudad> si hay varias; reseñas reales en el sitio."
   verify:
     - { type: manual, prompt: "Google Business Profile verificado y enlazado" }
+
+# ── Blog ──
+
+- id: blog-feed
+  title: "Feed RSS o Atom con las publicaciones recientes"
+  category: seo
+  level: recommended
+  phase: launch.seo
+  since: "2026.10.7"
+  when: { type: blog }
+  level_overrides:
+    - { when: { capabilities: [newsletter] }, level: required }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Lectores, agregadores y herramientas de newsletter se suscriben por feed; sin él, cada publicación depende de que alguien vuelva al sitio."
+  how: "/feed.xml o /rss.xml con título, enlace, fecha y resumen; enlazado con <link rel=\"alternate\" type=\"application/rss+xml\">."
+  verify:
+    - { type: grep, pattern: "application/(rss|atom)\\+xml", glob: "**/*.{tsx,jsx,ts,astro,html}" }
+
+- id: blog-article-schema
+  title: "Datos estructurados BlogPosting con autor y fechas de publicación y actualización"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.7"
+  when: { type: blog }
+  effort: { size: S, hours: [1, 2] }
+  why: "Autor y fechas visibles y marcados son señales de confianza para buscadores y asistentes de IA, y permiten mostrar la fecha en los resultados."
+  how: "JSON-LD BlogPosting (headline, author, datePublished, dateModified, image) y la fecha visible en un <time datetime>."
+  verify:
+    - { type: grep, pattern: "BlogPosting|[\"']@type[\"']\\s*:\\s*[\"']Article[\"']", glob: "**/*.{tsx,jsx,ts,astro}" }
+    - { type: grep, pattern: "datePublished", glob: "**/*.{tsx,jsx,ts,astro}" }
+
+- id: blog-author-pages
+  title: "Página de autor con biografía y sus publicaciones"
+  category: content
+  level: recommended
+  phase: launch.content
+  since: "2026.10.7"
+  when: { type: blog }
+  effort: { size: S, hours: [1, 3] }
+  why: "Quién escribe y por qué sabe del tema es la parte 'experiencia' de E-E-A-T; también ordena el sitio cuando hay varios autores."
+  how: "Ruta /autores/<slug> (o /authors/<slug>) con bio, foto, enlaces y listado; el artículo enlaza a ella."
+  verify:
+    - { type: file_exists, path: ["{app,src/app,pages,src/pages,src/content}/**/{author,authors,autor,autores}/**/*"] }
+
+# ── Directorio ──
+
+- id: directory-facets-crawl
+  title: "Filtros sin trampas de rastreo: combinaciones con noindex o canonical a la página base"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.7"
+  when: { type: directory }
+  effort: { size: M, hours: [2, 5] }
+  why: "Cada combinación de filtros es una URL nueva; miles de páginas casi iguales gastan el rastreo y diluyen las que importan."
+  how: "Solo las combinaciones con búsquedas reales son indexables (con contenido propio); el resto con noindex o canonical a la base, y el sitemap no las lista."
+  verify:
+    - { type: grep, pattern: "noindex|canonical", glob: "{app,src/app,pages,src/pages}/**/*.{tsx,jsx,ts}" }
+
+- id: directory-listing-schema
+  title: "Datos estructurados en cada ficha (LocalBusiness, Organization o el tipo que aplique) e ItemList en los listados"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.7"
+  when: { type: directory }
+  effort: { size: S, hours: [2, 4] }
+  why: "Las fichas de un directorio compiten en los resultados con las del propio negocio; sin datos estructurados pierden."
+  how: "JSON-LD por ficha con nombre, dirección, contacto y horario; ItemList en las páginas de categoría."
+  verify:
+    - { type: grep, pattern: "ItemList|LocalBusiness|[\"']@type[\"']\\s*:\\s*[\"']Organization[\"']", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: directory-report-and-claim
+  title: "Reportar información incorrecta y reclamar una ficha (con verificación del dueño)"
+  category: content
+  level: recommended
+  phase: build.features
+  since: "2026.10.7"
+  when: { type: directory }
+  effort: { size: M, hours: [3, 8] }
+  why: "Datos viejos o falsos sobre un negocio generan quejas y, si lo perjudican, reclamaciones; el dueño es quien mejor los corrige."
+  how: "Enlace 'reportar un error' en cada ficha; flujo para reclamar la ficha con verificación (email del dominio, teléfono o documento); fecha de última actualización visible."
+  verify:
+    - { type: grep, pattern: "report(ar)? (an? )?(error|issue|problema)|claim (this )?listing|reclamar (esta )?ficha", glob: "**/*.{tsx,jsx,json}", flags: i }
+
+# ── Portafolio ──
+
+- id: portfolio-client-permission
+  title: "Permiso por escrito de cada cliente cuyo trabajo se muestra"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.7"
+  when: { type: portfolio }
+  effort: { size: XS, hours: [0.5, 2] }
+  why: "Mostrar trabajo hecho bajo contrato o NDA sin permiso es incumplimiento de contrato, aunque lo hayas hecho tú."
+  how: "Consentimiento del cliente (email o cláusula del contrato) por cada proyecto publicado; si no hay permiso, mostrarlo anonimizado."
+  verify:
+    - { type: manual, prompt: "Cada proyecto publicado tiene permiso escrito del cliente (o se muestra anonimizado)" }
+
+- id: portfolio-case-studies
+  title: "Cada proyecto cuenta el problema, tu papel y el resultado, no solo imágenes"
+  category: content
+  level: recommended
+  phase: launch.content
+  since: "2026.10.7"
+  when: { type: portfolio }
+  effort: { size: M, hours: [2, 4], scales_with: pages }
+  why: "Quien contrata quiere saber qué resolviste y con qué resultado; una galería sola no lo dice."
+  how: "Plantilla por proyecto: contexto, problema, tu papel, proceso, resultado (con números si los hay)."
+  verify:
+    - { type: grep, pattern: "case.?stud|caso de estudio|resultado|outcome|challenge|reto", glob: "**/*.{tsx,jsx,md,mdx,json}", flags: i }
+
+# ── Aplicación interna ──
+
+- id: internal-sso
+  title: "Inicio de sesión con el proveedor de identidad de la empresa (Google Workspace, Microsoft Entra, Okta)"
+  category: auth
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { type: internal-app }
+  effort: { size: M, hours: [3, 6] }
+  why: "Con cuentas propias, quien sale de la empresa conserva el acceso; con SSO, desactivarlo en el proveedor lo saca de todo."
+  how: "OIDC o SAML con el proveedor de la empresa; sin contraseñas propias de la app."
+  verify:
+    - { type: grep, pattern: "azure-ad|microsoft-entra-id|okta|workos|saml|oidc|hostedDomain|hd:\\s*[\"']", glob: "**/*.{ts,tsx,js}", flags: i }
+
+- id: internal-no-public-signup
+  title: "Sin registro público: solo cuentas del dominio de la empresa o invitadas"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  sensitive: [auth]
+  when: { type: internal-app }
+  effort: { size: S, hours: [1, 2] }
+  why: "Una app interna con registro abierto es una puerta a los datos de la empresa para cualquiera con un email."
+  how: "Registro deshabilitado o lista de dominios permitidos validada en el servidor; cuentas creadas por invitación o por el proveedor de identidad."
+  verify:
+    - { type: grep, pattern: "allowed.?domains?|domain.?allow.?list|enable_?signup\\s*[:=]\\s*false|disableSignUp|hostedDomain", glob: "**/*.{ts,tsx,js,toml,json}", flags: i }
+
+- id: internal-audit-log
+  title: "Registro de auditoría: quién vio o cambió qué y cuándo"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  sensitive: [db]
+  when: { all: [ { type: internal-app }, { signals: { has_db: true } } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Ante un error o una fuga interna, la primera pregunta es quién fue; sin registro no hay respuesta."
+  how: "Tabla append-only (usuario, acción, recurso, fecha, IP) escrita en el servidor; solo lectura para admins."
+  verify:
+    - { type: grep, pattern: "audit_log|audit_events|activity_log", glob: "**/*.{ts,sql}", flags: i }
+
+- id: internal-offboarding
+  title: "Bajas: el acceso se revoca el mismo día que alguien deja la empresa"
+  category: auth
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.7"
+  when: { type: internal-app }
+  effort: { size: S, hours: [1, 2] }
+  why: "Las cuentas de exempleados activas son una de las causas más comunes de fugas internas."
+  how: "Acceso por grupo del proveedor de identidad (o SCIM); las sesiones se invalidan al desactivar la cuenta; procedimiento en el runbook."
+  verify:
+    - { type: manual, prompt: "Procedimiento de baja probado: al desactivar a alguien en el proveedor de identidad pierde el acceso" }

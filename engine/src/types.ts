@@ -95,6 +95,8 @@ export type Dimensions = {
   market_sublevels: Record<string, string[]>
   market_languages: Record<string, string[]>
   audience: string[]
+  /** Audiences mep refuses to scope: projects for minors, or that verify age. */
+  excluded_audience?: string[]
   context: string[]
   signals: Record<string, { values: (string | boolean)[]; default: string | boolean }>
   phases: string[]

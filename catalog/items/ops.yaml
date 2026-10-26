@@ -1,0 +1,68 @@
+# Operación después del lanzamiento: saber que algo falló antes que el cliente.
+
+- id: uptime-monitor
+  title: "Monitor de disponibilidad con alerta a un canal que alguien mira"
+  category: deploy
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.7"
+  level_overrides:
+    - { when: { any: [ { type: { any: [saas, ecommerce, marketplace, booking, internal-app] } }, { capabilities: { any: [payments, api-public] } } ] }, level: required }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Si el sitio cae un viernes en la noche, el monitor te avisa en minutos; si no, te enteras por el cliente el lunes."
+  how: "Monitor HTTP cada 1–5 min (Better Stack, UptimeRobot, Checkly, OpenStatus) sobre la home y un endpoint de salud; alerta por email, Slack o SMS. Anótalo en el runbook."
+  verify:
+    - { type: grep, pattern: "uptime|better.?stack|betteruptime|uptimerobot|checkly|openstatus|pingdom|statuscake", glob: "{README.md,docs/**/*.md,**/*.{json,yml,yaml,ts}}", flags: i }
+
+- id: health-endpoint
+  title: "Endpoint de salud que revisa lo que la app necesita (base de datos, servicios clave)"
+  category: deploy
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.7"
+  when: { signals: { has_db: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Que la home responda no dice que la base de datos funcione; el monitor necesita algo que pruebe lo importante."
+  how: "/api/health que hace una consulta mínima a la base de datos y responde 200 o 503, sin datos sensibles ni caché."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/api/{health,healthz,status}/route.{ts,js}", "{pages,src/pages}/api/{health,healthz,status}.{ts,js}"] }
+
+- id: status-page
+  title: "Página de estado pública e incidentes comunicados"
+  category: deploy
+  level: optional
+  phase: launch.ops
+  since: "2026.10.7"
+  level_overrides:
+    - { when: { any: [ { all: [ { type: saas }, { audience: [b2b] } ] }, { capabilities: [api-public] } ] }, level: recommended }
+  effort: { size: S, hours: [1, 2] }
+  why: "Los clientes de empresa y los que integran tu API necesitan saber si el problema es suyo o tuyo; una página de estado ahorra decenas de tickets."
+  how: "status.<dominio> con el proveedor del monitor; componentes, historial e incidentes; enlazada desde el pie y la documentación."
+  verify:
+    - { type: grep, pattern: "status\\.[a-z0-9-]+\\.[a-z]{2,}|statuspage|instatus|openstatus|betteruptime\\.com/|status page|página de estado", glob: "**/*.{tsx,jsx,md,mdx,json}", flags: i }
+
+- id: cron-monitoring
+  title: "Tareas programadas monitoreadas: alerta si una no corre o falla"
+  category: deploy
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.7"
+  when: { any: [ { type: saas }, { capabilities: { any: [subscriptions, usage-billing, notifications, newsletter] } } ] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un cron que deja de correr no da error: simplemente no se cobran renovaciones, no salen avisos o no se concilia el uso, y nadie se entera."
+  how: "Check-in al inicio y fin de cada tarea (Sentry Crons, Better Stack heartbeats, Healthchecks.io, Cronitor) con alerta si falta o falla."
+  verify:
+    - { type: grep, pattern: "withMonitor|captureCheckIn|checkIn|heartbeat|healthchecks\\.io|cronitor", glob: "**/*.{ts,js}", flags: i }
+
+- id: error-alerts-routed
+  title: "Las alertas de errores llegan a una persona: canal, responsable y umbral definidos"
+  category: deploy
+  level: required
+  phase: launch.ops
+  since: "2026.10.7"
+  depends_on: [error-monitoring]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un Sentry que nadie mira es igual a no tener Sentry; lo que importa es que el error nuevo despierte a alguien."
+  how: "Regla de alerta para errores nuevos y picos, a Slack o email de una persona responsable; releases con source maps subidos de forma privada para leer la traza."
+  verify:
+    - { type: manual, prompt: "Las alertas de errores nuevos llegan a un canal con responsable, y se probó con un error de prueba" }

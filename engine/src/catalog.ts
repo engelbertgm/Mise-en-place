@@ -171,7 +171,10 @@ export function validateProfile(profile: Profile, catalog: Catalog): string[] {
   if (!dims.type.includes(profile.type)) errors.push(`type "${profile.type}" is not valid`)
   if (!dims.context.includes(profile.context)) errors.push(`context "${profile.context}" is not valid`)
   for (const c of profile.capabilities) if (!dims.capabilities.includes(c)) errors.push(`capability "${c}" is not valid`)
-  for (const a of profile.audience) if (!dims.audience.includes(a)) errors.push(`audience "${a}" is not valid`)
+  for (const a of profile.audience) {
+    if (dims.excluded_audience?.includes(a)) errors.push(`mep no cubre proyectos para menores de edad ni que verifiquen edad (audience "${a}"): sus obligaciones legales quedan fuera del catálogo`)
+    else if (!dims.audience.includes(a)) errors.push(`audience "${a}" is not valid`)
+  }
   for (const m of profile.markets) if (!markets.includes(m)) errors.push(`market "${m}" is not valid`)
   for (const [k, v] of Object.entries(profile.signals)) {
     const def = dims.signals[k]

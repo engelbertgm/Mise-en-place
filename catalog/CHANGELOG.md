@@ -2,6 +2,19 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.7
+
+Reglas por tipo de proyecto, cobro por uso, operación y datos sensibles:
+
+- **SaaS** (`saas.yaml`): aislamiento entre clientes 🔴 (seguridad, con auditoría), límites de plan en el servidor, organizaciones con invitaciones y roles (B2B), onboarding y registro de actividad.
+- **Cobro por uso o por resultado** — nueva capacidad `usage-billing` ("RaaS"; implica `payments` y base de datos): eventos cobrables idempotentes, tramos en un solo lugar, tope de gasto con avisos, uso visible, factura con desglose, conciliación y página de precios que define la unidad.
+- **Ecommerce y marketplace** (`commerce.yaml`): sin sobreventa, precio total sin cargos sorpresa, emails del pedido, políticas de envío y devolución, schema Product, carrito persistente; vendedores verificados, pagos divididos por el proveedor, disputas, reseñas solo de compras verificadas y términos para vendedores.
+- **Blog, directorio, portafolio y app interna** (`types.yaml`): feed, BlogPosting, páginas de autor; filtros sin trampas de rastreo, schema por ficha, reportar y reclamar fichas; permiso escrito de clientes y casos de estudio; SSO, sin registro público, auditoría y bajas.
+- **Mapas, API pública y subida de archivos** (`integrations.yaml`): llave del mapa restringida, dirección en texto, atribución; rate limit con 429, llaves con hash, OpenAPI, errores problem+json; tamaño máximo en el servidor, archivos privados con URL firmada, EXIF eliminado.
+- **Operación** (`ops.yaml`): monitor de uptime (🔴 en SaaS, tiendas, marketplace, reservas, apps internas, pagos y APIs), endpoint de salud, página de estado, monitoreo de cron y alertas de errores que llegan a una persona.
+- **Datos de salud y financieros** (`sensitive-data.yaml`): cifrado por campo, registro de accesos, sin píxeles de seguimiento con datos de salud; HIPAA (BAA) en USA, art. 9 RGPD (consentimiento explícito y DPIA) en EU/UK y consentimiento expreso de la LFPDPPP en MX.
+- **Fuera del alcance de mep**: proyectos para menores de edad o que verifican edad. Se quita `minors` de las audiencias (y `usa-coppa`); un perfil con `minors` o `age-verification` es inválido y `/mep:scope` se detiene.
+
 ## 2026.10.6
 
 Cosas a evitar, ahora verificadas:

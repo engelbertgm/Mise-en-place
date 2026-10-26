@@ -13,6 +13,10 @@ Sigue el skill `mep` para interpretar el scope. Motor: `node "${CLAUDE_PLUGIN_RO
 
 1. Si ya existe `.mep/profile.yaml`, detente y sugiere `/mep:add`.
 2. Lee `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml` (valores válidos) y, si se indicó `--preset` o hay uno cercano, `${CLAUDE_PLUGIN_ROOT}/catalog/presets/<preset>.yaml`.
+**Límite de mep.** Si el proyecto está dirigido a menores de edad, los incluye como usuarios, o necesita verificar edad (contenido para adultos, apuestas, alcohol, tabaco, cannabis, citas 18+), di en una línea que mep no cubre ese tipo de proyecto y detente: no crees perfil ni brief. Si no queda claro, pregunta antes de seguir.
+
+Si cobra por uso o por resultado (por unidad, por resultado generado, por usuario activo a partir de un umbral), es la capacidad `usage-billing`.
+
 3. Propón el perfil (tipo, capacidades, mercados, audiencia, contexto, señales, counts) en una tabla corta. Pregunta **solo** lo que cambia 🔴 o los counts (ver skill `mep`). Si el scope cobra algo y no queda claro, pregunta si el pago es con enlace del proveedor (`payment-links`) o con checkout propio (`payments`); no marques `has_db` sin algo que guardar.
 4. Escribe en `summary` un párrafo con las palabras del usuario: qué es el proyecto, para quién y qué debe lograr (encabeza SCOPE.md). Las features del scope que no están en el catálogo (ej. "agenda por instructor") van en `custom_work` con su talla: `[{ title, size: XS|S|M|L|XL, phase }]`. Escribe la propuesta en `.mep/draft.yaml` (incluye `project` y `preset` si aplica) y corre `evaluate --from .mep/draft.yaml`. Si el motor rechaza un valor, corrígelo; no inventes valores.
 5. Muestra el resultado agrupado (🔴, 🟡, ⚪ por categoría) y las recomendaciones de stack con su porqué. Pide al usuario que elija los ⚪ que quiere y confirme.

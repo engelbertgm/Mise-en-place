@@ -1,0 +1,142 @@
+# Ítems de mapas, API pública y subida de archivos (lo que capabilities.yaml y security.yaml no cubrían).
+
+# ── Mapas ──
+
+- id: maps-key-restricted
+  title: "Llave del mapa restringida por dominio y por API, con cuota y alerta de presupuesto"
+  category: maps
+  level: required
+  phase: launch.ops
+  since: "2026.10.7"
+  when: { capabilities: [maps] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "La llave de un mapa va en el navegador: sin restricción, cualquiera la copia y la factura llega a tu cuenta."
+  how: "En la consola del proveedor (Google Maps, Mapbox): restricción por referrer HTTP a tus dominios, solo las APIs que usas, cuota diaria y alerta de presupuesto."
+  verify:
+    - { type: manual, prompt: "Llave restringida por dominio y por API en la consola del proveedor, con cuota y alerta de presupuesto" }
+
+- id: maps-text-alternative
+  title: "La dirección también en texto, con enlace para cómo llegar: el mapa no es la única forma"
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.7"
+  when: { capabilities: [maps] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un mapa no lo lee un lector de pantalla ni carga con mala conexión; la dirección en texto sí."
+  how: "Dirección en un <address> y un enlace a indicaciones (Google Maps, Apple Maps) junto al mapa."
+  verify:
+    - { type: grep, pattern: "<address|google\\.com/maps/dir|maps\\.apple\\.com|maps\\.google\\.com/\\?", glob: "**/*.{tsx,jsx,astro,html}" }
+
+- id: maps-attribution
+  title: "Atribución y términos del proveedor de mapas respetados"
+  category: legal
+  level: recommended
+  phase: launch.content
+  since: "2026.10.7"
+  when: { capabilities: [maps] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "OpenStreetMap exige atribución visible; Google prohíbe guardar resultados de geocodificación fuera de lo permitido."
+  how: "No ocultar la atribución del mapa; si usas OSM, '© OpenStreetMap contributors' visible; caché de geocodificación solo dentro de los términos."
+  verify:
+    - { type: grep, pattern: "attributionControl\\s*[:=]\\s*false|attributionControl=\\{false\\}", glob: "**/*.{ts,tsx,js,jsx}", expect: absent }
+
+# ── API pública ──
+
+- id: api-rate-limit
+  title: "Límite de solicitudes por llave, con 429 y Retry-After"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  sensitive: [config]
+  when: { capabilities: [api-public] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Sin límite, un cliente con un bug (o un atacante) tumba la API para todos y dispara la factura del hosting."
+  how: "Límite por llave y por IP (ventana deslizante en Redis, Upstash o el WAF del hosting); respuesta 429 con Retry-After y encabezados de cuota."
+  verify:
+    - { type: grep, pattern: "\\b429\\b|Retry-After|ratelimit|rate-limit|rateLimit", glob: "**/*.{ts,js}" }
+
+- id: api-keys-hashed
+  title: "Llaves de API guardadas con hash, mostradas una sola vez, revocables y con alcance"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  sensitive: [auth, db]
+  when: { capabilities: [api-public] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Una llave guardada en claro se filtra con cualquier respaldo o consulta; con hash, la base de datos sola no sirve para llamar a la API."
+  how: "Generar con un prefijo identificable, guardar solo el hash (SHA-256) y el prefijo, mostrarla una vez, permitir revocar y limitar permisos por llave."
+  verify:
+    - { type: grep, pattern: "key_hash|hashed_key|keyHash|api_key_hash", glob: "**/*.{ts,sql}", flags: i }
+
+- id: api-docs
+  title: "Documentación de la API con especificación OpenAPI"
+  category: content
+  level: required
+  phase: launch.content
+  since: "2026.10.7"
+  when: { capabilities: [api-public] }
+  effort: { size: M, hours: [3, 8], scales_with: integrations }
+  why: "Una API pública sin documentación no la usa nadie, o la usan mal y todo llega a soporte."
+  how: "openapi.yaml (o .json) versionado en el repo, con autenticación, límites, errores y ejemplos; publicado en una página de docs."
+  verify:
+    - { type: file_exists, path: ["openapi.{yaml,yml,json}", "**/openapi.{yaml,yml,json}"] }
+
+- id: api-error-format
+  title: "Errores con un formato único y documentado (application/problem+json)"
+  category: quality
+  level: recommended
+  phase: build.features
+  since: "2026.10.7"
+  when: { capabilities: [api-public] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Un formato de error por endpoint obliga a cada integrador a adivinar; uno estándar se maneja una vez."
+  how: "RFC 9457 (type, title, status, detail) en todas las respuestas de error; nunca trazas internas."
+  verify:
+    - { type: grep, pattern: "problem\\+json", glob: "**/*.{ts,js}" }
+
+# ── Subida de archivos ──
+
+- id: upload-size-limits
+  title: "Tamaño máximo por archivo y por usuario aplicado en el servidor"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { capabilities: [uploads] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un límite solo en el navegador se salta con una llamada directa: un archivo de varios GB llena el almacenamiento y la factura."
+  how: "Límite en el servidor o en la política del bucket (tamaño y tipo por URL firmada); cuota de almacenamiento por usuario u organización."
+  verify:
+    - { type: grep, pattern: "max_?file_?size|maxFileSize|fileSizeLimit|file_size_limit|maxSize|content-length-range|MAX_UPLOAD", glob: "**/*.{ts,js,sql,toml}", flags: i }
+
+- id: upload-private-signed-urls
+  title: "Archivos privados servidos con URLs firmadas que expiran; el bucket no es público"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  sensitive: [config]
+  when: { all: [ { capabilities: [uploads] }, { signals: { has_personal_data: true } } ] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Un bucket público con documentos de usuarios se indexa y se filtra; es de las fugas de datos más comunes."
+  how: "Bucket privado; cada descarga con una URL firmada de corta duración generada después de revisar permisos."
+  verify:
+    - { type: grep, pattern: "createSignedUrl|getSignedUrl|presign|generate_presigned|signedUrl", glob: "**/*.{ts,js}" }
+
+- id: upload-strip-metadata
+  title: "Las fotos subidas se procesan: tamaño redimensionado y metadatos EXIF (ubicación) eliminados"
+  category: privacy
+  level: recommended
+  phase: build.features
+  since: "2026.10.7"
+  when: { capabilities: [uploads] }
+  level_overrides:
+    - { when: { capabilities: [ugc] }, level: required }
+  effort: { size: S, hours: [1, 3] }
+  why: "Una foto publicada con EXIF revela dónde vive quien la tomó; además, el original sin redimensionar pesa megas."
+  how: "Procesar al subir (sharp, Cloudinary, Image CDN) quitando EXIF y generando tamaños; servir la versión procesada."
+  verify:
+    - { type: grep, pattern: "exif|sharp\\(|\\.rotate\\(\\)|withMetadata|strip.?metadata|cloudinary", glob: "**/*.{ts,js}", flags: i }

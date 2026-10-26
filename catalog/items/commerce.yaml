@@ -1,0 +1,148 @@
+# Ítems de tienda en línea (ecommerce) y de marketplace (compradores y vendedores).
+
+- id: ecommerce-no-oversell
+  title: "Sin sobreventa: el stock se descuenta en una transacción y nunca baja de cero"
+  category: commerce
+  level: required
+  phase: build.data
+  since: "2026.10.7"
+  when: { all: [ { type: { any: [ecommerce, marketplace] } }, { signals: { has_db: true } } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Dos compras simultáneas del último artículo terminan en un reembolso, un cliente molesto y, en algunos mercados, una queja ante la autoridad de consumo."
+  how: "CHECK (stock >= 0) y descuento atómico (UPDATE … WHERE stock >= cantidad) dentro de la transacción del pedido, o reserva con expiración durante el checkout."
+  verify:
+    - { type: grep, pattern: "check\\s*\\(\\s*(stock|inventory|quantity|existencias)\\s*>=\\s*0", glob: "**/*.sql", flags: i }
+
+- id: ecommerce-all-in-price
+  title: "Total con impuestos, envío y cargos visible antes de pagar: sin cargos sorpresa"
+  category: commerce
+  level: required
+  phase: build.ux
+  since: "2026.10.7"
+  when: { type: { any: [ecommerce, marketplace] } }
+  effort: { size: S, hours: [2, 4] }
+  why: "Los cargos que aparecen al final están prohibidos o sancionados en varios mercados (EU, California, México); además son la primera causa de carritos abandonados."
+  how: "Subtotal, envío, impuestos y total en el carrito y en el paso previo al pago; el precio mostrado en la ficha incluye impuestos donde la ley lo exige."
+  verify:
+    - { type: grep, pattern: "subtotal", glob: "**/*.{tsx,jsx}", flags: i }
+    - { type: grep, pattern: "shipping|env[ií]o", glob: "**/*.{tsx,jsx}", flags: i }
+
+- id: ecommerce-order-emails
+  title: "Emails del pedido: confirmación, envío con guía y reembolso"
+  category: commerce
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { type: { any: [ecommerce, marketplace] } }
+  effort: { size: M, hours: [3, 6] }
+  why: "La confirmación del pedido es el comprobante del cliente; sin ella llegan contracargos 'no reconozco este cargo'."
+  how: "Plantillas de confirmación (artículos, total, dirección), de envío (paquetería y guía) y de reembolso; disparadas por el cambio de estado del pedido."
+  verify:
+    - { type: grep, pattern: "order.?confirm|confirmaci[oó]n de (pedido|compra)|pedido confirmado", glob: "**/*.{ts,tsx}", flags: i }
+    - { type: grep, pattern: "shipped|tracking|enviado|n[uú]mero de gu[ií]a", glob: "**/*.{ts,tsx}", flags: i }
+
+- id: ecommerce-shipping-returns
+  title: "Política de envíos y devoluciones publicada y enlazada desde el checkout"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.7"
+  when: { type: { any: [ecommerce, marketplace] } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Plazos, costos y derecho de devolución por escrito evitan disputas; en EU, UK y MX son obligatorios antes de la compra."
+  how: "Página con zonas y tiempos de envío, costos, plazo y forma de devolución y quién paga el retorno; enlace en ficha y checkout."
+  verify:
+    - { type: grep, pattern: "pol[ií]tica de (env[ií]os|devoluci)|shipping policy|returns? policy", glob: "**/*.{tsx,jsx,md,mdx,json}", flags: i }
+
+- id: ecommerce-product-schema
+  title: "Datos estructurados Product con precio, moneda y disponibilidad en cada ficha"
+  category: seo
+  level: required
+  phase: launch.seo
+  since: "2026.10.7"
+  when: { type: { any: [ecommerce, marketplace] } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Sin Product y Offer, Google no muestra precio ni disponibilidad en los resultados y las fichas compiten en desventaja."
+  how: "JSON-LD Product con name, image, offers (price, priceCurrency, availability) y, si hay reseñas reales, aggregateRating."
+  verify:
+    - { type: grep, pattern: "[\"']@type[\"']\\s*:\\s*[\"']Product[\"']", glob: "**/*.{tsx,jsx,ts}" }
+
+- id: ecommerce-cart-persistence
+  title: "El carrito se conserva entre sesiones y dispositivos"
+  category: commerce
+  level: recommended
+  phase: build.ux
+  since: "2026.10.7"
+  when: { type: ecommerce }
+  effort: { size: M, hours: [2, 5] }
+  why: "Un carrito que se vacía al cerrar la pestaña es una venta perdida."
+  how: "Carrito en la base de datos para usuarios con cuenta y en almacenamiento local para invitados, fusionados al iniciar sesión."
+  verify:
+    - { type: grep, pattern: "cart", glob: "**/*.{ts,sql}", flags: i }
+
+# ── Marketplace ──
+
+- id: marketplace-seller-verification
+  title: "Vendedores verificados (identidad y cuenta de cobro) antes de recibir pagos"
+  category: payments
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { type: marketplace }
+  effort: { size: M, hours: [4, 8] }
+  why: "Pagar a vendedores no verificados expone a fraude y lavado; los procesadores y las leyes de pagos lo exigen."
+  how: "Onboarding del vendedor con el producto de marketplace del proveedor (Stripe Connect, Mercado Pago Marketplace), que hace la verificación (KYC); sin verificación, sin pagos."
+  verify:
+    - { type: grep, pattern: "accountLinks\\.create|accounts\\.create|connect.*onboarding|kyc|charges_enabled|payouts_enabled", glob: "**/*.{ts,js}", flags: i }
+
+- id: marketplace-split-payments
+  title: "Pagos divididos por el proveedor: la plataforma cobra su comisión sin custodiar el dinero del vendedor"
+  category: payments
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { type: marketplace }
+  effort: { size: M, hours: [4, 8] }
+  why: "Recibir el dinero de terceros y repartirlo después te convierte en transmisor de dinero, con licencias que casi ningún proyecto tiene."
+  how: "Cargos con destino o divididos (transfer_data, application_fee_amount, marketplace_fee) en el proveedor; nunca cobrar en tu cuenta y transferir a mano."
+  verify:
+    - { type: grep, pattern: "application_fee|transfer_data|on_behalf_of|marketplace_fee|split", glob: "**/*.{ts,js}", flags: i }
+
+- id: marketplace-disputes
+  title: "Flujo de disputas entre comprador y vendedor, con plazos y mediación de la plataforma"
+  category: commerce
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { type: marketplace }
+  effort: { size: L, hours: [8, 16] }
+  why: "Sin un camino interno, cada problema termina en contracargo contra la plataforma."
+  how: "Abrir un reclamo desde el pedido, respuesta del vendedor con plazo, decisión de la plataforma y reembolso o liberación del pago."
+  verify:
+    - { type: grep, pattern: "dispute|disputa|reclamo|claim", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: marketplace-review-integrity
+  title: "Reseñas solo de compras verificadas, sin reseñas compradas ni filtradas"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { all: [ { type: marketplace }, { capabilities: [ugc] } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Reseñas falsas o suprimidas están prohibidas (regla de la FTC de 2024 en USA, Directiva Ómnibus en EU) con multas por cada una."
+  how: "Solo quien compró puede reseñar (marca 'compra verificada'); no se ocultan reseñas negativas legítimas; moderación por reglas publicadas."
+  verify:
+    - { type: grep, pattern: "verified.?purchase|compra verificada|order_id", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: marketplace-seller-terms
+  title: "Términos para vendedores: comisiones, pagos, prohibiciones y suspensión"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.7"
+  when: { type: marketplace }
+  effort: { size: S, hours: [2, 4] }
+  why: "Suspender a un vendedor o cobrarle una comisión que no aceptó por escrito es una demanda casi segura."
+  how: "Documento aceptado al registrarse como vendedor, con versión y fecha; cambios avisados con anticipación."
+  verify:
+    - { type: grep, pattern: "t[eé]rminos (para|de) vendedores|seller (terms|agreement)|comisi[oó]n|commission", glob: "**/*.{tsx,jsx,md,mdx,json}", flags: i }

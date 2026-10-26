@@ -81,7 +81,7 @@ Definidas en `catalog/dimensions.yaml`. Solo se aceptan valores de ahí.
 | `type` | landing, corporate, local-business, blog, portfolio, ecommerce, saas, marketplace, internal-app, directory, booking |
 | `capabilities` | auth, payments (checkout integrado), payment-links (enlaces del proveedor, sin backend), subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration |
 | `markets` | MX, USA, CA, EU, UK, BR, IN (CN: reservado para fase futura) |
-| `audience` | b2b, b2c, minors, sensitive-data-health, sensitive-data-finance |
+| `audience` | b2b, b2c, sensitive-data-health, sensitive-data-finance (mep no cubre proyectos para menores ni con verificación de edad: `/mep:scope` los rechaza) |
 | `context` | client-project, own-product |
 
 ### Sub-niveles de mercado

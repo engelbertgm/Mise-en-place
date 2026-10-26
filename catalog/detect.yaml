@@ -9,6 +9,8 @@ payments:
 # payment-links: el pago ocurre en la página del proveedor.
 payment-links:
   - { grep: "buy\\.stripe\\.com|stripe-buy-button|stripe-pricing-table|mpago\\.la|link\\.mercadopago|mercadopago\\.com(\\.\\w+)*/checkout|lemonsqueezy\\.com/(buy|checkout)|gumroad\\.com/l/|paypal\\.me/|checkout\\.square\\.site|square\\.link|polar\\.sh/checkout", glob: "**/*.{tsx,jsx,ts,js,astro,html,md,mdx,json}" }
+usage-billing:
+  - { grep: "billing\\.meters|meterEvents|meter_events|usage_records|createUsageRecord|reportUsage", glob: "**/*.{ts,tsx,js,jsx}" }
 subscriptions:
   - { grep: "subscriptions\\.(create|update|cancel)|mode:\\s*[\"']subscription[\"']|billingPortal", glob: "**/*.{ts,tsx,js,jsx}" }
 email:

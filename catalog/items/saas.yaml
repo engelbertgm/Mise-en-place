@@ -1,0 +1,163 @@
+# Ítems de SaaS (cuentas, organizaciones, planes) y de cobro por uso o por resultado (usage-billing, "RaaS").
+
+- id: saas-tenant-isolation
+  title: "Aislamiento entre clientes: cada fila con su organización y ninguna consulta cruza de una a otra"
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.10.7"
+  sensitive: [db, auth]
+  when: { all: [ { type: saas }, { signals: { has_db: true } } ] }
+  effort: { size: M, hours: [4, 10], scales_with: entities }
+  why: "Que un cliente vea datos de otro es la fuga más grave de un SaaS: rompe contratos y leyes de datos personales en todos los mercados."
+  how: "organization_id (o tenant_id) en cada tabla de datos de clientes; RLS o un filtro obligatorio por organización en la capa de datos; un test que prueba que el usuario de A no lee nada de B."
+  verify:
+    - { type: grep, pattern: "\\b(organization|org|tenant|workspace|team|account)_id\\b", glob: "**/*.sql", flags: i }
+    - { type: grep, pattern: "cross.?tenant|other (org|organization|tenant|workspace)|tenant isolation|aislamiento", glob: "**/*.{test,spec}.{ts,tsx}", flags: i }
+
+- id: saas-plan-limits
+  title: "Límites de cada plan aplicados en el servidor, no solo escondidos en la UI"
+  category: saas
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { all: [ { type: saas }, { capabilities: { any: [subscriptions, usage-billing] } } ] }
+  effort: { size: M, hours: [3, 8] }
+  why: "Un límite que solo vive en un botón deshabilitado se salta llamando a la API; el cliente usa lo que no pagó."
+  how: "Una tabla o constante de planes con sus límites (entitlements) en un solo lugar; cada acción limitada la consulta en el servidor antes de ejecutarse."
+  verify:
+    - { type: grep, pattern: "entitlement|plan_limits|planLimits|limitsFor|quota|cuota", glob: "**/*.{ts,sql}", flags: i }
+
+- id: saas-teams
+  title: "Organizaciones: invitar miembros con enlace que expira y roles (owner/admin/member) verificados en el servidor"
+  category: saas
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { all: [ { type: saas }, { audience: [b2b] }, { capabilities: [auth] } ] }
+  effort: { size: L, hours: [8, 16] }
+  why: "En B2B una cuenta es un equipo: sin invitaciones y roles, todos comparten contraseña o todos son admin."
+  how: "Tabla de membresías con rol; invitación con token aleatorio de un solo uso que expira; cada acción revisa el rol en el servidor; siempre queda al menos un owner."
+  verify:
+    - { type: grep, pattern: "invit(e|ation)|invitaci[oó]n", glob: "**/*.{ts,tsx,sql}", flags: i }
+    - { type: grep, pattern: "\\b(owner|admin|member)\\b", glob: "**/*.sql", flags: i }
+
+- id: saas-onboarding
+  title: "Primer uso guiado: del registro al primer resultado útil sin leer documentación"
+  category: saas
+  level: recommended
+  phase: build.ux
+  since: "2026.10.7"
+  when: { type: saas }
+  effort: { size: M, hours: [3, 8] }
+  why: "La mayoría de las cuentas que se abandonan lo hacen en la primera sesión, antes de ver el valor del producto."
+  how: "Estados vacíos con la siguiente acción; checklist de primeros pasos o datos de ejemplo; medir el paso de registro a primer resultado."
+  verify:
+    - { type: grep, pattern: "onboarding|getting.?started|primeros pasos|welcome|bienvenida", glob: "**/*.{ts,tsx}", flags: i }
+
+- id: saas-activity-log
+  title: "Registro de actividad por organización: quién hizo qué y cuándo"
+  category: saas
+  level: recommended
+  phase: build.features
+  since: "2026.10.7"
+  when: { all: [ { type: saas }, { audience: [b2b] } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Los clientes empresariales lo piden en sus revisiones de seguridad; y resuelve el '¿quién borró esto?'."
+  how: "Tabla append-only (actor, acción, recurso, fecha) por organización; visible para owners y admins."
+  verify:
+    - { type: grep, pattern: "audit_log|activity_log|audit_events|activity_events", glob: "**/*.{ts,sql}", flags: i }
+
+# ── Cobro por uso o por resultado (usage-billing): el cliente paga por lo que la herramienta produce o consume ──
+
+- id: usage-events-idempotent
+  title: "Cada evento cobrable se registra una sola vez (clave de idempotencia única)"
+  category: billing
+  level: required
+  phase: build.data
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Un reintento que cuenta dos veces es un cobro indebido; repetido en miles de clientes, una demanda colectiva."
+  how: "Tabla de eventos de uso con una clave de idempotencia y restricción UNIQUE; el reporte al proveedor (Stripe Meters o equivalente) usa la misma clave."
+  verify:
+    - { type: grep, pattern: "usage|metered|billable|meter_event|consumo", glob: "**/*.sql", flags: i }
+    - { type: grep, pattern: "idempoten", glob: "**/*.{ts,sql}", flags: i }
+
+- id: usage-pricing-tiers
+  title: "Precio por tramos en un solo lugar y en unidades enteras (ej. gratis hasta 1,000; luego 0.01 USD c/u)"
+  category: billing
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Tramos repetidos en varios lugares o calculados con decimales de punto flotante terminan cobrando distinto de lo publicado."
+  how: "Tabla de tramos (desde, hasta, precio unitario) en el proveedor o en una constante única; montos en centavos o con decimal exacto; el precio publicado sale de la misma fuente."
+  verify:
+    - { type: grep, pattern: "tiers?\\b|tiered|graduated|unit_amount|tramo", glob: "**/*.{ts,json}", flags: i }
+
+- id: usage-spend-cap
+  title: "Tope de gasto y avisos al cliente (80 % y 100 %), con política clara al llegar al tope"
+  category: billing
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Una factura sorpresa por uso descontrolado es la principal causa de contracargos y quejas en cobro por uso."
+  how: "El cliente fija o ve su tope; email o aviso en la app al 80 % y al 100 %; al llegar al tope, se detiene o cobra excedente según lo que aceptó."
+  verify:
+    - { type: grep, pattern: "spend.?(limit|cap)|usage.?(alert|limit|threshold)|budget|tope de gasto", glob: "**/*.{ts,tsx,sql}", flags: i }
+
+- id: usage-visible
+  title: "Uso del periodo y factura estimada visibles para el cliente en todo momento"
+  category: billing
+  level: required
+  phase: build.ux
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: M, hours: [3, 6] }
+  why: "El cliente que no puede ver lo que consume no confía en la factura; la transparencia evita disputas."
+  how: "Página de uso con unidades del periodo, tramo actual y monto estimado, con la misma fuente que factura."
+  verify:
+    - { type: file_exists, path: ["{app,src/app,pages,src/pages}/**/{usage,billing,uso,facturacion}/**/*.{tsx,jsx}", "{app,src/app,pages,src/pages}/**/{usage,billing,uso,facturacion}.{tsx,jsx}"] }
+
+- id: usage-invoice-detail
+  title: "La factura muestra qué se contó: unidades por concepto y periodo"
+  category: billing
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: S, hours: [2, 4] }
+  why: "Una factura con un solo monto no se puede revisar; es la primera queja ante el procesador de pagos."
+  how: "Reportar el uso al proveedor por medidor (Stripe Meters, usage records) para que la factura lo desglose; o desglose propio en el PDF."
+  verify:
+    - { type: grep, pattern: "meterEvents|meter_events|billing\\.meters|usage_records|createUsageRecord|reportUsage", glob: "**/*.{ts,js}" }
+
+- id: usage-reconciliation
+  title: "Conciliación diaria: lo contado por la app contra lo que factura el proveedor"
+  category: billing
+  level: recommended
+  phase: launch.ops
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Un evento perdido es dinero no cobrado; uno duplicado, un cobro indebido. Solo la conciliación los encuentra."
+  how: "Tarea programada que compara totales por cliente y periodo y avisa ante diferencias."
+  verify:
+    - { type: grep, pattern: "reconcil|concilia", glob: "**/*.{ts,sql}", flags: i }
+
+- id: usage-pricing-terms
+  title: "Página de precios clara: qué es una unidad o un resultado, cómo se cuenta, redondeo y periodo"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.10.7"
+  when: { capabilities: [usage-billing] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Si 'resultado' no está definido por escrito, el cliente y tú cuentan distinto, y en una disputa gana la lectura del cliente."
+  how: "Definición de la unidad cobrable, ejemplos de qué cuenta y qué no, tramos, redondeo, periodo de facturación y qué pasa con el excedente."
+  verify:
+    - { type: grep, pattern: "per (unit|result|request|user|seat)|por (unidad|resultado|usuario|solicitud)", glob: "**/*.{tsx,jsx,mdx,md,json}", flags: i }
