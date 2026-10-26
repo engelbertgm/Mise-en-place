@@ -2,6 +2,15 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.2.1
+
+Panel (`/mep:panel`):
+
+- **Every item is selectable again.** The hover card on each row is gone: it covered the rows below it and took their pointer.
+- **Item detail fits.** Actions come first and the long list of what fails comes last; while the pane is not focused, a hint says how to scroll (ctrl+x tab, arrows).
+- **Clickable counts.** The 🔴 and 🟡 counts in the top line open the first pending item of that level.
+- **⚙ Herramientas.** Ask the deploy and PR gates ahead of time, run mep commands as if typed (check, phase, quote, audit, update, export, phase close, scope, add, log-time) and see the last events in `.mep/log`. Human-only commands stay out: the engine refuses them from a plugin.
+
 ## 0.2.0
 
 Hardening: mep's blocks now hold against the agent's own shortcuts. Nothing on the same machine is tamper-proof, so the rule is that no shortcut is silent: it needs the person, or it shows up in CI.
