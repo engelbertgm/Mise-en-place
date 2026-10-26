@@ -10,7 +10,7 @@ You describe the project. mep knows what to ask and what to require.
 [![Catalog](https://img.shields.io/badge/catalog-2026.10.7-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
-[![Works with batuta](https://img.shields.io/badge/works_with-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
+[![Works with baladero](https://img.shields.io/badge/works_with-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **English** · [Español](README.es.md)
@@ -72,7 +72,7 @@ On the same machine nothing is tamper-proof; a deliberate workaround is still vi
 | Plugin | How they fit |
 | --- | --- |
 | [ponytail](https://github.com/DietrichGebert/ponytail) | Applies the code mantra on every change. `/ponytail-review` replaces mep's quality review when closing a sub-phase. The engine detects Ponytail and requires the review recorded (`mep review record`), with no "must fix" and on the current code, before the close |
-| [batuta](https://github.com/engelbertgm/Batuta) | Routes each task to the right model (Opus decides, Sonnet executes, Haiku reads). mep's two agents are fixed exceptions: finding code always goes to `mep-locator` and security always to `mep-security` |
+| [baladero](https://github.com/engelbertgm/Baladero) | Live HUD for Claude Code: model, git, context and usage bars, tools, todos, and the cost of each task. mep's status line and panel show the checklist; Baladero shows what the session spends doing it |
 
 Both are optional. mep works on its own.
 

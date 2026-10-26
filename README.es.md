@@ -10,7 +10,7 @@ Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 [![Catálogo](https://img.shields.io/badge/catálogo-2026.10.7-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
-[![Funciona con batuta](https://img.shields.io/badge/funciona_con-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
+[![Funciona con baladero](https://img.shields.io/badge/funciona_con-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
 [![PRs bienvenidos](https://img.shields.io/badge/PRs-bienvenidos-brightgreen.svg)](CONTRIBUTING.md)
 
 [English](README.md) · **Español**
@@ -72,7 +72,7 @@ En la misma máquina nada es a prueba de todo; un truco deliberado igual queda a
 | Plugin | Cómo se complementan |
 | --- | --- |
 | [ponytail](https://github.com/DietrichGebert/ponytail) | Aplica el mantra de código en cada cambio. `/ponytail-review` reemplaza la revisión de calidad de mep al cerrar una sub-etapa. El motor detecta Ponytail y exige la revisión registrada (`mep review record`), sin "must fix" y sobre el código actual, antes de cerrar |
-| [batuta](https://github.com/engelbertgm/Batuta) | Envía cada tarea al modelo adecuado (Opus decide, Sonnet ejecuta, Haiku lee). Los dos agentes de mep son excepciones fijas: localizar código siempre va a `mep-locator` y seguridad siempre a `mep-security` |
+| [baladero](https://github.com/engelbertgm/Baladero) | HUD en vivo para Claude Code: modelo, git, barras de contexto y uso, herramientas, pendientes y el costo de cada tarea. La línea de estado y el panel de mep muestran el checklist; Baladero muestra lo que la sesión gasta en cumplirlo |
 
 Los dos son opcionales. mep funciona solo.
 

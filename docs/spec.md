@@ -1225,4 +1225,4 @@ Reglas de convivencia:
 
 Notas de implementación:
 - Verificar en la documentación actual de Claude Code cómo se declaran modelo y esfuerzo en el frontmatter de los agentes.
-- Si el proyecto usa otro plugin de ruteo de modelos (ej. Batuta), estos dos agentes son excepciones fijas: el ruteo general lo decide ese plugin; localizar y seguridad siempre van a estos agentes.
+- Estos dos agentes tienen modelo fijo: localizar código siempre va a `mep-locator` (Haiku) y seguridad siempre a `mep-security` (Opus), elija quien elija el modelo de la sesión. Baladero (HUD) muestra lo que cuesta cada uno.
