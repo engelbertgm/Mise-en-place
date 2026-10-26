@@ -54,7 +54,18 @@ Las sub-etapas van en orden: `foundation.setup → foundation.design → build.d
 | `mep-security` | Opus | alto | Implementa y audita los ítems de seguridad. Sus reportes en `.mep/security/` son lo único que da por cumplido un ítem de seguridad |
 
 > [!NOTE]
-> Un ítem de seguridad cuenta como cumplido solo si sus verificaciones automáticas pasan **y** `mep-security` dejó un reporte vigente. El reporte guarda un hash de los archivos que revisó; si alguno cambia, el reporte vence y el ítem vuelve a estar pendiente.
+> Un ítem de seguridad cuenta como cumplido solo si sus verificaciones automáticas pasan **y** `mep-security` dejó un reporte vigente. El reporte guarda un hash de los archivos que revisó, siempre incluidos los archivos sensibles del grupo del ítem (auth, pagos, base de datos, configuración); si alguno cambia, el reporte vence y el ítem vuelve a estar pendiente.
+
+### Lo que el agente no puede hacer
+
+Los bloqueos de mep aguantan también los atajos del propio agente, no solo errores honestos:
+
+- **El estado cambia solo con la CLI.** `.mep/profile.yaml`, el log, los reportes y las revisiones quedan sellados con un hash después de cada escritura. Una edición por fuera de la CLI bloquea `mep verify` (local y en CI, incluso con `MEP_BYPASS`) hasta que corras `/mep:resync`.
+- **Tus acciones son tuyas.** `/mep:confirm`, `/mep:override`, `/mep:threshold` (al relajar) y `/mep:resync` solo corren cuando tú los escribes o los pulsas en el panel; desde el Bash del agente se niegan. Las confirmaciones registran tu usuario de git.
+- **Los PR necesitan una revisión real.** La revisión de la rama se registra (`mep review record --pr`) y queda ligada al código; reintentar sin ella no pasa, y el CI también la pide.
+- **Nada es silencioso.** El CI escribe en el resumen del job cada cambio de estado del PR (overrides, confirmaciones, cierres de fase, bypass, re-sellados), así lo ves antes del merge.
+
+En la misma máquina nada es a prueba de todo; un truco deliberado igual queda a la vista en ese resumen.
 
 ## Funciona con
 
@@ -211,7 +222,8 @@ Mise-en-place/
 │   └── marketplace.json       # hace el repo instalable con /plugin
 ├── skills/                    # cada carpeta es un comando /mep:<nombre>
 │   ├── mep/                   # guía: interpretar un scope, usar el catálogo, respetar el brief
-│   ├── scope/  add/  check/  phase/  skip/  override/
+│   ├── scope/  add/  check/  phase/  skip/  panel/
+│   ├── override/  confirm/  threshold/  resync/   # solo tuyas (disable-model-invocation)
 │   ├── audit/  update/
 │   └── quote/  export/  log-time/
 ├── agents/
@@ -222,11 +234,15 @@ Mise-en-place/
 ├── mods/
 │   ├── register.tsx           # gate, guardia, panel, comandos instantáneos y línea de estado
 │   └── register.test.ts       # tests de los mods (claude plugin test .)
+├── types/index.d.ts           # contrato del estado del mod (panel)
 ├── engine/
 │   ├── src/                   # motor determinista en TypeScript, sin LLM
 │   │   ├── evaluate.ts        # perfil + catálogo → ítems que aplican, diff, stack
 │   │   ├── verify.ts          # corre las verificaciones de cada ítem (html.ts, sql.ts, maps.ts)
 │   │   ├── gate.ts            # reglas de bloqueo y cierre de fases
+│   │   ├── seal.ts guard.ts   # estado sellado tras cada escritura; lo que el agente no puede tocar
+│   │   ├── human.ts           # acciones que solo toma la persona
+│   │   ├── live.ts            # verificaciones contra el sitio desplegado y su DNS
 │   │   ├── render.ts          # BRIEF.md, ADRs, bloque de CLAUDE.md
 │   │   ├── scope.ts           # SCOPE.md: el scope en palabras simples
 │   │   ├── audit.ts           # infiere el perfil de un repo existente
@@ -261,8 +277,9 @@ Mise-en-place/
 tu-proyecto/
 ├── .mep/
 │   ├── profile.yaml           # fuente de verdad: tipo, capacidades, mercados, señales, fase
-│   ├── log                    # overrides, bypass y cambios de fase
+│   ├── log                    # overrides, bypass, cambios de fase y confirmaciones; sellado
 │   ├── security/<id>.json     # reportes de auditoría de mep-security
+│   ├── reviews/<sub|pr>.json  # revisiones de calidad (cierre de fase, PR)
 │   └── exports.yaml           # versiones del brief para el cliente
 ├── SCOPE.md                   # generado: qué es y qué no es el proyecto, en palabras simples
 ├── BRIEF.md                   # brief generado: perfil, stack, checklist por sub-etapa
@@ -284,12 +301,12 @@ tu-proyecto/
 ## Por dentro
 
 - **Motor** ([`engine/src`](engine/src)): TypeScript, sin LLM. Mismo perfil, mismos ítems, mismo resultado. Se empaqueta en [`engine/dist/mep.mjs`](engine/dist/mep.mjs) sin dependencias en tiempo de ejecución y se publica como `@engelbertgm/mep` para el CI.
-- **Mods** ([`mods/register.tsx`](mods/register.tsx)): corren dentro de Claude Code. `/mep:check` y `/mep:phase` responden al instante, sin turno de Claude; los deploys esperan al gate del motor; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes.
-- **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse y PostToolUse, como respaldo donde no hay mods.
-- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod`.
+- **Mods** ([`mods/register.tsx`](mods/register.tsx)): corren dentro de Claude Code. El chat solo oye a mep cuando algo bloquea; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes; el panel (`/mep:panel`) muestra el porqué, el cómo y todo lo que falla de cada ítem, con tus acciones (confirmar, omitir, desactivar con un diálogo). `/mep:check` y `/mep:phase` responden al instante; los deploys (Vercel, Netlify, Cloudflare, Fly, Railway, Firebase, Supabase, `git push` a main) esperan al gate del motor; se niegan las ediciones al estado de mep y los secretos en archivos versionados.
+- **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse (gate y guardia) y PostToolUse, como respaldo donde no hay mods.
+- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod` (con `--pr` en los pull requests, y contra `MEP_URL` para las verificaciones en vivo), y escribe los cambios de estado del PR en el resumen del job.
 - **Mapas**: `mep codemap` y `mep registry` generan `CODEMAP.md` y `REGISTRY.md` desde el código. "Para qué" y "No usar para" se escriben en el comentario de cada export; un export sin entrada bloquea cuando su sub-etapa está cerrada.
 - **Export**: un subconjunto simple de Markdown se convierte en .docx y .pdf sin dependencias, así funciona en cualquier máquina.
-- **Catálogo** ([`catalog/`](catalog)): 345 ítems de accesibilidad, sistema de diseño, UX, contenido, formularios, datos, responsive, seguridad, privacidad, legal, performance, i18n, calidad de código, despliegue y los mercados MX, USA, CA, EU, UK, BR e IN, cada ítem legal con su fuente oficial.
+- **Catálogo** ([`catalog/`](catalog)): 400 ítems de accesibilidad, sistema de diseño, UX, contenido, formularios, datos, responsive, seguridad, privacidad, legal, performance, i18n, calidad de código, despliegue y operación; reglas por tipo de proyecto (SaaS, ecommerce, marketplace, reservas, blog, directorio, portafolio, app interna), cobro por uso, datos de salud y financieros, y los mercados MX, USA, CA, EU, UK, BR e IN, cada ítem legal con su fuente oficial o tu confirmación.
 
 ### Proyecto de prueba
 
@@ -302,7 +319,9 @@ tu-proyecto/
 
 - El check de CI solo bloquea merges cuando lo marcas como **obligatorio** en la protección de ramas del repo.
 - Las verificaciones de HTML necesitan una salida de build (`out/`, `.next/server/app`, `dist/`). Sin ella, esos ítems quedan pendientes en lugar de pasar.
-- Muchos ítems de UX, legal y diseño son `manual`: el motor los lleva, pero los confirma una persona (o `mep-security`, en seguridad).
+- Muchos ítems de UX, legal y diseño son `manual`: el motor los lleva, pero los confirmas tú (o `mep-security`, en seguridad).
+- Las verificaciones en vivo y de DNS necesitan el sitio desplegado (`urls` en el perfil, o `MEP_URL`); sin él se omiten, y los ítems que solo dependen de ellas quedan pendientes.
+- La guardia y el sello frenan los atajos obvios; un truco deliberado en la misma máquina no se impide, solo queda a la vista en el resumen del PR.
 - Los precios de `catalog/costs.yaml` y los rangos de esfuerzo son estimaciones; verifica precios actuales y calibra con `/mep:log-time`.
 
 El diseño completo está en [docs/spec.md](docs/spec.md).
