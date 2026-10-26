@@ -16,6 +16,13 @@ Hardening: mep's blocks now hold against the agent's own shortcuts. Nothing on t
 - Review and report hashes normalize line endings (CRLF), so a review recorded on Windows stays valid in CI. Existing reviews and reports expire once after the upgrade.
 - Build: the bundle banner works on Windows (the hashbang lives in `cli.ts`).
 
+Checks that prove behavior (catalog 2026.10.7):
+
+- New check types `live` (headers, HSTS, compression and caching, cookies, 404 page, canonical redirects, sitemap — against `urls.preview`/`urls.production` in the profile, or `MEP_URL`) and `dns` (SPF, DMARC, DKIM on `email_domain`). Requests run in a short child process so the engine stays synchronous.
+- New HTML rule `clean_links`. Seven manual items become automatic; three header items also check what the site really sends.
+- A check that cannot run (no site, quick mode) is `skip`: it never passes or fails an item on its own.
+- The CI template passes `MEP_URL` from the repository variable of the same name.
+
 Quiet chat, full panel:
 
 - **The chat only hears from mep when something blocks.** The Stop hook no longer lists the active sub-phase's pending items after every message; a block lists at most five. Pending counts stay in the status line.

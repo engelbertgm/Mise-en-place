@@ -110,11 +110,12 @@
   phase: launch.ops
   sensitive: [config]
   since: "2026.10.1"
+  updated: "2026.10.7"
   effort: { size: XS, hours: [0.5, 1] }
   why: "Una sola versión del dominio: sin contenido duplicado ni cookies servidas por HTTP."
   how: "Dominio principal en el hosting y redirección 308/301 desde las variantes."
   verify:
-    - { type: manual, prompt: "http:// y la variante www (o sin www) redirigen al dominio canónico https://" }
+    - { type: live, rule: canonical_redirect }
 
 - id: security-headers
   title: "Headers: X-Content-Type-Options, Referrer-Policy, frame-ancestors"
@@ -123,6 +124,7 @@
   phase: launch.ops
   sensitive: [config]
   since: "2026.10.1"
+  updated: "2026.10.7"
   effort: { size: S, hours: [1, 2] }
   why: "Evitan sniffing de tipos, fuga de URLs a terceros y clickjacking."
   how: "headers() en next.config: X-Content-Type-Options: nosniff, Referrer-Policy: strict-origin-when-cross-origin, CSP frame-ancestors 'self' (o X-Frame-Options: DENY)."
@@ -130,6 +132,7 @@
     - { type: grep, pattern: "X-Content-Type-Options", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
     - { type: grep, pattern: "Referrer-Policy", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
     - { type: grep, pattern: "frame-ancestors|X-Frame-Options", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
+    - { type: live, rule: headers, names: [x-content-type-options, referrer-policy, "x-frame-options|frame-ancestors"] }
 
 - id: lockfile-committed
   title: Lockfile versionado
@@ -174,12 +177,13 @@
   phase: launch.ops
   sensitive: [config]
   since: "2026.10.1"
+  updated: "2026.10.7"
   effort: { size: S, hours: [1, 2] }
   why: "Un stack trace revela rutas, versiones y consultas que guían un ataque."
   how: "Páginas de error genéricas; el detalle va al monitoreo de errores, nunca a la respuesta."
   verify:
     - { type: grep, pattern: "(error|err)\\.stack|JSON\\.stringify\\((error|err)\\)", glob: "{app,src/app,pages,src/pages}/**/{route,api,*.api}.{ts,js}", expect: absent }
-    - { type: manual, prompt: "Las respuestas de error no exponen stack, SQL ni rutas internas" }
+    - { type: live, rule: error_page }
 
 - id: csp-strict
   title: Content-Security-Policy estricta
@@ -188,11 +192,13 @@
   phase: launch.ops
   sensitive: [config]
   since: "2026.10.1"
+  updated: "2026.10.7"
   effort: { size: M, hours: [2, 6] }
   why: "Limita el daño de un XSS: el navegador no ejecuta scripts de orígenes no permitidos."
   how: "CSP con nonce (middleware de Next.js) y lista mínima de orígenes."
   verify:
     - { type: grep, pattern: "Content-Security-Policy", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers}" }
+    - { type: live, rule: headers, names: [content-security-policy] }
 
 - id: security-txt
   title: security.txt
@@ -402,13 +408,14 @@
   phase: build.features
   sensitive: [auth]
   since: "2026.10.1"
+  updated: "2026.10.7"
   when: { capabilities: [auth] }
   effort: { size: XS, hours: [0.5, 1] }
   why: "Una cookie legible por JavaScript se roba con un XSS; sin SameSite, se envía en peticiones de otros sitios."
   how: "httpOnly: true, secure: true, sameSite: 'lax' (Supabase SSR lo configura así)."
   verify:
     - { type: grep, pattern: "httpOnly:\\s*false|sameSite:\\s*[\"']none[\"']", glob: "**/*.{ts,tsx,js,jsx}", flags: i, expect: absent }
-    - { type: manual, prompt: "Cookies de sesión con HttpOnly, Secure y SameSite" }
+    - { type: live, rule: cookies, paths: ["/login", "/signin", "/iniciar-sesion", "/api/auth/session"] }
 
 - id: csrf-protection
   title: Protección CSRF

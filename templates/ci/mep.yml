@@ -31,7 +31,10 @@ jobs:
       # Las verificaciones de HTML (títulos únicos, un h1, og:image…) corren sobre la salida del build.
       - run: pnpm build
       # En un PR a main también exige la revisión de calidad de la rama (los hooks no corren al fusionar en GitHub).
+      # Los checks `live` y `dns` prueban el sitio desplegado: define la variable MEP_URL del repo (Settings → Variables) con la URL de preview o producción.
       - run: pnpm dlx @engelbertgm/mep@0.2.0 verify --prod ${{ github.event_name == 'pull_request' && '--pr' || '' }}
+        env:
+          MEP_URL: ${{ vars.MEP_URL }}
       # Todo cambio de estado de mep del PR (overrides, confirmaciones, cierres, bypass, re-sellados), a la vista antes del merge.
       - if: github.event_name == 'pull_request'
         run: pnpm dlx @engelbertgm/mep@0.2.0 changes --base origin/${{ github.base_ref }} >> "$GITHUB_STEP_SUMMARY"

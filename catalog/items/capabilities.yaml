@@ -160,12 +160,15 @@
   level: required
   phase: launch.ops
   since: "2026.10.2"
+  updated: "2026.10.7"
   when: { capabilities: { any: [email, newsletter] } }
   effort: { size: S, hours: [1, 2] }
   why: "Sin autenticación, Gmail y Yahoo mandan los correos a spam o los rechazan."
   how: "Registros SPF y DKIM del proveedor y DMARC (p=quarantine o reject) en el DNS del dominio."
   verify:
-    - { type: manual, prompt: "SPF, DKIM y DMARC configurados y verificados en el dominio de envío" }
+    - { type: dns, rule: spf }
+    - { type: dns, rule: dmarc }
+    - { type: dns, rule: dkim }
   references: ["https://support.google.com/a/answer/81126"]
 
 - id: email-templates

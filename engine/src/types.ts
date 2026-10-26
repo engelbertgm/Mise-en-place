@@ -34,7 +34,12 @@ export type Check =
   | { type: 'design'; rule: 'font_families' | 'font_weights'; max: number }
   | { type: 'build'; rule: 'max_js_chunk' | 'no_source_maps' | 'server_rendered'; max_kb?: number }
   | { type: 'robots'; rule: 'allows_ai' }
+  | { type: 'live'; rule: LiveRule; names?: string[]; paths?: string[] }
+  | { type: 'dns'; rule: 'spf' | 'dmarc' | 'dkim'; selectors?: string[] }
   | { type: 'manual'; prompt: string }
+
+/** Checks against the deployed site (urls in the profile, or MEP_URL). */
+export type LiveRule = 'headers' | 'hsts' | 'compression' | 'cookies' | 'error_page' | 'canonical_redirect' | 'sitemap'
 
 export type HtmlRule =
   | 'meta'
@@ -53,6 +58,7 @@ export type HtmlRule =
   | 'iframe_title'
   | 'skip_link'
   | 'has_text'
+  | 'clean_links'
 
 export type Size = 'XS' | 'S' | 'M' | 'L' | 'XL'
 export type ScaleDim = 'pages' | 'entities' | 'languages' | 'markets' | 'integrations'
@@ -140,6 +146,11 @@ export type Profile = {
   custom_work?: { title: string; size: Size; phase?: string }[]
   /** One paragraph, in the person's words: what the project is, for whom and what it must achieve. Shown at the top of SCOPE.md. */
   summary?: string
+  /** The deployed site, for the live checks (MEP_URL overrides). */
+  urls?: { production?: string; preview?: string }
+  /** The domain email is sent from, for the DNS checks (defaults to the production host). */
+  email_domain?: string
+  email_dkim_selector?: string
   /** Code quality thresholds (complexity, max_lines, max_function_lines). Laxer than the defaults needs a reason. */
   quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines', number>>
 }
@@ -153,8 +164,11 @@ export type Evaluated = {
   reason?: string
 }
 
-/** `all`: every finding when `detail` names only the first few (the panel shows the whole list). */
-export type CheckResult = { ok: boolean | null; detail: string; violation?: boolean; all?: string[] }
+/**
+ * `all`: every finding when `detail` names only the first few (the panel shows the whole list).
+ * `skip`: the check could not run here (no deployed site to check, quick mode): it neither passes nor fails the item.
+ */
+export type CheckResult = { ok: boolean | null; detail: string; violation?: boolean; all?: string[]; skip?: boolean }
 
 export type ItemStatus = 'pass' | 'fail' | 'unknown'
 

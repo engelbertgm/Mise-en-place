@@ -49,12 +49,13 @@
   level: required
   phase: launch.seo
   since: "2026.10.1"
+  updated: "2026.10.7"
   depends_on: [sitemap-xml]
   effort: { size: XS, hours: [0.5, 1] }
   why: "Un sitemap con páginas noindex, redirecciones o 404 desperdicia rastreo y confunde a Google."
   how: "Generar el sitemap desde la misma lista de rutas públicas; excluir privadas, noindex y redirecciones."
   verify:
-    - { type: manual, prompt: "El sitemap no lista dashboard, cuenta, checkout, búsqueda interna ni páginas noindex" }
+    - { type: live, rule: sitemap }
 
 - id: noindex-private-pages
   title: "noindex y fuera del sitemap: dashboard, cuenta, checkout, búsqueda interna"
@@ -88,12 +89,13 @@
   level: required
   phase: build.features
   since: "2026.10.1"
+  updated: "2026.10.7"
   effort: { size: XS, hours: [0.5, 1] }
   why: "URLs legibles se comparten y posicionan mejor; mezclar estilos crea duplicados."
   how: "Carpetas de rutas en kebab-case; slugs en lugar de IDs; trailingSlash fijo en la config."
   verify:
     - { type: file_exists, path: ["{app,src/app,pages,src/pages,src/routes}/**/*"] }
-    - { type: manual, prompt: "Rutas en minúsculas con guiones, slugs en vez de IDs y trailing slash consistente" }
+    - { type: html, rule: clean_links }
 
 - id: redirects-on-change
   title: 301 cuando una URL cambia

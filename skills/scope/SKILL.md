@@ -15,6 +15,8 @@ Sigue el skill `mep` para interpretar el scope. Motor: `node "${CLAUDE_PLUGIN_RO
 2. Lee `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml` (valores válidos) y, si se indicó `--preset` o hay uno cercano, `${CLAUDE_PLUGIN_ROOT}/catalog/presets/<preset>.yaml`.
 **Límite de mep.** Si el proyecto está dirigido a menores de edad, los incluye como usuarios, o necesita verificar edad (contenido para adultos, apuestas, alcohol, tabaco, cannabis, citas 18+), di en una línea que mep no cubre ese tipo de proyecto y detente: no crees perfil ni brief. Si no queda claro, pregunta antes de seguir.
 
+Si ya hay dominio o URL de preview, guárdalos en el perfil (`urls: { production, preview }` y, si envía emails, `email_domain`): con ellos mep prueba el sitio real (encabezados, cookies, 404, redirecciones, sitemap) y el DNS del email (SPF, DMARC, DKIM). Si aún no hay, se agregan después con `/mep:add`.
+
 Si cobra por uso o por resultado (por unidad, por resultado generado, por usuario activo a partir de un umbral), es la capacidad `usage-billing`.
 
 3. Propón el perfil (tipo, capacidades, mercados, audiencia, contexto, señales, counts) en una tabla corta. Pregunta **solo** lo que cambia 🔴 o los counts (ver skill `mep`). Si el scope cobra algo y no queda claro, pregunta si el pago es con enlace del proveedor (`payment-links`) o con checkout propio (`payments`); no marques `has_db` sin algo que guardar.

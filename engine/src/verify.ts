@@ -7,6 +7,7 @@ import { checkSql } from './sql.ts'
 import { checkThresholds } from './quality.ts'
 import { checkDesign } from './design.ts'
 import { checkBuild, checkRobots } from './build.ts'
+import { checkDns, checkLive } from './live.ts'
 import { reportState } from './security.ts'
 import type { Check, CheckResult, Evaluated, ItemResult, ItemStatus, Profile } from './types.ts'
 
@@ -93,6 +94,10 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkBuild(root, check)
     case 'robots':
       return checkRobots(root)
+    case 'live':
+      return checkLive(profile, check, mode)
+    case 'dns':
+      return checkDns(profile, check, mode)
     case 'manual': {
       const confirmed = profile.selections.manual_confirmed.find(c => c.id === itemId)
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` }
@@ -100,9 +105,11 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
   }
 }
 
-function statusOf(results: CheckResult[]): ItemStatus {
+function statusOf(all: CheckResult[]): ItemStatus {
+  // A check that could not run here does not count; an item with nothing else to go on stays unknown.
+  const results = all.filter(r => !r.skip)
   if (results.some(r => r.ok === false)) return 'fail'
-  if (results.some(r => r.ok === null)) return 'unknown'
+  if (!results.length || results.some(r => r.ok === null)) return 'unknown'
   return 'pass'
 }
 

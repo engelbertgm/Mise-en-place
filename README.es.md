@@ -112,6 +112,8 @@ La cotización corre sola solo al definir el scope (`/mep:scope`) y cuando cambi
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
 
+Las verificaciones corren sobre el código, sobre la salida del build y, cuando el perfil tiene `urls.preview`/`urls.production` (o está `MEP_URL`), sobre el sitio desplegado y su DNS: los encabezados que de verdad envía, cookies, compresión y caché, un 404 real, redirecciones al dominio canónico, el sitemap y SPF/DMARC/DKIM.
+
 Fuera del alcance a propósito: proyectos para menores de edad o que requieren verificar edad (contenido para adultos, apuestas, alcohol…). `/mep:scope` se detiene y un perfil con esa audiencia es inválido.
 
 Cada regla se activa por el scope del proyecto (tipo, capacidades, mercados, audiencia, contexto, señales), nunca por defecto: una landing sin cuentas no recibe reglas de RLS, un sitio sin cookies no recibe banner. `mep explain <id>` muestra la condición de la regla con ✓/✗ y por qué aplica o no.

@@ -7380,7 +7380,7 @@ import { fileURLToPath } from "node:url";
 var LEVELS = ["required", "recommended", "optional"];
 var SIZES = ["XS", "S", "M", "L", "XL"];
 var SCALES = ["pages", "entities", "languages", "markets", "integrations"];
-var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "build", "robots", "manual"];
+var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "build", "robots", "live", "dns", "manual"];
 function defaultCatalogDir() {
   if (process.env.MEP_CATALOG) return resolve(process.env.MEP_CATALOG);
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -7470,6 +7470,8 @@ function validateCheck(check, where) {
     design: ["rule", "max"],
     build: ["rule"],
     robots: ["rule"],
+    live: ["rule"],
+    dns: ["rule"],
     manual: ["prompt"]
   };
   const errors = required[check.type].filter((f) => check[f] === void 0).map((f) => `${where}: verify ${check.type} needs "${f}"`);
@@ -8259,6 +8261,12 @@ var PAGE_RULES = {
     const count = headingLevels(p.html).filter((l) => l === 1).length;
     return count === 1 ? void 0 : `${count} <h1> (debe haber exactamente 1)`;
   },
+  // Internal links in lowercase with hyphens and slugs: no uppercase, underscores, .php/.asp, or bare IDs.
+  clean_links: (p) => {
+    const hrefs = [...p.html.matchAll(/<a\b[^>]*\bhref=["'](\/[^"'#?]*)/gi)].map((m) => m[1]);
+    const bad = hrefs.filter((h) => !h.startsWith("//") && !/^\/(_next|assets|_astro|static|api)\//.test(h) && (/[A-Z_ ]|%20/.test(h) || /\.(php|aspx?)$/i.test(h) || /\/(\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/|$)/i.test(h)));
+    return bad.length ? `enlaces internos poco limpios: ${[...new Set(bad)].slice(0, 3).join(", ")}` : void 0;
+  },
   heading_order: (p) => {
     const levels = headingLevels(p.html);
     if (levels.length && levels[0] !== 1) return `el primer heading es h${levels[0]}, no h1`;
@@ -8719,6 +8727,176 @@ function checkRobots(root) {
   return blocked.length ? { ok: false, detail: `${source} bloquea el sitio a: ${[...new Set(blocked)].join(", ")}` } : { ok: true, detail: `${source}: buscadores y asistentes de IA pueden leer el sitio` };
 }
 
+// engine/src/live.ts
+import { execFileSync } from "node:child_process";
+var FETCH = `
+const [url, redirect] = process.argv.slice(1)
+try {
+  const r = await fetch(url, { redirect, headers: { 'accept-encoding': 'br, gzip', 'user-agent': 'mep-check' }, signal: AbortSignal.timeout(10000) })
+  const body = redirect === 'manual' ? '' : (await r.text()).slice(0, 300000)
+  process.stdout.write(JSON.stringify({ status: r.status, headers: Object.fromEntries(r.headers), cookies: r.headers.getSetCookie(), body }))
+} catch (e) {
+  process.stdout.write(JSON.stringify({ status: 0, headers: {}, cookies: [], body: '', error: String(e?.cause?.code ?? e?.message ?? e) }))
+}`;
+var TXT = `
+const [name] = process.argv.slice(1)
+const { promises } = await import('node:dns')
+promises.resolveTxt(name).then(r => process.stdout.write(JSON.stringify(r.map(x => x.join('')))), e => process.stdout.write(JSON.stringify({ error: e.code })))`;
+var cache = /* @__PURE__ */ new Map();
+function fetchSync(url, redirect = "follow") {
+  const key = `${redirect} ${url}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  let res;
+  try {
+    res = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", FETCH, url, redirect], { encoding: "utf8", timeout: 15e3, stdio: ["ignore", "pipe", "ignore"] }));
+  } catch (e) {
+    res = { status: 0, headers: {}, cookies: [], body: "", error: e.message.split("\n")[0] };
+  }
+  cache.set(key, res);
+  return res;
+}
+function txtSync(name) {
+  try {
+    return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", TXT, name], { encoding: "utf8", timeout: 1e4, stdio: ["ignore", "pipe", "ignore"] }));
+  } catch {
+    return { error: "TIMEOUT" };
+  }
+}
+function liveTarget(profile, env = process.env) {
+  return (env.MEP_URL || profile.urls?.production || profile.urls?.preview)?.replace(/\/+$/, "");
+}
+var skip = (detail) => ({ ok: null, detail, skip: true });
+var NO_URL = "sin URL del sitio: define urls.preview o urls.production en el perfil (/mep:add) o MEP_URL";
+var LEAK = /\bat [\w.<>]+ \(|node_modules\/|Traceback \(most recent|SQLSTATE|PrismaClient\w*Error|stack":|ECONNREFUSED/;
+var PRIVATE = /\/(dashboard|account|cuenta|checkout|carrito|cart|login|iniciar-sesion|signin|signup|registro|admin|api|settings|ajustes)(\/|$)|[?&](q|s|search|query)=/i;
+function headerPresent(res, name) {
+  if (name === "frame-ancestors") return /frame-ancestors/i.test(res.headers["content-security-policy"] ?? "");
+  return res.headers[name.toLowerCase()] !== void 0;
+}
+function checkHeaders(home, names) {
+  const missing = names.filter((entry) => !entry.split("|").some((alt) => headerPresent(home, alt)));
+  return missing.length ? { ok: false, detail: `el sitio no env\xEDa: ${missing.join(", ")}`, all: missing } : { ok: true, detail: `encabezados presentes: ${names.join(", ")}` };
+}
+function checkHsts(home) {
+  const value = home.headers["strict-transport-security"];
+  const age = Number(value?.match(/max-age=(\d+)/i)?.[1] ?? 0);
+  if (!value) return { ok: false, detail: "el sitio no env\xEDa Strict-Transport-Security" };
+  return age >= 15552e3 ? { ok: true, detail: `HSTS max-age=${age}` } : { ok: false, detail: `HSTS max-age=${age}: menos de 180 d\xEDas` };
+}
+function checkCompression(base, home) {
+  const encoding = home.headers["content-encoding"] ?? "";
+  if (!/br|gzip|zstd/.test(encoding)) return { ok: false, detail: "el HTML se sirve sin compresi\xF3n (falta Brotli o gzip)" };
+  const asset = home.body.match(/["'](\/(?:_next\/static|assets|_astro|build)\/[^"'?#\s]+\.(?:js|css))["']/)?.[1];
+  if (!asset) return { ok: true, detail: `HTML con ${encoding}; no se encontr\xF3 un asset con hash que revisar` };
+  const cache2 = fetchSync(base + asset).headers["cache-control"] ?? "";
+  const maxAge = Number(cache2.match(/max-age=(\d+)/)?.[1] ?? 0);
+  return /immutable/.test(cache2) || maxAge >= 31536e3 ? { ok: true, detail: `HTML con ${encoding}; ${asset} con Cache-Control "${cache2}"` } : { ok: false, detail: `${asset} sin cach\xE9 larga: Cache-Control "${cache2 || "ausente"}" (se espera max-age=31536000, immutable)` };
+}
+function checkCookies(base, home, paths) {
+  const cookies = [...home.cookies, ...paths.flatMap((p) => fetchSync(base + p).cookies)];
+  if (!cookies.length) return { ok: true, detail: `sin cookies en ${["/", ...paths].join(", ")}` };
+  const problems = [...new Set(cookies)].flatMap((c) => {
+    const name = c.split("=")[0].trim();
+    const flags = c.toLowerCase();
+    const missing = [!/;\s*secure/.test(flags) && "Secure", !/;\s*samesite=/.test(flags) && "SameSite", /sess|auth|token|sid|jwt/i.test(name) && !/;\s*httponly/.test(flags) && "HttpOnly"].filter(Boolean);
+    return missing.length ? [`${name} sin ${missing.join(", ")}`] : [];
+  });
+  return problems.length ? { ok: false, detail: problems.slice(0, 5).join("; "), all: problems } : { ok: true, detail: `${cookies.length} cookie(s) con Secure, SameSite y HttpOnly donde aplica` };
+}
+function checkErrorPage(base) {
+  const res = fetchSync(`${base}/mep-check-404-${Date.now().toString(36)}`);
+  if (res.status === 200) return { ok: false, detail: "una ruta inexistente responde 200 (404 suave): debe responder 404" };
+  const leak = res.body.match(LEAK)?.[0];
+  return leak ? { ok: false, detail: `la p\xE1gina de error muestra detalles internos ("${leak}")` } : { ok: true, detail: `ruta inexistente \u2192 ${res.status}, sin detalles internos` };
+}
+function checkCanonicalRedirect(base) {
+  const url = new URL(base);
+  if (url.protocol !== "https:") return skip("la URL del sitio no es https://");
+  const problems = [];
+  const http = fetchSync(`http://${url.host}/`, "manual");
+  if (http.status && !(http.status >= 300 && http.status < 400 && /^https:/.test(http.headers.location ?? ""))) problems.push(`http:// responde ${http.status} sin redirigir a https://`);
+  const other = url.host.startsWith("www.") ? url.host.slice(4) : `www.${url.host}`;
+  const alt = fetchSync(`https://${other}/`, "manual");
+  if (alt.status && !(alt.status >= 300 && alt.status < 400 && (alt.headers.location ?? "").includes(url.host))) problems.push(`${other} responde ${alt.status} sin redirigir a ${url.host}`);
+  return problems.length ? { ok: false, detail: problems.join("; ") } : { ok: true, detail: `http:// y ${other} llevan a ${url.origin}` };
+}
+function checkSitemap(base) {
+  const res = fetchSync(`${base}/sitemap.xml`);
+  if (res.status !== 200) return { ok: false, detail: `/sitemap.xml responde ${res.status}` };
+  const locs = [...res.body.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1]);
+  if (!locs.length) return { ok: false, detail: "el sitemap no lista ninguna URL" };
+  const problems = [];
+  for (const loc of locs.slice(0, 30)) {
+    let path = loc;
+    try {
+      const u = new URL(loc);
+      path = u.pathname + u.search;
+    } catch {
+    }
+    if (PRIVATE.test(path)) {
+      problems.push(`${path}: p\xE1gina privada o de b\xFAsqueda`);
+      continue;
+    }
+    const page = fetchSync(base + path);
+    if (page.status !== 200) problems.push(`${path}: responde ${page.status}`);
+    else if (/noindex/i.test(page.headers["x-robots-tag"] ?? "") || /<meta[^>]+name=["']robots["'][^>]+noindex/i.test(page.body)) problems.push(`${path}: es noindex`);
+  }
+  return problems.length ? { ok: false, detail: problems.slice(0, 5).join("; "), all: problems } : { ok: true, detail: `${Math.min(locs.length, 30)} URL(s) del sitemap p\xFAblicas e indexables` };
+}
+function checkLive(profile, check, mode, env = process.env) {
+  if (mode === "fast") return skip("se verifica contra el sitio desplegado en /mep:check");
+  const base = liveTarget(profile, env);
+  if (!base) return skip(NO_URL);
+  const home = fetchSync(`${base}/`);
+  if (!home.status) return { ok: null, detail: `no se pudo abrir ${base}: ${home.error ?? "sin respuesta"}` };
+  switch (check.rule) {
+    case "headers":
+      return checkHeaders(home, check.names ?? []);
+    case "hsts":
+      return checkHsts(home);
+    case "compression":
+      return checkCompression(base, home);
+    case "cookies":
+      return checkCookies(base, home, check.paths ?? []);
+    case "error_page":
+      return checkErrorPage(base);
+    case "canonical_redirect":
+      return checkCanonicalRedirect(base);
+    case "sitemap":
+      return checkSitemap(base);
+  }
+}
+function spfResult(records) {
+  const spf = records.filter((r) => /^v=spf1\b/i.test(r));
+  if (!spf.length) return { ok: false, detail: "sin registro SPF (v=spf1)" };
+  if (spf.length > 1) return { ok: false, detail: `${spf.length} registros SPF: debe haber uno solo` };
+  return /\+all\b/.test(spf[0]) ? { ok: false, detail: "SPF con +all: autoriza a cualquiera a enviar" } : { ok: true, detail: spf[0] };
+}
+function dmarcResult(records) {
+  const dmarc = records.find((r) => /^v=DMARC1\b/i.test(r));
+  if (!dmarc) return { ok: false, detail: "sin registro DMARC en _dmarc" };
+  const policy = dmarc.match(/;\s*p=(\w+)/i)?.[1]?.toLowerCase();
+  if (!policy) return { ok: false, detail: "DMARC sin pol\xEDtica (p=)" };
+  return { ok: true, detail: policy === "none" ? "DMARC p=none: solo monitorea; sube a quarantine o reject cuando el env\xEDo est\xE9 estable" : `DMARC p=${policy}` };
+}
+var DKIM_SELECTORS = ["resend", "google", "default", "selector1", "selector2", "s1", "s2", "k1", "mail", "smtp", "dkim", "pm", "mandrill", "zoho"];
+function checkDns(profile, check, mode, env = process.env) {
+  if (mode === "fast") return skip("se verifica en el DNS en /mep:check");
+  const target = liveTarget(profile, env);
+  const domain = profile.email_domain ?? (target ? new URL(target).hostname.replace(/^www\./, "") : void 0);
+  if (!domain) return skip("sin dominio: define email_domain o urls.production en el perfil (/mep:add)");
+  const lookup = (name) => {
+    const r = txtSync(name);
+    return Array.isArray(r) ? r : [];
+  };
+  if (check.rule === "spf") return spfResult(lookup(domain));
+  if (check.rule === "dmarc") return dmarcResult(lookup(`_dmarc.${domain}`));
+  const selectors = [...profile.email_dkim_selector ? [profile.email_dkim_selector] : [], ...check.selectors ?? DKIM_SELECTORS];
+  const found = selectors.find((s) => lookup(`${s}._domainkey.${domain}`).some((r) => /\bp=\S/.test(r)));
+  return found ? { ok: true, detail: `DKIM en ${found}._domainkey.${domain}` } : { ok: false, detail: `sin DKIM en los selectores comunes de ${domain}; si tu proveedor usa otro, ponlo en email_dkim_selector del perfil` };
+}
+
 // engine/src/security.ts
 import { createHash as createHash3 } from "node:crypto";
 import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "node:fs";
@@ -8829,15 +9007,20 @@ function runCheck(root, check, profile, itemId, mode) {
       return checkBuild(root, check);
     case "robots":
       return checkRobots(root);
+    case "live":
+      return checkLive(profile, check, mode);
+    case "dns":
+      return checkDns(profile, check, mode);
     case "manual": {
       const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
     }
   }
 }
-function statusOf(results) {
+function statusOf(all) {
+  const results = all.filter((r) => !r.skip);
   if (results.some((r) => r.ok === false)) return "fail";
-  if (results.some((r) => r.ok === null)) return "unknown";
+  if (!results.length || results.some((r) => r.ok === null)) return "unknown";
   return "pass";
 }
 function isSecurityItem(e) {
@@ -8988,6 +9171,10 @@ function describeCheck(c) {
       return "robots.txt no bloquea buscadores ni asistentes de IA";
     case "design":
       return `${c.rule === "font_families" ? "familias tipogr\xE1ficas" : "pesos de texto"} \u2264 ${c.max}`;
+    case "live":
+      return { headers: `el sitio env\xEDa ${(c.names ?? []).join(", ")}`, hsts: "el sitio env\xEDa HSTS \u2265 180 d\xEDas", compression: "el sitio sirve con Brotli/gzip y assets con cach\xE9 inmutable", cookies: "las cookies del sitio llevan Secure, SameSite y HttpOnly", error_page: "una ruta inexistente da 404 sin detalles internos", canonical_redirect: "http:// y www redirigen al dominio can\xF3nico", sitemap: "el sitemap lista solo p\xE1ginas p\xFAblicas e indexables" }[c.rule];
+    case "dns":
+      return `DNS: ${c.rule.toUpperCase()}`;
     case "manual":
       return `manual: ${c.prompt}`;
   }

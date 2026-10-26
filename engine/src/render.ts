@@ -36,6 +36,10 @@ function describeCheck(c: Check): string {
       return 'robots.txt no bloquea buscadores ni asistentes de IA'
     case 'design':
       return `${c.rule === 'font_families' ? 'familias tipográficas' : 'pesos de texto'} ≤ ${c.max}`
+    case 'live':
+      return { headers: `el sitio envía ${(c.names ?? []).join(', ')}`, hsts: 'el sitio envía HSTS ≥ 180 días', compression: 'el sitio sirve con Brotli/gzip y assets con caché inmutable', cookies: 'las cookies del sitio llevan Secure, SameSite y HttpOnly', error_page: 'una ruta inexistente da 404 sin detalles internos', canonical_redirect: 'http:// y www redirigen al dominio canónico', sitemap: 'el sitemap lista solo páginas públicas e indexables' }[c.rule]
+    case 'dns':
+      return `DNS: ${c.rule.toUpperCase()}`
     case 'manual':
       return `manual: ${c.prompt}`
   }

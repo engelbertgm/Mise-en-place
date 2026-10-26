@@ -68,6 +68,12 @@ const PAGE_RULES: Record<string, PageRule> = {
     const count = headingLevels(p.html).filter(l => l === 1).length
     return count === 1 ? undefined : `${count} <h1> (debe haber exactamente 1)`
   },
+  // Internal links in lowercase with hyphens and slugs: no uppercase, underscores, .php/.asp, or bare IDs.
+  clean_links: p => {
+    const hrefs = [...p.html.matchAll(/<a\b[^>]*\bhref=["'](\/[^"'#?]*)/gi)].map(m => m[1]!)
+    const bad = hrefs.filter(h => !h.startsWith('//') && !/^\/(_next|assets|_astro|static|api)\//.test(h) && (/[A-Z_ ]|%20/.test(h) || /\.(php|aspx?)$/i.test(h) || /\/(\d{6,}|[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})(\/|$)/i.test(h)))
+    return bad.length ? `enlaces internos poco limpios: ${[...new Set(bad)].slice(0, 3).join(', ')}` : undefined
+  },
   heading_order: p => {
     const levels = headingLevels(p.html)
     if (levels.length && levels[0] !== 1) return `el primer heading es h${levels[0]}, no h1`

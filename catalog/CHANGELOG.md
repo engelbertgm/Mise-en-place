@@ -13,6 +13,12 @@ Reglas por tipo de proyecto, cobro por uso, operación y datos sensibles:
 - **Mapas, API pública y subida de archivos** (`integrations.yaml`): llave del mapa restringida, dirección en texto, atribución; rate limit con 429, llaves con hash, OpenAPI, errores problem+json; tamaño máximo en el servidor, archivos privados con URL firmada, EXIF eliminado.
 - **Operación** (`ops.yaml`): monitor de uptime (🔴 en SaaS, tiendas, marketplace, reservas, apps internas, pagos y APIs), endpoint de salud, página de estado, monitoreo de cron y alertas de errores que llegan a una persona.
 - **Datos de salud y financieros** (`sensitive-data.yaml`): cifrado por campo, registro de accesos, sin píxeles de seguimiento con datos de salud; HIPAA (BAA) en USA, art. 9 RGPD (consentimiento explícito y DPIA) en EU/UK y consentimiento expreso de la LFPDPPP en MX.
+- **Verificaciones que prueban el comportamiento real**, no solo texto en el código:
+  - `live` (contra el sitio desplegado: `urls.preview` / `urls.production` del perfil, o `MEP_URL`): encabezados de seguridad y CSP enviados de verdad, HSTS ≥ 180 días, Brotli/gzip y caché inmutable de assets, cookies con Secure/SameSite/HttpOnly, 404 real sin trazas internas, http:// y www redirigen al dominio canónico, sitemap sin páginas privadas ni noindex.
+  - `dns`: SPF (uno, sin +all), DMARC con política y DKIM en el dominio de envío (`email_domain`).
+  - `html` `clean_links`: enlaces internos sin mayúsculas, guiones bajos, .php ni IDs sueltos.
+  - Pasan de manual a automáticas: `clean-urls`, `sitemap-indexable-only`, `compression-caching`, `email-auth-dns`, `canonical-redirects`, `production-errors-hidden`, `secure-session-cookies`. `security-headers`, `csp-strict` y `https-hsts` revisan además lo que el sitio envía.
+  - Sin sitio que revisar, un check `live`/`dns` se omite: no aprueba ni reprueba por sí solo; un ítem que solo depende de ellos queda ❔ hasta definir la URL.
 - **Fuera del alcance de mep**: proyectos para menores de edad o que verifican edad. Se quita `minors` de las audiencias (y `usa-coppa`); un perfil con `minors` o `age-verification` es inválido y `/mep:scope` se detiene.
 
 ## 2026.10.6

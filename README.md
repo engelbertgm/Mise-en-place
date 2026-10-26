@@ -112,6 +112,8 @@ The quote runs by itself only when the scope is defined (`/mep:scope`) or change
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
 
+Checks run on the code, on the build output and, when the profile has `urls.preview`/`urls.production` (or `MEP_URL` is set), on the deployed site and its DNS: the headers it really sends, cookies, compression and caching, a real 404, canonical redirects, the sitemap, and SPF/DMARC/DKIM.
+
 Out of scope by design: projects for minors, or that need age verification (adult content, gambling, alcohol…). `/mep:scope` stops, and a profile with that audience is invalid.
 
 Every rule is activated by the project's scope (type, capabilities, markets, audience, context, signals), never by default: a landing without accounts gets no RLS rules, a site without cookies gets no consent banner. `mep explain <id>` shows the rule's condition with ✓/✗ and why it applies or not.
