@@ -35,7 +35,7 @@ function repo(on: On, opts: { profile?: boolean; branch?: string; verifyExit?: n
     return { value: { exitCode: code, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } }
   })
   on('tool.call', () => ({ result: 'ran' }))
-  on('command.run', ($, e) => ({ text: 'skill' }))
+  on('command.run', ($, e) => (calls.push(['command', e.command, e.args]), { text: 'skill' }))
   return calls
 }
 
@@ -145,8 +145,8 @@ describe('panel', () => {
     await opened($, on)
     for (const surface of ['terminal', 'desktop'] as const) {
       const ui = await $.ui.mount({ ...PANE, surface })
-      expect((await ui.find({ type: 'Text', text: /foundation\.setup · 🔴 2 · 🟡 1/ }))?.text).toMatch(/foundation\.setup · 🔴 2 · 🟡 1/)
-      await ui.press({ key: 'code-maps' })
+      expect((await ui.find({ type: 'Text', text: /foundation\.setup · / }))?.text).toMatch(/foundation\.setup/)
+      await ui.press({ key: 'first-required' })
       expect((await ui.find({ type: 'Text', text: /Saber dónde está cada cosa/ }))?.text).toMatch(/Saber dónde está cada cosa/)
       expect((await ui.find({ type: 'Text', text: /Todo lo que falla \(61\)/ }))?.text).toMatch(/Todo lo que falla \(61\)/)
       expect((await ui.find({ type: 'Text', text: /export60 no está en REGISTRY\.md/ }))?.text).toMatch(/export60 no está en REGISTRY\.md/)
@@ -193,10 +193,33 @@ describe('panel', () => {
     await ui.unmount()
   })
 
-  test('each row carries a hover card with its why', async ($, on) => {
+  test('the tools run mep commands as if typed; a text tool passes what was typed', async ($, on) => {
+    const calls = await opened($, on)
+    const runs = () => calls.filter(a => a[0] === 'command').map(a => a.slice(1).join(' ').trim())
+    for (const surface of ['terminal', 'desktop'] as const) {
+      calls.length = 0
+      const ui = await $.ui.mount({ ...PANE, surface })
+      await ui.press({ key: 'tools' })
+      await ui.press({ key: 't-mep:audit' })
+      await ui.press({ key: 't-mep:phase-close' })
+      await ui.input({ key: 't-mep:add', text: 'pagos con Stripe', kind: 'submit' })
+      expect(runs()).toEqual(['mep:audit', 'mep:phase close', 'mep:add pagos con Stripe'])
+      await ui.press({ key: 't-deploy' })
+      expect((await ui.find({ type: 'Text', text: /bloquea el deploy a producción|Nada bloquea/ }))?.text).toBeTruthy()
+      expect(calls.some(a => a.includes('verify') && a.includes('--prod'))).toBe(true)
+      await ui.press({ key: 't-pr' })
+      expect((await ui.find({ type: 'Text', text: /revisión de calidad/ }))?.text).toMatch(/revisión de calidad/)
+      await ui.press({ key: 'tools-back' })
+      await ui.unmount()
+    }
+  })
+
+  test('the list draws no card over its rows: every item stays pressable', async ($, on) => {
     await opened($, on)
-    const ui = await $.ui.mount({ ...PANE, surface: 'desktop' })
-    expect((await ui.find({ type: 'Text', text: /Nadie empuja a main/ }))?.text).toMatch(/Nadie empuja a main/)
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await ui.find({ type: 'Text', text: /Nadie empuja a main/ })).toBeFalsy()
+    await ui.press({ key: 'csp-strict' })
+    expect((await ui.find({ type: 'Text', text: /Frena XSS/ }))?.text).toMatch(/Frena XSS/)
     await ui.unmount()
   })
 })

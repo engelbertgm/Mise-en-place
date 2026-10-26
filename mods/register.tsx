@@ -14,6 +14,25 @@ const selected = atom({ plugin: 'mep', key: 'selected' } as const, null, { shape
 const expanded = atom({ plugin: 'mep', key: 'expanded' } as const, [], { shape: 'expanded-1' })
 const pending = atom({ plugin: 'mep', key: 'pending' } as const, null, { shape: 'pending-1' })
 const flash = atom({ plugin: 'mep', key: 'flash' } as const, '', { shape: 'flash-1' })
+const tools = atom({ plugin: 'mep', key: 'tools' } as const, false, { shape: 'tools-1' })
+
+/** The panel's tools: each runs the slash command as if typed. The human-only ones stay out (the engine refuses a plugin's). */
+const INSTANT = [
+  ['mep:check', 'Estado del checklist'],
+  ['mep:phase', 'Sub-etapa activa'],
+  ['mep:quote', 'Cotización interna'],
+] as const
+const WITH_TURN = [
+  ['mep:audit', 'Auditar el repo contra su scope'],
+  ['mep:update', 'Integrar ítems nuevos del catálogo'],
+  ['mep:export', 'Exportar brief al cliente (.docx/.pdf)'],
+  ['mep:phase', 'Cerrar la sub-etapa (auditoría + revisión)', 'close'],
+] as const
+const WITH_TEXT = [
+  ['mep:scope', 'Scope, descripción:', 'crear'],
+  ['mep:add', 'Agregar scope:', 'agregar'],
+  ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
+] as const
 
 const LEVEL = { required: '🔴', recommended: '🟡', optional: '⚪' } as const
 const STATUS = { pass: '✅', fail: '❌', unknown: '❔' } as const
@@ -204,6 +223,59 @@ export const register: Register = on => {
     const id = await read($, selected)
     const item = id ? data.items.find(i => i.id === id) : undefined
 
+    if (await read($, tools)) {
+      const run = async (command: string, args = '') => {
+        await update($, flash, () => `/${command} ${args}`.trim() + ' en cola.')
+        void $.command.run({ command, args }).catch(err => update($, flash, () => `/${command}: ${String(err)}`))
+      }
+      // The same checks the gate runs on a deploy or a PR into main, asked ahead; the whole answer shows.
+      const ask = async (args: string[], clear: string) => {
+        await update($, flash, () => 'verificando…')
+        const r = await runEngine($, args)
+        await update($, flash, () => r.stdout.trim() || (r.exitCode === 0 ? clear : r.stderr.trim()))
+      }
+      const recent = (await $.fs.read('.mep/log').catch(() => ''))
+        .split('\n')
+        .filter(l => l && l.split(' ')[1] !== 'state')
+        .slice(-5)
+        .map(l => `${l.slice(0, 10)} ${l.slice(l.indexOf(' ') + 1)}`)
+      return (
+        <Box flexDirection="column">
+          <Button key="tools-back" plain onPress={() => update($, tools, () => false)}>
+            ← Volver
+          </Button>
+          {message ? <Text dimColor>{message}</Text> : null}
+          <Text bold>Antes de deployar o abrir PR</Text>
+          <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nada bloquea el deploy a producción.')}>
+            {'  ¿Puedo deployar a producción?'}
+          </Button>
+          <Button key="t-pr" plain onPress={() => ask(['pr-gate'], '✅ Nada detiene el PR a main.')}>
+            {'  ¿Puedo abrir PR a main?'}
+          </Button>
+          <Text bold>Al instante</Text>
+          {INSTANT.map(([command, label]) => (
+            <Button key={`t-${command}`} plain onPress={() => run(command)}>
+              {`  ${label} `}
+              <Text dimColor>{`/${command}`}</Text>
+            </Button>
+          ))}
+          <Text bold>Con un turno de Claude</Text>
+          {WITH_TURN.map(([command, label, args]) => (
+            <Button key={`t-${command}${args ? `-${args}` : ''}`} plain onPress={() => run(command, args)}>
+              {`  ${label} `}
+              <Text dimColor>{`/${command}${args ? ` ${args}` : ''}`}</Text>
+            </Button>
+          ))}
+          {Input &&
+            WITH_TEXT.map(([command, label, submitLabel]) => (
+              <Input key={`t-${command}`} label={label} submitLabel={submitLabel} onSubmit={v => (v.trim() ? run(command, v.trim()) : undefined)} />
+            ))}
+          <Text bold>Actividad reciente</Text>
+          {recent.length ? recent.map(l => <Text dimColor>{`  ${l}`}</Text>) : <Text dimColor>  Sin eventos en .mep/log.</Text>}
+        </Box>
+      )
+    }
+
     if (item) {
       const confirming = await read($, pending)
       const canConfirm = item.manual && item.category !== 'security' && isPending(item)
@@ -220,18 +292,8 @@ export const register: Register = on => {
             {item.locked ? ' · 🔒 locked' : ''}
           </Text>
           <Text>{item.title}</Text>
-          <Text> </Text>
-          <Text bold>Por qué</Text>
-          <Text>{item.why}</Text>
-          <Text bold>Cómo</Text>
-          <Text>{item.how}</Text>
-          {item.detail ? <Text bold>{item.state === 'active' ? 'Qué falta' : 'Razón'}</Text> : null}
-          {item.detail ? <Text>{item.detail}</Text> : null}
-          {item.all.length > 0 && <Text dimColor>Todo lo que falla ({item.all.length}):</Text>}
-          {item.all.map(f => (
-            <Text>  · {f}</Text>
-          ))}
-          <Text> </Text>
+          {/* Actions sit above the long list, so they stay in the frame; the rest scrolls. */}
+          {!e.props.isFocused && <Text dimColor>ctrl+x tab y flechas para desplazar.</Text>}
           {message ? <Text dimColor>{message}</Text> : null}
           {item.locked && <Text dimColor>🔒 No se puede desactivar.</Text>}
           {item.category === 'security' && isPending(item) && <Text dimColor>Lo da por cumplido una auditoría de mep-security.</Text>}
@@ -247,19 +309,49 @@ export const register: Register = on => {
             <Input key={`override-${item.id}`} label="Desactivar, razón:" submitLabel="siguiente" onSubmit={v => (v.trim() ? askOverride($, item.id, v.trim()) : undefined)} />
           )}
           {confirming && confirming.id === item.id && <Text dimColor>Confirma o cancela en el diálogo.</Text>}
+          <Text> </Text>
+          <Text bold>Por qué</Text>
+          <Text>{item.why}</Text>
+          <Text bold>Cómo</Text>
+          <Text>{item.how}</Text>
+          {item.detail ? <Text bold>{item.state === 'active' ? 'Qué falta' : 'Razón'}</Text> : null}
+          {item.detail ? <Text>{item.detail}</Text> : null}
+          {item.all.length > 0 && <Text dimColor>Todo lo que falla ({item.all.length}):</Text>}
+          {item.all.map(f => (
+            <Text>  · {f}</Text>
+          ))}
         </Box>
       )
     }
 
     const open = await read($, expanded)
     const toggle = (phase: string) => update($, expanded, list => (list.includes(phase) ? list.filter(p => p !== phase) : [...list, phase]))
+    // A count opens its first pending item; a zero count is not a button.
+    const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i))
+    const count = (level: 'required' | 'recommended') => {
+      const label = `${LEVEL[level]} ${data.counts[level]}`
+      const target = first(level)
+      return target ? (
+        <Button key={`first-${level}`} plain onPress={() => update($, selected, () => target.id)}>
+          {label}
+        </Button>
+      ) : (
+        <Text>{label}</Text>
+      )
+    }
     return (
       <Box flexDirection="column">
-        <Text bold>
-          {data.active} · 🔴 {data.counts.required} · 🟡 {data.counts.recommended}
-        </Text>
+        <Box flexDirection="row">
+          <Text bold>{`${data.active} · `}</Text>
+          {count('required')}
+          <Text>{' · '}</Text>
+          {count('recommended')}
+        </Box>
         <Button key="full" plain onPress={() => refresh($, true)}>
           {data.full ? '↻ Verificar todo' : '↻ Verificar todo (❔ = comando o build sin correr)'}
+        </Button>
+        <Button key="tools" plain onPress={() => update($, tools, () => true)}>
+          ⚙ Herramientas
         </Button>
         {message ? <Text dimColor>{message}</Text> : null}
         {data.phases.map(phase => {
@@ -276,19 +368,13 @@ export const register: Register = on => {
                 {`${mark} ${phase} `}
                 <Text dimColor>{`🔴 ${req} · 🟡 ${items.length - req}`}</Text>
               </Button>
+              {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
               {shown &&
                 items.map(i => (
-                  // A keyed row is a hover scope: its card shows the why without opening the item.
-                  <Box key={`row-${i.id}`} flexDirection="column">
-                    <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
-                      {`  ${LEVEL[i.level]} ${i.id} `}
-                      <Text dimColor>{STATUS[i.status]}</Text>
-                    </Button>
-                    <Box position="absolute" top={1} left={4} display="none" hover={{ display: 'flex' }} borderStyle="round" backgroundColor="background" paddingX={1} flexDirection="column">
-                      <Text>{i.why}</Text>
-                      <Text dimColor>clic para ver el detalle</Text>
-                    </Box>
-                  </Box>
+                  <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
+                    {`  ${LEVEL[i.level]} ${i.id} `}
+                    <Text dimColor>{STATUS[i.status]}</Text>
+                  </Button>
                 ))}
             </Box>
           )
