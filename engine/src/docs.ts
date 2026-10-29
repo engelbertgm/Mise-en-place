@@ -23,8 +23,20 @@ export function loadImages(blocks: Block[], baseDir: string): Block[] {
     if (!/\.png$/i.test(b.path)) throw new Error(`solo PNG: ${b.path}`)
     const file = join(baseDir, b.path)
     if (!existsSync(file)) throw new Error(`falta la imagen ${b.path}`)
-    return { ...b, data: readFileSync(file) }
+    const data = readFileSync(file)
+    const problem = pngProblem(data)
+    if (problem) throw new Error(`${problem}: ${b.path}`)
+    return { ...b, data }
   })
+}
+
+const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])
+
+/** Why a file cannot be embedded, or undefined when it is a PNG decodePng supports. */
+function pngProblem(data: Buffer): string | undefined {
+  if (data.length < 33 || !data.subarray(0, 8).equals(PNG_SIGNATURE)) return 'no es un PNG válido'
+  if (data[24] !== 8 || ![0, 2, 4, 6].includes(data[25]) || data[28] !== 0) return 'PNG no soportado (usa 8 bits por canal, sin paleta ni entrelazado)'
+  return undefined
 }
 
 // ── PNG (8-bit gray, RGB, gray+alpha and RGBA, not interlaced: what diagram exports produce) ──

@@ -8607,7 +8607,7 @@ function codeHeadings(text) {
 }
 function diagrams(root, md, check, profile) {
   const missing = [];
-  for (const m of md.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
+  for (const m of md.replace(/<!--[\s\S]*?-->/g, "").matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
     if (!exists(root, posix.join(DIR2, m[1]))) missing.push(m[1]);
   }
   const applies = !check.if_capabilities || check.if_capabilities.some((c) => profile.capabilities.includes(c));
@@ -8628,8 +8628,12 @@ function checkPlan(root, check, profile) {
       return result((check.sections ?? []).filter((k) => section(md, k) === void 0), `${file} sin las secciones`, `${file} con sus secciones`);
     case "custom_work":
       return result((profile.custom_work ?? []).map((w) => w.title).filter((t) => !lower.includes(t.toLowerCase())), `${file} no menciona`, "trabajo a la medida incluido");
-    case "stack":
-      return result(Object.values(profile.stack.decided).filter((v) => !lower.includes(v.toLowerCase())), `${file} no menciona`, "stack incluido");
+    case "stack": {
+      const plain = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const text = plain(md);
+      const decided = Object.values(profile.stack.decided).filter((v) => v !== "none");
+      return result(decided.filter((v) => !text.includes(plain(v))), `${file} no menciona`, "stack incluido");
+    }
     case "phases": {
       const listed = new Set(codeHeadings(section(md, "fases") ?? ""));
       const wanted = (check.phases ?? []).filter((p) => p !== "build.data" || profile.signals.has_db === true);
@@ -8639,7 +8643,8 @@ function checkPlan(root, check, profile) {
       return diagrams(root, md, check, profile);
     case "routes": {
       const listed = new Set([...(section(md, "pantallas") ?? "").matchAll(/`(\/[^`]*)`/g)].map((m) => m[1]));
-      return result(pageRoutes(root).filter((r) => !listed.has(r)), `${file} sin las pantallas`, "todas las pantallas en el inventario");
+      const screens = pageRoutes(root).filter((r) => r !== "/404" && r !== "/500");
+      return result(screens.filter((r) => !listed.has(r)), `${file} sin las pantallas`, "todas las pantallas en el inventario");
     }
     case "tables": {
       const inCode = scanMigrations(root).tables;
@@ -9792,8 +9797,17 @@ function loadImages(blocks, baseDir) {
     if (!/\.png$/i.test(b.path)) throw new Error(`solo PNG: ${b.path}`);
     const file = join14(baseDir, b.path);
     if (!existsSync13(file)) throw new Error(`falta la imagen ${b.path}`);
-    return { ...b, data: readFileSync12(file) };
+    const data = readFileSync12(file);
+    const problem = pngProblem(data);
+    if (problem) throw new Error(`${problem}: ${b.path}`);
+    return { ...b, data };
   });
+}
+var PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+function pngProblem(data) {
+  if (data.length < 33 || !data.subarray(0, 8).equals(PNG_SIGNATURE)) return "no es un PNG v\xE1lido";
+  if (data[24] !== 8 || ![0, 2, 4, 6].includes(data[25]) || data[28] !== 0) return "PNG no soportado (usa 8 bits por canal, sin paleta ni entrelazado)";
+  return void 0;
 }
 function pngSize(data) {
   return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
@@ -11075,6 +11089,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
         writeFileSync10(`${base}.pdf`, toPdf(blocks));
         files.push(`${base}.pdf`.slice(root.length + 1));
       }
+      if (!basename(input).startsWith("brief-")) return print(`\u{1F4C4} Documento para el cliente: ${files.join(", ")}`);
       const { rates, configured } = loadRates();
       const fromName = basename(input).match(/-v(\d+)\.md$/)?.[1];
       const record = recordExport(root, profile, catalog, String(args.flags.lang ?? "es"), files, configured ? quote(profile, catalog, rates).price : void 0, fromName ? Number(fromName) : void 0);

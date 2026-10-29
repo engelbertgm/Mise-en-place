@@ -139,3 +139,27 @@ describe('client versions of the plan', () => {
     }
   })
 })
+
+describe('final review fixes', () => {
+  test('diagrams: image links inside HTML comments are ignored', () => {
+    const files = { 'docs/plan/PRD.md': '<!-- ejemplo: ![d](diagrams/prd-<tipo>.png) -->\n# PRD\n' }
+    assert.equal(run(files, { doc: 'prd', rule: 'diagrams', required: [] }).ok, true)
+  })
+
+  test('stack: internal names match product names (nextjs ↔ Next.js), and none is not required', () => {
+    const p = prof({ stack: { decided: { framework: 'nextjs', payments: 'payment-links', cms: 'none' } } })
+    assert.equal(run({ 'docs/plan/TRD.md': 'Next.js con Payment Links de Stripe.' }, { doc: 'trd', rule: 'stack' }, p).ok, true)
+  })
+
+  test('routes: error pages (/404, /500) are not screens', () => {
+    const files = {
+      'package.json': '{"dependencies":{"next":"15.0.0"}}',
+      'app/page.tsx': 'export default function P() {}',
+      'app/not-found.tsx': 'export default function N() {}',
+      'app/error.tsx': 'export default function E() {}',
+      'docs/plan/FLOWS.md': '## Pantallas\n<!-- mep:pantallas -->\n- `/`: inicio\n',
+    }
+    const r = run(files, { doc: 'flows', rule: 'routes' })
+    assert.equal(r.ok, true, r.detail)
+  })
+})

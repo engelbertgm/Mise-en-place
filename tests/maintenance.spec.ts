@@ -275,6 +275,33 @@ describe('images in the client documents', () => {
     assert.throws(() => loadImages(parseMarkdown('![x](x.jpg)'), makeRepo({ 'x.jpg': 'x' })), /solo PNG: x\.jpg/)
   })
 
+  test('an unsupported or broken PNG fails in loadImages, naming the file', () => {
+    const root = makeRepo({ 'lfs.png': 'version https://git-lfs.github.com/spec/v1' })
+    const palette = png(2, 2, false)
+    palette[25] = 3 // color type 3: palette
+    writeFileSync(join(root, 'palette.png'), palette)
+    assert.throws(() => loadImages(parseMarkdown('![x](lfs.png)'), root), /lfs\.png/)
+    assert.throws(() => loadImages(parseMarkdown('![x](palette.png)'), root), /palette\.png/)
+  })
+
+  test('mep export with a broken image writes nothing', () => {
+    const root = makeRepo({ 'docs/client/implementation-v1.md': '# Plan\n\n![Gantt](bad.png)\n', 'docs/client/bad.png': 'not a png' })
+    withProfile(root, real, { project: 'x', type: 'saas' })
+    const r = spawnSync('node', [CLI, 'export', '--in', 'docs/client/implementation-v1.md'], { cwd: root, encoding: 'utf8' })
+    assert.notEqual(r.status, 0)
+    assert.match(r.stdout + r.stderr, /bad\.png/)
+    assert.equal(existsSync(join(root, 'docs/client/implementation-v1.docx')), false)
+  })
+
+  test('exporting a client plan document does not touch the brief export record', () => {
+    const root = makeRepo({ 'docs/client/prd-v1.md': '# PRD\n\nTexto.\n' })
+    withProfile(root, real, { project: 'x', type: 'saas' })
+    const r = spawnSync('node', [CLI, 'export', '--in', 'docs/client/prd-v1.md', '--format', 'docx'], { cwd: root, encoding: 'utf8' })
+    assert.equal(r.status, 0, r.stderr)
+    assert.doesNotMatch(r.stdout, /Brief/)
+    assert.equal(existsSync(join(root, '.mep/exports.yaml')), false)
+  })
+
   test('mep export stops on a missing image and names it', () => {
     const root = makeRepo({ 'docs/client/implementation-v1.md': '# Plan\n\n![Gantt](missing.png)\n' })
     withProfile(root, real, { project: 'x', type: 'saas' })

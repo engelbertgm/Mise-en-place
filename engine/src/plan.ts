@@ -39,7 +39,8 @@ export function codeHeadings(text: string): string[] {
 
 function diagrams(root: string, md: string, check: PlanCheck, profile: Profile): CheckResult {
   const missing: string[] = []
-  for (const m of md.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
+  // Template comments show example links (diagrams/prd-<tipo>.png); only real images count.
+  for (const m of md.replace(/<!--[\s\S]*?-->/g, '').matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
     if (!exists(root, posix.join(DIR, m[1]))) missing.push(m[1])
   }
   const applies = !check.if_capabilities || check.if_capabilities.some(c => profile.capabilities.includes(c))
@@ -61,8 +62,13 @@ export function checkPlan(root: string, check: PlanCheck, profile: Profile): Che
       return result((check.sections ?? []).filter(k => section(md, k) === undefined), `${file} sin las secciones`, `${file} con sus secciones`)
     case 'custom_work':
       return result((profile.custom_work ?? []).map(w => w.title).filter(t => !lower.includes(t.toLowerCase())), `${file} no menciona`, 'trabajo a la medida incluido')
-    case 'stack':
-      return result(Object.values(profile.stack.decided).filter(v => !lower.includes(v.toLowerCase())), `${file} no menciona`, 'stack incluido')
+    case 'stack': {
+      // Decisions are internal names (nextjs, payment-links); the document says "Next.js", "Payment Links".
+      const plain = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+      const text = plain(md)
+      const decided = Object.values(profile.stack.decided).filter(v => v !== 'none')
+      return result(decided.filter(v => !text.includes(plain(v))), `${file} no menciona`, 'stack incluido')
+    }
     case 'phases': {
       const listed = new Set(codeHeadings(section(md, 'fases') ?? ''))
       const wanted = (check.phases ?? []).filter(p => p !== 'build.data' || profile.signals.has_db === true)
@@ -72,7 +78,9 @@ export function checkPlan(root: string, check: PlanCheck, profile: Profile): Che
       return diagrams(root, md, check, profile)
     case 'routes': {
       const listed = new Set([...(section(md, 'pantallas') ?? '').matchAll(/`(\/[^`]*)`/g)].map(m => m[1]))
-      return result(pageRoutes(root).filter(r => !listed.has(r)), `${file} sin las pantallas`, 'todas las pantallas en el inventario')
+      // Error pages (not-found, error) are not screens of a flow.
+      const screens = pageRoutes(root).filter(r => r !== '/404' && r !== '/500')
+      return result(screens.filter(r => !listed.has(r)), `${file} sin las pantallas`, 'todas las pantallas en el inventario')
     }
     case 'tables': {
       const inCode = scanMigrations(root).tables
