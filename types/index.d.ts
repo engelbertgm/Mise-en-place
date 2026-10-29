@@ -37,6 +37,7 @@ declare module 'claude-code' {
       expanded: Shaped<string[]>
       pending: Shaped<PendingOverride | null>
       flash: Shaped<string>
+      tools: Shaped<boolean>
     }
   }
 }

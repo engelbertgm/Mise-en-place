@@ -128,3 +128,14 @@ describe('plan catalog and templates', () => {
     for (const c of phases) for (const p of c.phases ?? []) assert.ok(real.dimensions.phases.includes(p), p)
   })
 })
+
+describe('client versions of the plan', () => {
+  test('client templates exist and never mention internal diagrams', () => {
+    for (const doc of ['PRD', 'FLOWS', 'IMPLEMENTATION']) {
+      for (const lang of ['es', 'en']) {
+        const text = readFileSync(join(REPO, 'templates', 'client-plan', `${doc}.${lang}.md`), 'utf8')
+        for (const internal of ['-state', 'swimlane', 'heatmap', '-sequence', 'trd-', 'schema-']) assert.ok(!text.includes(internal), `${doc}.${lang}: ${internal}`)
+      }
+    }
+  })
+})

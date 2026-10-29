@@ -2,7 +2,7 @@
 name: scope
 description: Crea el brief de un website o webapp desde una descripción en lenguaje natural — perfil, stack justificado y checklist 🔴🟡⚪.
 argument-hint: "[--preset landing|corporate|ecommerce|saas|marketplace] <descripción del proyecto>"
-allowed-tools: Bash(node *), Read, Write, Edit, AskUserQuestion
+allowed-tools: Bash(node *), Bash(python *), Bash(python3 *), Read, Write, Edit, AskUserQuestion, Skill
 ---
 
 # /mep:scope
@@ -29,5 +29,10 @@ Si cobra por uso o por resultado (por unidad, por resultado generado, por usuari
    - `codemap` y `registry` para crear `CODEMAP.md` y `REGISTRY.md`.
    - `init` instala `tests/responsive.spec.ts` y el script `test:responsive`: pide editar `PAGES` con las rutas clave y agregar `@playwright/test` si no está.
    - `init` ya calcula la cotización (el toggle: solo corre al definir el scope y en cambios de scope). Muestra su línea; si la tarifa está en 0, indica dónde definirla.
-7. Si el plugin Ponytail no está instalado, sugiérelo una vez (`DietrichGebert/ponytail`); mep funciona igual sin él.
-8. Cierra con: sub-etapa activa (`foundation.setup`), cuántos 🔴 tiene y el siguiente paso. Recuerda hacer `mep` check obligatorio del PR a `main` en GitHub.
+7. Documentos de planeación (`docs/plan/`):
+   - Comprueba que la skill `diagram-design:diagram-design` esté disponible (plugin `cathrynlavery/diagram-design` ≥ 2.6.136) y que su exportación a PNG funcione (Python + Playwright + Chromium). Si falta algo, detente aquí y da los comandos: `claude plugin install diagram-design@diagram-design`, `pip install playwright` y `python -m playwright install chromium`. No hay respaldo sin PNG.
+   - Escribe `PRD.md`, `TRD.md` e `IMPLEMENTATION.md` desde `${CLAUDE_PLUGIN_ROOT}/templates/plan/`, en el idioma del usuario. Sigue los comentarios de cada sección; los marcadores `<!-- mep:clave -->` se quedan tal cual.
+   - Diagramas: genera cada uno con la skill `diagram-design:diagram-design` y expórtalo a PNG con `diagram-design:export-diagram` (correr esta skill de mep es la petición del usuario para esas exportaciones). Guarda el HTML y el PNG en `docs/plan/diagrams/<doc>-<tipo>[-<nombre>]` (`<tipo>` es el nombre del tipo en diagram-design: `journey`, `architecture`, `gantt`…) y muéstralo con `![descripción](diagrams/<archivo>.png)`. Antes de cerrar `foundation.design` usan el estilo por defecto de diagram-design; después, los tokens del proyecto.
+   - Corre `check` y confirma que `plan-prd`, `plan-trd` y `plan-implementation` pasan.
+8. Si el plugin Ponytail no está instalado, sugiérelo una vez (`DietrichGebert/ponytail`); mep funciona igual sin él.
+9. Cierra con: sub-etapa activa (`foundation.setup`), cuántos 🔴 tiene y el siguiente paso. Recuerda hacer `mep` check obligatorio del PR a `main` en GitHub.
