@@ -11089,7 +11089,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
         writeFileSync10(`${base}.pdf`, toPdf(blocks));
         files.push(`${base}.pdf`.slice(root.length + 1));
       }
-      if (!basename(input).startsWith("brief-")) return print(`\u{1F4C4} Documento para el cliente: ${files.join(", ")}`);
+      if (/^(prd|flows|implementation)-v\d+\.md$/.test(basename(input))) return print(`\u{1F4C4} Documento para el cliente: ${files.join(", ")}`);
       const { rates, configured } = loadRates();
       const fromName = basename(input).match(/-v(\d+)\.md$/)?.[1];
       const record = recordExport(root, profile, catalog, String(args.flags.lang ?? "es"), files, configured ? quote(profile, catalog, rates).price : void 0, fromName ? Number(fromName) : void 0);

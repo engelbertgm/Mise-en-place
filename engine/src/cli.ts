@@ -615,7 +615,7 @@ function main(): void {
         files.push(`${base}.pdf`.slice(root.length + 1))
       }
       // Only the brief is versioned in .mep/exports.yaml; plan documents (prd-vN, flows-vN, implementation-vN) reuse its version.
-      if (!basename(input).startsWith('brief-')) return print(`📄 Documento para el cliente: ${files.join(', ')}`)
+      if (/^(prd|flows|implementation)-v\d+\.md$/.test(basename(input))) return print(`📄 Documento para el cliente: ${files.join(', ')}`)
       const { rates, configured } = loadRates()
       const fromName = basename(input).match(/-v(\d+)\.md$/)?.[1]
       const record = recordExport(root, profile, catalog, String(args.flags.lang ?? 'es'), files, configured ? quote(profile, catalog, rates).price : undefined, fromName ? Number(fromName) : undefined)
