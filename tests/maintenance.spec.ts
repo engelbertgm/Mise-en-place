@@ -270,6 +270,26 @@ describe('images in the client documents', () => {
     assert.match(pdf, /\/XObject << \/Im1 \d+ 0 R \/Im2 \d+ 0 R >>/)
   })
 
+  test('links render as their text; external links keep the address', () => {
+    const [p] = parseMarkdown('See [the diagram](diagrams/x.html) and [docs](https://example.com/a).')
+    assert.equal(p.kind, 'paragraph')
+    assert.equal((p as { text: { text: string }[] }).text.map(t => t.text).join(''), 'See the diagram and docs (https://example.com/a).')
+  })
+
+  test('image lines with a title or an angle-bracket path become image blocks', () => {
+    assert.deepEqual(parseMarkdown('![G](diagrams/g.png "Gantt")'), [{ kind: 'image', alt: 'G', path: 'diagrams/g.png' }])
+    assert.deepEqual(parseMarkdown('![G](<diagrams/my gantt.png>)'), [{ kind: 'image', alt: 'G', path: 'diagrams/my gantt.png' }])
+    assert.throws(() => loadImages(parseMarkdown('![x](https://example.com/x.png)'), makeRepo()), /imagen externa.*example\.com/)
+  })
+
+  test('a tall image is shrunk to fit the page height in Word', () => {
+    const root = makeRepo()
+    writeFileSync(join(root, 'tall.png'), png(100, 4000, false))
+    const xmlText = toDocx(loadImages(parseMarkdown('![t](tall.png)'), root)).toString('latin1')
+    const cy = Number(xmlText.match(/<wp:extent cx="\d+" cy="(\d+)"/)?.[1])
+    assert.ok(cy > 0 && cy <= Math.round(((15840 - 2 * 1134) / 1440) * 914400), String(cy))
+  })
+
   test('missing image fails with its path', () => {
     assert.throws(() => loadImages(parseMarkdown('![x](diagrams/x.png)'), makeRepo()), /falta la imagen diagrams\/x\.png/)
     assert.throws(() => loadImages(parseMarkdown('![x](x.jpg)'), makeRepo({ 'x.jpg': 'x' })), /solo PNG: x\.jpg/)

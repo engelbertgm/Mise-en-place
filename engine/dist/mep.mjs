@@ -7845,8 +7845,8 @@ function parseJsonc(text) {
 // engine/src/gate.ts
 import { execSync as execSync4 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
-import { existsSync as existsSync9, mkdirSync as mkdirSync5, readFileSync as readFileSync8, writeFileSync as writeFileSync5 } from "node:fs";
-import { join as join10 } from "node:path";
+import { existsSync as existsSync10, mkdirSync as mkdirSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync5 } from "node:fs";
+import { join as join11 } from "node:path";
 
 // engine/src/profile.ts
 var import_yaml2 = __toESM(require_dist(), 1);
@@ -8536,1287 +8536,19 @@ function checkCodemap(root) {
 // engine/src/plan.ts
 import { posix } from "node:path";
 
-// engine/src/sql.ts
-var DEFAULT_GLOB = "{supabase/migrations,migrations,db/migrations,prisma/migrations,drizzle}/**/*.sql";
-var SYSTEM_SCHEMAS = /* @__PURE__ */ new Set(["auth", "storage", "extensions", "realtime", "supabase_functions", "graphql", "vault"]);
-var OPERATIONS = ["select", "insert", "update", "delete"];
-function tableName(raw) {
-  const parts = raw.replace(/"/g, "").toLowerCase().split(".");
-  if (parts.length === 2 && SYSTEM_SCHEMAS.has(parts[0])) return void 0;
-  return parts.length === 2 && parts[0] === "public" ? parts[1] : parts.join(".");
-}
-var NAME = '((?:"?[\\w]+"?\\.)?"?[\\w]+"?)';
-function scanMigrations(root, glob = DEFAULT_GLOB) {
-  const sql = matchFiles(root, glob).map((f) => (readText(root, f) ?? "").replace(/--.*$/gm, "")).join("\n");
-  const tables = /* @__PURE__ */ new Set();
-  const rls = /* @__PURE__ */ new Set();
-  const policies = /* @__PURE__ */ new Map();
-  for (const m of sql.matchAll(new RegExp(`create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?${NAME}`, "gi"))) {
-    const t = tableName(m[1]);
-    if (t) tables.add(t);
-  }
-  for (const m of sql.matchAll(new RegExp(`drop\\s+table\\s+(?:if\\s+exists\\s+)?${NAME}`, "gi"))) {
-    const t = tableName(m[1]);
-    if (t) tables.delete(t);
-  }
-  for (const m of sql.matchAll(new RegExp(`alter\\s+table\\s+(?:only\\s+)?${NAME}\\s+enable\\s+row\\s+level\\s+security`, "gi"))) {
-    const t = tableName(m[1]);
-    if (t) rls.add(t);
-  }
-  for (const m of sql.matchAll(new RegExp(`create\\s+policy\\s+(?:"[^"]*"|\\w+)\\s+on\\s+${NAME}([\\s\\S]*?);`, "gi"))) {
-    const t = tableName(m[1]);
-    if (!t) continue;
-    const op = m[2].match(/\bfor\s+(all|select|insert|update|delete)\b/i)?.[1].toLowerCase() ?? "all";
-    const set = policies.get(t) ?? /* @__PURE__ */ new Set();
-    for (const o of op === "all" ? OPERATIONS : [op]) set.add(o);
-    policies.set(t, set);
-  }
-  return { files: matchFiles(root, glob).length, tables, rls, policies };
-}
-function checkSql(root, check) {
-  const { files, tables, rls, policies } = scanMigrations(root, check.glob);
-  if (files === 0) return { ok: null, detail: "sin migraciones SQL versionadas" };
-  if (check.rule === "rls_enabled") {
-    const missing = [...tables].filter((t) => !rls.has(t)).sort();
-    return missing.length ? { ok: false, violation: true, detail: `tablas sin RLS: ${missing.join(", ")}` } : { ok: true, detail: `RLS activo en ${tables.size} tablas` };
-  }
-  const incomplete = [...tables].filter((t) => rls.has(t)).map((t) => ({ t, missing: OPERATIONS.filter((o) => !policies.get(t)?.has(o)) })).filter((x) => x.missing.length);
-  return incomplete.length ? { ok: false, detail: incomplete.slice(0, 5).map((x) => `${x.t}: sin pol\xEDtica ${x.missing.join("/")}`).join("; ") } : { ok: true, detail: "pol\xEDticas por operaci\xF3n en todas las tablas" };
-}
-
-// engine/src/plan.ts
-var DIR2 = "docs/plan";
-var PLAN_FILES = {
-  prd: `${DIR2}/PRD.md`,
-  trd: `${DIR2}/TRD.md`,
-  flows: `${DIR2}/FLOWS.md`,
-  schema: `${DIR2}/SCHEMA.md`,
-  implementation: `${DIR2}/IMPLEMENTATION.md`
-};
-var list = (items) => items.slice(0, 5).join(", ") + (items.length > 5 ? " \u2026" : "");
-var result = (missing, what, ok) => missing.length ? { ok: false, detail: `${what}: ${list(missing)}` } : { ok: true, detail: ok };
-function section(md, key) {
-  const lines = md.replace(/\r\n/g, "\n").split("\n");
-  const start = lines.findIndex((l) => l.trim() === `<!-- mep:${key} -->`);
-  if (start < 0) return void 0;
-  const end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
-  return lines.slice(start + 1, end < 0 ? void 0 : end).join("\n");
-}
-function codeHeadings(text) {
-  return [...text.matchAll(/^###\s+`([^`]+)`/gm)].map((m) => m[1]);
-}
-function diagrams(root, md, check, profile) {
-  const missing = [];
-  for (const m of md.replace(/<!--[\s\S]*?-->/g, "").matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
-    if (!exists(root, posix.join(DIR2, m[1]))) missing.push(m[1]);
-  }
-  const applies = !check.if_capabilities || check.if_capabilities.some((c) => profile.capabilities.includes(c));
-  for (const required of applies ? check.required ?? [] : []) {
-    const found = required.split("|").some((type) => matchFiles(root, `${DIR2}/diagrams/${check.doc}-${type}*.png`).length > 0);
-    if (!found) missing.push(`diagrama ${required.replace(/\|/g, " o ")}`);
-  }
-  return result(missing, "faltan", "diagramas al d\xEDa");
-}
-function checkPlan(root, check, profile) {
-  const file = PLAN_FILES[check.doc];
-  const raw = readText(root, file);
-  if (raw === void 0) return { ok: false, detail: `falta ${file}` };
-  const md = raw.replace(/\r\n/g, "\n");
-  const lower = md.toLowerCase();
-  switch (check.rule) {
-    case "sections":
-      return result((check.sections ?? []).filter((k) => section(md, k) === void 0), `${file} sin las secciones`, `${file} con sus secciones`);
-    case "custom_work":
-      return result((profile.custom_work ?? []).map((w) => w.title).filter((t) => !lower.includes(t.toLowerCase())), `${file} no menciona`, "trabajo a la medida incluido");
-    case "stack": {
-      const plain = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const text = plain(md);
-      const decided = Object.values(profile.stack.decided).filter((v) => v !== "none");
-      return result(decided.filter((v) => !text.includes(plain(v))), `${file} no menciona`, "stack incluido");
-    }
-    case "phases": {
-      const listed = new Set(codeHeadings(section(md, "fases") ?? ""));
-      const wanted = (check.phases ?? []).filter((p) => p !== "build.data" || profile.signals.has_db === true);
-      return result(wanted.filter((p) => !listed.has(p)), `${file} sin las fases`, "una secci\xF3n por sub-etapa");
-    }
-    case "diagrams":
-      return diagrams(root, md, check, profile);
-    case "routes": {
-      const listed = new Set([...(section(md, "pantallas") ?? "").matchAll(/`(\/[^`]*)`/g)].map((m) => m[1]));
-      const screens = pageRoutes(root).filter((r) => r !== "/404" && r !== "/500");
-      return result(screens.filter((r) => !listed.has(r)), `${file} sin las pantallas`, "todas las pantallas en el inventario");
-    }
-    case "tables": {
-      const inCode = scanMigrations(root).tables;
-      const inDoc = new Set(codeHeadings(section(md, "tablas") ?? "").map(tableName).filter((t) => !!t));
-      const problems = [...[...inCode].filter((t) => !inDoc.has(t)).map((t) => `falta ${t}`), ...[...inDoc].filter((t) => !inCode.has(t)).map((t) => `sobra ${t}`)];
-      return result(problems, `${file} no coincide con las migraciones`, "tablas iguales a las migraciones");
-    }
-  }
-}
-
-// engine/src/quality.ts
-var QUALITY_DEFAULTS = { complexity: 10, max_lines: 300, max_function_lines: 50, max_params: 4 };
-var ESLINT_RULE = { complexity: "complexity", max_lines: "max-lines", max_function_lines: "max-lines-per-function", max_params: "max-params" };
-function thresholds(profile) {
-  return { ...QUALITY_DEFAULTS, ...profile.quality };
-}
-function eslintValue(text, rule) {
-  const name = rule.replace(/-/g, "\\-");
-  const m = text.match(new RegExp(`["']?${name}["']?\\s*:\\s*\\[\\s*["']?(?:error|warn|1|2)["']?\\s*,\\s*(?:\\{[^}]*?\\bmax\\s*:\\s*)?(\\d+)`));
-  return m ? Number(m[1]) : void 0;
-}
-function checkThresholds(root, profile) {
-  const wanted = thresholds(profile);
-  const eslint = matchFiles(root, "{eslint.config.{js,mjs,cjs,ts},.eslintrc,.eslintrc.{json,js,cjs,yml,yaml}}")[0];
-  if (!eslint) {
-    const biome = matchFiles(root, "biome.{json,jsonc}")[0];
-    if (!biome) return { ok: false, detail: "sin config de ESLint ni Biome" };
-    const max = Number((readText(root, biome) ?? "").match(/"maxAllowedComplexity"\s*:\s*(\d+)/)?.[1]);
-    if (!max) return { ok: false, detail: `${biome}: falta noExcessiveCognitiveComplexity con maxAllowedComplexity` };
-    if (max > wanted.complexity) return { ok: false, detail: `${biome}: complejidad ${max} > ${wanted.complexity}` };
-    return { ok: null, detail: "Biome no tiene max-lines ni max-params: revisa el largo de archivos y funciones y el n\xFAmero de par\xE1metros a mano" };
-  }
-  const text = readText(root, eslint) ?? "";
-  const problems = [];
-  for (const key of Object.keys(ESLINT_RULE)) {
-    const value = eslintValue(text, ESLINT_RULE[key]);
-    if (value === void 0) problems.push(`falta ${ESLINT_RULE[key]} (\u2264 ${wanted[key]})`);
-    else if (value > wanted[key]) problems.push(`${ESLINT_RULE[key]} ${value} > ${wanted[key]}`);
-  }
-  return problems.length ? { ok: false, detail: `${eslint}: ${problems.join("; ")}` } : { ok: true, detail: `${eslint}: umbrales al d\xEDa` };
-}
-var RUFF_SETTING = { complexity: "max-complexity", max_params: "max-args", max_function_lines: "max-statements" };
-var RUFF_RULE_SETS = ["C90", "PLR", "S"];
-function checkPythonThresholds(root, profile) {
-  const text = readText(root, "pyproject.toml");
-  if (text === void 0) return { ok: false, detail: "falta pyproject.toml con la configuraci\xF3n de Ruff" };
-  const wanted = thresholds(profile);
-  const problems = [];
-  for (const [key, setting] of Object.entries(RUFF_SETTING)) {
-    const value = Number(text.match(new RegExp(`^\\s*${setting}\\s*=\\s*(\\d+)`, "m"))?.[1]);
-    if (!value) problems.push(`falta ${setting} (\u2264 ${wanted[key]})`);
-    else if (value > wanted[key]) problems.push(`${setting} ${value} > ${wanted[key]}`);
-  }
-  const selected = [...text.matchAll(/^\s*(?:extend-)?select\s*=\s*\[([^\]]*)\]/gm)].flatMap((m) => [...m[1].matchAll(/["']([A-Z0-9]+)["']/g)].map((c) => c[1]));
-  const missing = RUFF_RULE_SETS.filter((set) => !selected.some((code) => code === "ALL" || set.startsWith(code)));
-  if (missing.length) problems.push(`Ruff no selecciona ${missing.join(", ")} (complejidad, refactor y seguridad: ${RUFF_RULE_SETS.join(", ")})`);
-  const long = matchFiles(root, "**/*.py").filter((f) => (readText(root, f) ?? "").split("\n").length > wanted.max_lines);
-  if (long.length) problems.push(`archivos con m\xE1s de ${wanted.max_lines} l\xEDneas: ${long.slice(0, 5).join(", ")}`);
-  return problems.length ? { ok: false, detail: `pyproject.toml: ${problems.join("; ")}` } : { ok: true, detail: "Ruff con los umbrales del perfil" };
-}
-
-// engine/src/design.ts
-var UI = "**/*.{tsx,jsx,astro,vue,svelte,html}";
-var CSS = "**/*.{css,scss}";
-var GENERIC = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-sans-serif", "ui-serif", "ui-monospace", "inherit", "initial", "unset", "-apple-system", "blinkmacsystemfont", "segoe ui", "arial", "helvetica", "helvetica neue", "apple color emoji", "segoe ui emoji", "noto color emoji"]);
-var norm = (name) => name.replace(/["']/g, "").replace(/[_-]variable$/i, "").replace(/_/g, " ").trim().toLowerCase();
-function fontFamilies(root) {
-  const out = /* @__PURE__ */ new Set();
-  for (const f of matchFiles(root, "**/*.{ts,tsx,js,jsx,mjs}")) {
-    const text = readText(root, f) ?? "";
-    for (const m of text.matchAll(/import\s*\{([^}]+)\}\s*from\s*["']next\/font\/google["']/g)) {
-      for (const name of m[1].split(",").map((n) => n.trim().split(/\s+as\s+/)[0]).filter(Boolean)) out.add(norm(name));
-    }
-    for (const m of text.matchAll(/localFont\(\s*\{[^}]*?src:\s*["'`][^"'`]*?\/([\w-]+?)(?:-(?:regular|bold|medium|light|variable|\w+))?\.(?:woff2?|ttf|otf)/gi)) out.add(norm(m[1]));
-  }
-  for (const dep of dependencies(root)) {
-    const m = dep.match(/^@fontsource(?:-variable)?\/(.+)$/);
-    if (m) out.add(norm(m[1].replace(/-/g, " ")));
-  }
-  for (const f of matchFiles(root, CSS)) {
-    const text = readText(root, f) ?? "";
-    for (const m of text.matchAll(/@font-face\s*\{[^}]*?font-family:\s*([^;}]+)/g)) out.add(norm(m[1].split(",")[0]));
-    for (const m of text.matchAll(/(?<![-\w])font-family:\s*([^;}]+)/g)) {
-      const first = norm(m[1].split(",")[0]);
-      if (first && !first.startsWith("var(") && !GENERIC.has(first)) out.add(first);
-    }
-  }
-  return [...out].sort();
-}
-var TW_WEIGHT = { thin: "100", extralight: "200", light: "300", normal: "400", medium: "500\u2013600", semibold: "500\u2013600", bold: "700", extrabold: "800", black: "900" };
-function cssWeight(v) {
-  const n = v === "bold" ? 700 : v === "normal" ? 400 : Number(v);
-  return n === 500 || n === 600 ? "500\u2013600" : String(n);
-}
-function fontWeights(root) {
-  const out = /* @__PURE__ */ new Set();
-  for (const f of matchFiles(root, UI)) {
-    for (const m of (readText(root, f) ?? "").matchAll(/\bfont-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b/g)) out.add(TW_WEIGHT[m[1]]);
-  }
-  for (const f of matchFiles(root, CSS)) {
-    for (const m of (readText(root, f) ?? "").matchAll(/font-weight:\s*(\d{3}|bold|normal)\b/g)) out.add(cssWeight(m[1]));
-  }
-  return [...out].sort();
-}
-function checkDesign(root, check) {
-  const found = check.rule === "font_families" ? fontFamilies(root) : fontWeights(root);
-  const label = check.rule === "font_families" ? "familias" : "pesos";
-  return found.length <= check.max ? { ok: true, detail: `${found.length} ${label}${found.length ? `: ${found.join(", ")}` : ""}` } : { ok: false, detail: `${found.length} ${label} (m\xE1ximo ${check.max}): ${found.join(", ")}` };
-}
-
-// engine/src/build.ts
-import { existsSync as existsSync8, readFileSync as readFileSync7, statSync as statSync3 } from "node:fs";
-import { join as join8 } from "node:path";
-import { gzipSync } from "node:zlib";
-var JS_DIRS = [".next/static", "out/_next/static", "dist/assets", "dist/_astro", "build/static/js", ".vercel/output/static"];
-var PUBLIC_DIRS = ["out", "dist", "build", ".next/static", ".vercel/output/static"];
-function filesUnder(root, dirs, ext) {
-  return dirs.filter((d) => existsSync8(join8(root, d))).flatMap((d) => listFiles(join8(root, d), { includeIgnored: true }).filter((f) => ext.test(f)).map((f) => `${d}/${f}`));
-}
-var VITE_SSR = ["vike", "vite-plugin-ssr", "@react-router/dev", "@tanstack/react-start", "@remix-run/dev", "waku", "vite-react-ssg", "react-snap"];
-function serverRendered(root) {
-  const framework = detectFramework(root);
-  if (framework !== "vite-react") return { ok: true, detail: `${framework}: genera HTML en el servidor o en el build` };
-  const deps = dependencies(root);
-  const ssr = VITE_SSR.find((d) => deps.has(d));
-  return ssr ? { ok: true, detail: `Vite + React con ${ssr}` } : { ok: false, detail: 'SPA de Vite + React sin SSR/SSG: "ver c\xF3digo fuente" llega vac\xEDo. Usa Next.js o Astro, agrega SSR/SSG, o justifica la excepci\xF3n con /mep:override.' };
-}
-function maxJsChunk(root, maxKb) {
-  const files = filesUnder(root, JS_DIRS, /\.m?js$/);
-  if (!files.length) return { ok: null, detail: "sin salida de build con JavaScript (corre el build primero)" };
-  const sizes = files.filter((f) => statSync3(join8(root, f)).size < 2e7).map((f) => ({ f, kb: Math.round(gzipSync(readFileSync7(join8(root, f))).length / 1024) })).sort((a, b) => b.kb - a.kb);
-  const big = sizes.filter((s) => s.kb > maxKb);
-  return big.length ? { ok: false, detail: `${big.length} archivo(s) JS sobre ${maxKb} KB gzip: ${big.slice(0, 3).map((s) => `${s.f} (${s.kb} KB)`).join(", ")}` } : { ok: true, detail: `el m\xE1s grande: ${sizes[0].f} (${sizes[0].kb} KB gzip)` };
-}
-function noSourceMaps(root) {
-  const maps = filesUnder(root, PUBLIC_DIRS, /\.(js|css|mjs)\.map$/);
-  return maps.length ? { ok: false, violation: true, detail: `source maps p\xFAblicos: ${maps.slice(0, 3).join(", ")}${maps.length > 3 ? ` (+${maps.length - 3})` : ""}` } : { ok: true, detail: "sin source maps en la salida p\xFAblica" };
-}
-function checkBuild(root, check) {
-  if (check.rule === "server_rendered") return serverRendered(root);
-  if (check.rule === "max_js_chunk") return maxJsChunk(root, check.max_kb ?? 200);
-  return noSourceMaps(root);
-}
-var AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai", "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot", "Bytespider", "meta-externalagent"];
-function blockedInTxt(text) {
-  const blocked = [];
-  let agents = [];
-  let inRules = false;
-  for (const raw of text.split("\n")) {
-    const line3 = raw.replace(/#.*/, "").trim();
-    const [key, ...rest] = line3.split(":");
-    const value = rest.join(":").trim();
-    if (/^user-agent$/i.test(key)) {
-      if (inRules) agents = [];
-      agents.push(value);
-      inRules = false;
-    } else if (/^(dis)?allow$/i.test(key)) {
-      inRules = true;
-      if (/^disallow$/i.test(key) && value === "/") {
-        for (const a of agents) if (a === "*" || AI_BOTS.some((b) => b.toLowerCase() === a.toLowerCase())) blocked.push(a);
-      }
-    }
-  }
-  return blocked;
-}
-function checkRobots(root) {
-  const txt = ["public/robots.txt", "static/robots.txt", "out/robots.txt", "dist/robots.txt", ".next/server/app/robots.txt.body"].find((f) => existsSync8(join8(root, f)));
-  if (txt) {
-    const blocked2 = [...new Set(blockedInTxt(readText(root, txt) ?? ""))];
-    return blocked2.length ? { ok: false, detail: `${txt} bloquea el sitio a: ${blocked2.join(", ")}` } : { ok: true, detail: `${txt}: buscadores y asistentes de IA pueden leer el sitio` };
-  }
-  const source = matchFiles(root, "{app,src/app}/robots.{ts,js}")[0];
-  if (!source) return { ok: null, detail: "sin robots.txt" };
-  const text = readText(root, source) ?? "";
-  const rules = text.match(/\{[^{}]*userAgent[^{}]*\}/g) ?? [];
-  const blocked = rules.filter((r) => /disallow:\s*(\[\s*)?["'`]\/["'`]\s*(\]|,|\n|\})/.test(r)).flatMap((r) => [...r.matchAll(/["'`]([\w*-]+)["'`]/g)].map((m) => m[1])).filter((a) => a === "*" || AI_BOTS.some((b) => b.toLowerCase() === a.toLowerCase()));
-  return blocked.length ? { ok: false, detail: `${source} bloquea el sitio a: ${[...new Set(blocked)].join(", ")}` } : { ok: true, detail: `${source}: buscadores y asistentes de IA pueden leer el sitio` };
-}
-
-// engine/src/live.ts
-import { execFileSync } from "node:child_process";
-var FETCH = `
-const [url, redirect] = process.argv.slice(1)
-try {
-  const r = await fetch(url, { redirect, headers: { 'accept-encoding': 'br, gzip', 'user-agent': 'mep-check' }, signal: AbortSignal.timeout(10000) })
-  const body = redirect === 'manual' ? '' : (await r.text()).slice(0, 300000)
-  process.stdout.write(JSON.stringify({ status: r.status, headers: Object.fromEntries(r.headers), cookies: r.headers.getSetCookie(), body }))
-} catch (e) {
-  process.stdout.write(JSON.stringify({ status: 0, headers: {}, cookies: [], body: '', error: String(e?.cause?.code ?? e?.message ?? e) }))
-}`;
-var TXT = `
-const [name] = process.argv.slice(1)
-const { promises } = await import('node:dns')
-promises.resolveTxt(name).then(r => process.stdout.write(JSON.stringify(r.map(x => x.join('')))), e => process.stdout.write(JSON.stringify({ error: e.code })))`;
-var cache = /* @__PURE__ */ new Map();
-function fetchSync(url, redirect = "follow") {
-  const key = `${redirect} ${url}`;
-  const hit = cache.get(key);
-  if (hit) return hit;
-  let res;
-  try {
-    res = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", FETCH, url, redirect], { encoding: "utf8", timeout: 15e3, stdio: ["ignore", "pipe", "ignore"] }));
-  } catch (e) {
-    res = { status: 0, headers: {}, cookies: [], body: "", error: e.message.split("\n")[0] };
-  }
-  cache.set(key, res);
-  return res;
-}
-function txtSync(name) {
-  try {
-    return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", TXT, name], { encoding: "utf8", timeout: 1e4, stdio: ["ignore", "pipe", "ignore"] }));
-  } catch {
-    return { error: "TIMEOUT" };
-  }
-}
-function liveTarget(profile, env = process.env) {
-  return (env.MEP_URL || profile.urls?.production || profile.urls?.preview)?.replace(/\/+$/, "");
-}
-var skip = (detail) => ({ ok: null, detail, skip: true });
-var NO_URL = "sin URL del sitio: define urls.preview o urls.production en el perfil (/mep:add) o MEP_URL";
-var LEAK = /\bat [\w.<>]+ \(|node_modules\/|Traceback \(most recent|SQLSTATE|PrismaClient\w*Error|stack":|ECONNREFUSED/;
-var PRIVATE = /\/(dashboard|account|cuenta|checkout|carrito|cart|login|iniciar-sesion|signin|signup|registro|admin|api|settings|ajustes)(\/|$)|[?&](q|s|search|query)=/i;
-function headerPresent(res, name) {
-  if (name === "frame-ancestors") return /frame-ancestors/i.test(res.headers["content-security-policy"] ?? "");
-  return res.headers[name.toLowerCase()] !== void 0;
-}
-function checkHeaders(home, names) {
-  const missing = names.filter((entry) => !entry.split("|").some((alt) => headerPresent(home, alt)));
-  return missing.length ? { ok: false, detail: `el sitio no env\xEDa: ${missing.join(", ")}`, all: missing } : { ok: true, detail: `encabezados presentes: ${names.join(", ")}` };
-}
-function checkHsts(home) {
-  const value = home.headers["strict-transport-security"];
-  const age = Number(value?.match(/max-age=(\d+)/i)?.[1] ?? 0);
-  if (!value) return { ok: false, detail: "el sitio no env\xEDa Strict-Transport-Security" };
-  return age >= 15552e3 ? { ok: true, detail: `HSTS max-age=${age}` } : { ok: false, detail: `HSTS max-age=${age}: menos de 180 d\xEDas` };
-}
-function checkCompression(base, home) {
-  const encoding = home.headers["content-encoding"] ?? "";
-  if (!/br|gzip|zstd/.test(encoding)) return { ok: false, detail: "el HTML se sirve sin compresi\xF3n (falta Brotli o gzip)" };
-  const asset = home.body.match(/["'](\/(?:_next\/static|assets|_astro|build)\/[^"'?#\s]+\.(?:js|css))["']/)?.[1];
-  if (!asset) return { ok: true, detail: `HTML con ${encoding}; no se encontr\xF3 un asset con hash que revisar` };
-  const cache2 = fetchSync(base + asset).headers["cache-control"] ?? "";
-  const maxAge = Number(cache2.match(/max-age=(\d+)/)?.[1] ?? 0);
-  return /immutable/.test(cache2) || maxAge >= 31536e3 ? { ok: true, detail: `HTML con ${encoding}; ${asset} con Cache-Control "${cache2}"` } : { ok: false, detail: `${asset} sin cach\xE9 larga: Cache-Control "${cache2 || "ausente"}" (se espera max-age=31536000, immutable)` };
-}
-function checkCookies(base, home, paths) {
-  const cookies = [...home.cookies, ...paths.flatMap((p) => fetchSync(base + p).cookies)];
-  if (!cookies.length) return { ok: true, detail: `sin cookies en ${["/", ...paths].join(", ")}` };
-  const problems = [...new Set(cookies)].flatMap((c) => {
-    const name = c.split("=")[0].trim();
-    const flags = c.toLowerCase();
-    const missing = [!/;\s*secure/.test(flags) && "Secure", !/;\s*samesite=/.test(flags) && "SameSite", /sess|auth|token|sid|jwt/i.test(name) && !/;\s*httponly/.test(flags) && "HttpOnly"].filter(Boolean);
-    return missing.length ? [`${name} sin ${missing.join(", ")}`] : [];
-  });
-  return problems.length ? { ok: false, detail: problems.slice(0, 5).join("; "), all: problems } : { ok: true, detail: `${cookies.length} cookie(s) con Secure, SameSite y HttpOnly donde aplica` };
-}
-function checkErrorPage(base) {
-  const res = fetchSync(`${base}/mep-check-404-${Date.now().toString(36)}`);
-  if (res.status === 200) return { ok: false, detail: "una ruta inexistente responde 200 (404 suave): debe responder 404" };
-  const leak = res.body.match(LEAK)?.[0];
-  return leak ? { ok: false, detail: `la p\xE1gina de error muestra detalles internos ("${leak}")` } : { ok: true, detail: `ruta inexistente \u2192 ${res.status}, sin detalles internos` };
-}
-function checkCanonicalRedirect(base) {
-  const url = new URL(base);
-  if (url.protocol !== "https:") return skip("la URL del sitio no es https://");
-  const problems = [];
-  const http = fetchSync(`http://${url.host}/`, "manual");
-  if (http.status && !(http.status >= 300 && http.status < 400 && /^https:/.test(http.headers.location ?? ""))) problems.push(`http:// responde ${http.status} sin redirigir a https://`);
-  const other = url.host.startsWith("www.") ? url.host.slice(4) : `www.${url.host}`;
-  const alt = fetchSync(`https://${other}/`, "manual");
-  if (alt.status && !(alt.status >= 300 && alt.status < 400 && (alt.headers.location ?? "").includes(url.host))) problems.push(`${other} responde ${alt.status} sin redirigir a ${url.host}`);
-  return problems.length ? { ok: false, detail: problems.join("; ") } : { ok: true, detail: `http:// y ${other} llevan a ${url.origin}` };
-}
-function checkSitemap(base) {
-  const res = fetchSync(`${base}/sitemap.xml`);
-  if (res.status !== 200) return { ok: false, detail: `/sitemap.xml responde ${res.status}` };
-  const locs = [...res.body.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1]);
-  if (!locs.length) return { ok: false, detail: "el sitemap no lista ninguna URL" };
-  const problems = [];
-  for (const loc of locs.slice(0, 30)) {
-    let path = loc;
-    try {
-      const u = new URL(loc);
-      path = u.pathname + u.search;
-    } catch {
-    }
-    if (PRIVATE.test(path)) {
-      problems.push(`${path}: p\xE1gina privada o de b\xFAsqueda`);
-      continue;
-    }
-    const page = fetchSync(base + path);
-    if (page.status !== 200) problems.push(`${path}: responde ${page.status}`);
-    else if (/noindex/i.test(page.headers["x-robots-tag"] ?? "") || /<meta[^>]+name=["']robots["'][^>]+noindex/i.test(page.body)) problems.push(`${path}: es noindex`);
-  }
-  return problems.length ? { ok: false, detail: problems.slice(0, 5).join("; "), all: problems } : { ok: true, detail: `${Math.min(locs.length, 30)} URL(s) del sitemap p\xFAblicas e indexables` };
-}
-function checkLive(profile, check, mode, env = process.env) {
-  if (mode === "fast") return skip("se verifica contra el sitio desplegado en /mep:check");
-  const base = liveTarget(profile, env);
-  if (!base) return skip(NO_URL);
-  const home = fetchSync(`${base}/`);
-  if (!home.status) return { ok: null, detail: `no se pudo abrir ${base}: ${home.error ?? "sin respuesta"}` };
-  switch (check.rule) {
-    case "headers":
-      return checkHeaders(home, check.names ?? []);
-    case "hsts":
-      return checkHsts(home);
-    case "compression":
-      return checkCompression(base, home);
-    case "cookies":
-      return checkCookies(base, home, check.paths ?? []);
-    case "error_page":
-      return checkErrorPage(base);
-    case "canonical_redirect":
-      return checkCanonicalRedirect(base);
-    case "sitemap":
-      return checkSitemap(base);
-    case "reachable":
-      return home.status < 400 ? { ok: true, detail: `${base}/ responde ${home.status}` } : { ok: false, detail: `${base}/ responde ${home.status}` };
-  }
-}
-function spfResult(records) {
-  const spf = records.filter((r) => /^v=spf1\b/i.test(r));
-  if (!spf.length) return { ok: false, detail: "sin registro SPF (v=spf1)" };
-  if (spf.length > 1) return { ok: false, detail: `${spf.length} registros SPF: debe haber uno solo` };
-  return /\+all\b/.test(spf[0]) ? { ok: false, detail: "SPF con +all: autoriza a cualquiera a enviar" } : { ok: true, detail: spf[0] };
-}
-function dmarcResult(records) {
-  const dmarc = records.find((r) => /^v=DMARC1\b/i.test(r));
-  if (!dmarc) return { ok: false, detail: "sin registro DMARC en _dmarc" };
-  const policy = dmarc.match(/;\s*p=(\w+)/i)?.[1]?.toLowerCase();
-  if (!policy) return { ok: false, detail: "DMARC sin pol\xEDtica (p=)" };
-  return { ok: true, detail: policy === "none" ? "DMARC p=none: solo monitorea; sube a quarantine o reject cuando el env\xEDo est\xE9 estable" : `DMARC p=${policy}` };
-}
-var DKIM_SELECTORS = ["resend", "google", "default", "selector1", "selector2", "s1", "s2", "k1", "mail", "smtp", "dkim", "pm", "mandrill", "zoho"];
-function checkDns(profile, check, mode, env = process.env) {
-  if (mode === "fast") return skip("se verifica en el DNS en /mep:check");
-  const target = liveTarget(profile, env);
-  const domain = profile.email_domain ?? (target ? new URL(target).hostname.replace(/^www\./, "") : void 0);
-  if (!domain) return skip("sin dominio: define email_domain o urls.production en el perfil (/mep:add)");
-  const lookup = (name) => {
-    const r = txtSync(name);
-    return Array.isArray(r) ? r : [];
-  };
-  if (check.rule === "spf") return spfResult(lookup(domain));
-  if (check.rule === "dmarc") return dmarcResult(lookup(`_dmarc.${domain}`));
-  const selectors = [...profile.email_dkim_selector ? [profile.email_dkim_selector] : [], ...check.selectors ?? DKIM_SELECTORS];
-  const found = selectors.find((s) => lookup(`${s}._domainkey.${domain}`).some((r) => /\bp=\S/.test(r)));
-  return found ? { ok: true, detail: `DKIM en ${found}._domainkey.${domain}` } : { ok: false, detail: `sin DKIM en los selectores comunes de ${domain}; si tu proveedor usa otro, ponlo en email_dkim_selector del perfil` };
-}
-
-// engine/src/security.ts
-import { createHash as createHash3 } from "node:crypto";
-import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join9 } from "node:path";
-var SECURITY_DIR = join9(MEP_DIR, "security");
-function hashFiles(root, files) {
-  const h = createHash3("sha256");
-  for (const f of [...files].sort()) {
-    h.update(`${f}\0${readText(root, f)?.replace(/\r\n/g, "\n") ?? "<missing>"}\0`);
-  }
-  return h.digest("hex");
-}
-function readReport(root, id) {
-  const text = readText(root, join9(SECURITY_DIR, `${id}.json`));
-  if (!text) return void 0;
-  try {
-    return JSON.parse(text);
-  } catch {
-    return void 0;
-  }
-}
-function reportState(root, id) {
-  const report = readReport(root, id);
-  if (!report) return { valid: false, detail: "sin auditor\xEDa de mep-security" };
-  if (report.result !== "pass") return { valid: false, detail: `auditor\xEDa: ${report.result} \u2014 ${report.notes}` };
-  if (hashFiles(root, report.files) !== report.hash) return { valid: false, detail: "auditor\xEDa vencida: cambiaron los archivos revisados" };
-  return { valid: true, detail: `auditado ${report.date}` };
-}
-function recordReport(root, input) {
-  assertSealed(root);
-  const report = { ...input, hash: hashFiles(root, input.files), date: today(), by: "mep-security" };
-  mkdirSync4(join9(root, SECURITY_DIR), { recursive: true });
-  writeFileSync4(join9(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
-  seal(root);
-  return report;
-}
-
-// engine/src/verify.ts
-function getKey(obj, path) {
-  return path.split(".").reduce((o, k) => o && typeof o === "object" ? o[k] : void 0, obj);
-}
-function grep(root, check) {
-  const re = new RegExp(check.pattern, check.flags?.replace("g", ""));
-  const hits = [];
-  for (const file of matchFiles(root, check.glob, check.exclude)) {
-    const lines = (readText(root, file) ?? "").split("\n");
-    lines.forEach((line3, i) => {
-      if (re.test(line3)) hits.push(`${file}:${i + 1}`);
-    });
-    if (hits.length >= 200) break;
-  }
-  if ((check.expect ?? "present") === "present") {
-    return hits.length ? { ok: true, detail: `encontrado en ${hits[0]}` } : { ok: false, detail: `no se encontr\xF3 /${check.pattern}/ en ${check.glob}` };
-  }
-  return hits.length ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(", ")}${hits.length > 5 ? " \u2026" : ""}`, all: hits } : { ok: true, detail: "sin coincidencias" };
-}
-function runCheck(root, check, profile, itemId, mode) {
-  switch (check.type) {
-    case "file_exists": {
-      const paths = Array.isArray(check.path) ? check.path : [check.path];
-      const found = paths.find((p) => /[*{]/.test(p) ? matchFiles(root, p).length > 0 : exists(root, p));
-      return found ? { ok: true, detail: found } : { ok: false, detail: `falta ${paths.join(" o ")}` };
-    }
-    case "route_exists":
-      return routeExists(root, check.path) ? { ok: true, detail: `ruta ${check.path}` } : { ok: false, detail: `falta la ruta ${check.path}` };
-    case "grep":
-      return grep(root, check);
-    case "json_key": {
-      const text = readText(root, check.file);
-      if (text === void 0) return { ok: false, detail: `falta ${check.file}` };
-      let value;
-      try {
-        value = getKey(parseJsonc(text), check.key);
-      } catch {
-        return { ok: false, detail: `${check.file} no es JSON v\xE1lido` };
-      }
-      if (value === void 0) return { ok: false, detail: `${check.file}: falta ${check.key}` };
-      if (check.value !== void 0 && JSON.stringify(value) !== JSON.stringify(check.value)) {
-        return { ok: false, detail: `${check.file}: ${check.key} es ${JSON.stringify(value)}, se espera ${JSON.stringify(check.value)}` };
-      }
-      return { ok: true, detail: `${check.file}: ${check.key}` };
-    }
-    case "command": {
-      if (mode === "fast") return { ok: null, detail: `se verifica en /mep:check: ${check.run}` };
-      try {
-        execSync3(check.run, { cwd: root, stdio: "pipe", timeout: (check.timeout ?? 300) * 1e3 });
-        return { ok: true, detail: `${check.run} \u2713` };
-      } catch (err) {
-        const out = String(err.stdout ?? "") + String(err.stderr ?? "");
-        return { ok: false, detail: `${check.run} fall\xF3: ${out.trim().split("\n").slice(-3).join(" ").slice(0, 300)}` };
-      }
-    }
-    case "html":
-      if (mode === "fast") return { ok: null, detail: "se verifica sobre el build en /mep:check" };
-      return checkHtml(root, check);
-    case "sql":
-      return checkSql(root, check);
-    case "maps": {
-      const errors = check.rule === "registry" ? checkRegistry(root) : checkCodemap(root);
-      return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : ""), all: errors } : { ok: true, detail: `${check.rule} al d\xEDa` };
-    }
-    case "quality":
-      return check.rule === "python" ? checkPythonThresholds(root, profile) : checkThresholds(root, profile);
-    case "design":
-      return checkDesign(root, check);
-    case "build":
-      if (mode === "fast" && check.rule !== "server_rendered") return { ok: null, detail: "se verifica sobre el build en /mep:check" };
-      return checkBuild(root, check);
-    case "robots":
-      return checkRobots(root);
-    case "live":
-      return checkLive(profile, check, mode);
-    case "dns":
-      return checkDns(profile, check, mode);
-    case "plan":
-      return checkPlan(root, check, profile);
-    case "manual": {
-      const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
-      return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
-    }
-  }
-}
-function statusOf(all) {
-  const results = all.filter((r) => !r.skip);
-  if (results.some((r) => r.ok === false)) return "fail";
-  if (!results.length || results.some((r) => r.ok === null)) return "unknown";
-  return "pass";
-}
-function isSecurityItem(e) {
-  return e.item.category === "security";
-}
-function verifyItems(root, profile, evaluated, mode) {
-  return evaluated.map((e) => {
-    if (e.state !== "active") return { ...e, status: "unknown", checks: [], violation: false };
-    const security = isSecurityItem(e);
-    const checks = e.item.verify.filter((check) => !(security && check.type === "manual")).map((check) => ({ check, result: runCheck(root, check, profile, e.item.id, mode) }));
-    const violation = checks.some((c) => c.result.ok === false && c.result.violation === true);
-    let status = statusOf(checks.map((c) => c.result));
-    if (security && status !== "fail") {
-      const audit = reportState(root, e.item.id);
-      checks.push({ check: { type: "manual", prompt: "auditor\xEDa mep-security" }, result: { ok: audit.valid, detail: audit.detail } });
-      if (!audit.valid) status = "fail";
-    }
-    return { ...e, status, checks, violation };
-  });
-}
-function failingDetail(r) {
-  return r.checks.filter((c) => c.result.ok !== true).map((c) => c.result.detail).join("; ");
-}
-
-// engine/src/gate.ts
-var PASS = { block: false, blockers: [], info: [], bypassed: false, message: "" };
-function formatItems(results, max = 15) {
-  const lines = results.slice(0, max).map((r) => `${LEVEL_ICON[r.level]} ${r.item.id} (${r.item.phase}) \u2014 ${r.item.how}
-   \u21B3 ${failingDetail(r) || "pendiente"}`);
-  if (results.length > max) lines.push(`\u2026 y ${results.length - max} m\xE1s (/mep:check)`);
-  return lines.join("\n");
-}
-function gate(root, catalog, kind, env = process.env) {
-  if (!hasProfile(root)) return PASS;
-  const sealed = checkSeal(root);
-  if (!sealed.ok) return { block: true, blockers: [], info: [], bypassed: false, message: `mep bloquea: ${sealed.detail}` };
-  const profile = loadProfile(root, catalog);
-  const mode = kind === "prod" ? "full" : "fast";
-  const results = verifyItems(root, profile, evaluate(profile, catalog), mode).filter((r) => r.state === "active");
-  const closed = new Set(profile.phase.closed);
-  const locked = results.filter((r) => r.item.locked && r.violation);
-  const required = results.filter((r) => r.level === "required");
-  const grace = new Set(profile.selections.grace);
-  const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail" && !grace.has(r.item.id));
-  const blockers = uniq([...locked, ...regressions]);
-  const info = kind === "prod" ? [] : required.filter((r) => r.item.phase === profile.phase.active && r.status !== "pass" && !blockers.includes(r));
-  const bypassed = env.MEP_BYPASS === "1" && blockers.length > 0 && locked.length === 0;
-  if (bypassed) log(root, "bypass", `${kind}: ${blockers.map((b) => b.item.id).join(",")}`);
-  const block = blockers.length > 0 && !bypassed;
-  const label = { stop: "cerrar el trabajo", preview: "el deploy de preview", prod: "el deploy a producci\xF3n" }[kind];
-  const parts = [];
-  if (block) {
-    parts.push(`mep bloquea ${label}: ${blockers.length} \u{1F534} pendiente(s).`);
-    if (locked.length) parts.push("\xCDtems locked violados (no aceptan MEP_BYPASS):");
-    parts.push(formatItems(blockers, kind === "stop" ? 5 : 15));
-  } else if (bypassed) parts.push(`MEP_BYPASS=1: ${blockers.length} \u{1F534} omitidos para ${label} (registrado en .mep/log).`);
-  if (info.length) parts.push(`Pendientes de ${profile.phase.active} (a\xFAn no bloquean):
-${formatItems(info, 5)}`);
-  return { block, blockers, info, bypassed, message: parts.join("\n") };
-}
-function uniq(xs) {
-  return [...new Set(xs)];
-}
-function closePhase(root, catalog, sub, { review = true, env = process.env } = {}) {
-  const profile = loadProfile(root, catalog);
-  const phases = catalog.dimensions.phases;
-  if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. V\xE1lidas: ${phases.join(", ")}`, pending: [], profile };
-  if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya est\xE1 cerrada`, pending: [], profile };
-  const grace = new Set(profile.selections.grace);
-  const relevant = evaluate(profile, catalog).filter((e) => e.item.phase === sub || grace.has(e.item.id));
-  const quality = review ? reviewState(root, sub, env) : { valid: true, detail: "" };
-  const results = verifyItems(root, profile, relevant, "full");
-  const pending = results.filter(
-    (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass"
-  );
-  if (pending.length || !quality.valid) {
-    const parts = [`No se puede cerrar ${sub}:`];
-    if (pending.length) parts.push(`${pending.length} \u{1F534} sin cumplir.
-${formatItems(pending)}`);
-    if (!quality.valid) parts.push(`Revisi\xF3n de calidad: ${quality.detail}`);
-    return { closed: false, message: parts.join("\n"), pending, profile };
-  }
-  profile.phase.closed = phases.filter((p) => p === sub || profile.phase.closed.includes(p));
-  profile.phase.active = phases.find((p) => !profile.phase.closed.includes(p)) ?? sub;
-  profile.selections.grace = [];
-  saveProfile(root, profile);
-  log(root, "phase-close", review ? sub : `${sub} (adopci\xF3n, sin revisi\xF3n de calidad)`);
-  return { closed: true, message: `\u2705 ${sub} cerrada. Sus \u{1F534} quedan protegidos contra regresiones. Sub-etapa activa: ${profile.phase.active}.`, pending: [], profile };
-}
-var CACHE_TTL_MS = 12e4;
-function gitState(root) {
-  try {
-    return execSync4('git rev-parse HEAD && git status --porcelain -- . ":!.mep"', { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString();
-  } catch {
-    return "no-git";
-  }
-}
-function cachedGate(root, catalog, kind, env = process.env) {
-  if (!hasProfile(root)) return PASS;
-  const key = createHash4("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync8(join10(root, MEP_DIR, "profile.yaml"), "utf8")}\0${stateHash(root)}`).digest("hex");
-  const dir = join10(root, MEP_DIR, ".cache");
-  const file = join10(dir, `gate-${kind}.json`);
-  if (existsSync9(file)) {
-    const cached = JSON.parse(readFileSync8(file, "utf8"));
-    if (cached.key === key && Date.now() - cached.time < CACHE_TTL_MS) return cached;
-  }
-  const { block, message } = gate(root, catalog, kind, env);
-  mkdirSync5(dir, { recursive: true });
-  writeFileSync5(join10(root, MEP_DIR, ".gitignore"), ".cache/\n");
-  writeFileSync5(file, JSON.stringify({ key, time: Date.now(), block, message }));
-  return { block, message };
-}
-function prReviewGate(root, env = process.env) {
-  if (!hasProfile(root)) return { block: false, message: "" };
-  const state = reviewState(root, PR_REVIEW, env);
-  return state.valid ? { block: false, message: "" } : { block: true, message: `mep: antes del PR a main, revisi\xF3n de calidad de la rama: ${state.detail}` };
-}
-
-// engine/src/render.ts
-import { existsSync as existsSync10, mkdirSync as mkdirSync6, readdirSync as readdirSync5, readFileSync as readFileSync9, writeFileSync as writeFileSync6 } from "node:fs";
-import { join as join11 } from "node:path";
-var BRIEF_FILE = "BRIEF.md";
-var ADR_DIR = "docs/decisions";
-var LEGAL_NOTE = "> Checklist orientativo, no sustituye asesor\xEDa legal.";
-function describeCheck(c) {
-  switch (c.type) {
-    case "file_exists":
-      return `existe ${Array.isArray(c.path) ? c.path.join(" o ") : c.path}`;
-    case "route_exists":
-      return `ruta ${c.path}`;
-    case "grep":
-      return `${c.expect === "absent" ? "sin" : "contiene"} /${c.pattern}/ en ${c.glob}`;
-    case "json_key":
-      return `${c.file} \u2192 ${c.key}${c.value !== void 0 ? ` = ${JSON.stringify(c.value)}` : ""}`;
-    case "command":
-      return `\`${c.run}\` sale con 0`;
-    case "html":
-      return `HTML del build: ${c.rule}${c.name ?? c.property ?? c.rel ? ` ${c.name ?? c.property ?? c.rel}` : ""}`;
-    case "sql":
-      return `migraciones SQL: ${c.rule}`;
-    case "maps":
-      return c.rule === "registry" ? "REGISTRY.md al d\xEDa (mep registry --check)" : "CODEMAP.md al d\xEDa";
-    case "quality":
-      return c.rule === "python" ? "Ruff con los umbrales del perfil en pyproject.toml" : "umbrales de complejidad y largo en la config del linter";
-    case "build":
-      return { max_js_chunk: `JS por archivo \u2264 ${c.max_kb ?? 200} KB gzip`, no_source_maps: "sin source maps p\xFAblicos", server_rendered: "HTML renderizado en servidor o build" }[c.rule];
-    case "robots":
-      return "robots.txt no bloquea buscadores ni asistentes de IA";
-    case "design":
-      return `${c.rule === "font_families" ? "familias tipogr\xE1ficas" : "pesos de texto"} \u2264 ${c.max}`;
-    case "live":
-      return { headers: `el sitio env\xEDa ${(c.names ?? []).join(", ")}`, hsts: "el sitio env\xEDa HSTS \u2265 180 d\xEDas", compression: "el sitio sirve con Brotli/gzip y assets con cach\xE9 inmutable", cookies: "las cookies del sitio llevan Secure, SameSite y HttpOnly", error_page: "una ruta inexistente da 404 sin detalles internos", canonical_redirect: "http:// y www redirigen al dominio can\xF3nico", sitemap: "el sitemap lista solo p\xE1ginas p\xFAblicas e indexables", reachable: "el sitio desplegado responde" }[c.rule];
-    case "dns":
-      return `DNS: ${c.rule.toUpperCase()}`;
-    case "plan":
-      return `docs/plan: ${c.doc} (${c.rule})`;
-    case "manual":
-      return `manual: ${c.prompt}`;
-  }
-}
-function checkbox(e, results) {
-  const r = results?.get(e.item.id);
-  return r?.status === "pass" ? "[x]" : "[ ]";
-}
-function line(e, results) {
-  const lock = e.item.locked ? " \u{1F512}" : "";
-  const verify = e.item.verify.map(describeCheck).join(" \xB7 ");
-  return `- ${checkbox(e, results)} \`${e.item.id}\`${lock} \u2014 ${e.item.title} \u2014 ${verify}`;
-}
-function profileSection(p, locales) {
-  const signals = Object.entries(p.signals).filter(([, v]) => v !== false).map(([k, v]) => v === true ? k : `${k}=${v}`);
-  return [
-    `- **Tipo:** ${p.type}${p.preset ? ` (preset ${p.preset})` : ""}`,
-    `- **Capacidades:** ${p.capabilities.join(", ") || "\u2014"}`,
-    `- **Mercados:** ${p.markets.join(", ") || "\u2014"}${locales.length ? ` \xB7 idiomas: ${locales.join(", ")}` : ""}`,
-    `- **Audiencia:** ${p.audience.join(", ") || "\u2014"}`,
-    `- **Contexto:** ${p.context}`,
-    `- **Se\xF1ales:** ${signals.join(", ") || "\u2014"}`,
-    `- **Conteos:** ${Object.entries(p.counts).map(([k, v]) => `${k} ${v}`).join(" \xB7 ") || "\u2014"}`
-  ].join("\n");
-}
-function stackSection(decisions) {
-  if (!decisions.length) return "_Sin decisiones de stack._";
-  return stackGroups(decisions).map((g) => `- ${g.decisions.map((d) => `**${d.key}:** ${d.value}${d.decided ? "" : " _(recomendado)_"}`).join(" \xB7 ")} \u2014 ${g.why}`).join("\n");
-}
-function renderBrief(profile, evaluated, catalog, results) {
-  const byId = results ? new Map(results.map((r) => [r.item.id, r])) : void 0;
-  const out = [
-    `<!-- Generado por mep desde .mep/profile.yaml (cat\xE1logo ${profile.catalog_version}). No editar a mano: usa /mep:add, /mep:skip, /mep:override. -->`,
-    `# Brief \u2014 ${profile.project}`,
-    "",
-    "> El resumen del scope en lenguaje claro est\xE1 en [SCOPE.md](SCOPE.md).",
-    "",
-    "## Perfil",
-    profileSection(profile, marketLocales(profile, catalog)),
-    "",
-    "## Stack (decisi\xF3n + por qu\xE9)",
-    stackSection(stack(profile, catalog)),
-    "",
-    "## Fase actual",
-    `- **Cerradas:** ${profile.phase.closed.join(", ") || "\u2014"}`,
-    `- **Activa:** ${profile.phase.active}`,
-    "",
-    "## Checklist"
-  ];
-  for (const phase of catalog.dimensions.phases) {
-    const inPhase = evaluated.filter((e) => e.item.phase === phase && e.state === "active");
-    if (!inPhase.length) continue;
-    const mark = profile.phase.closed.includes(phase) ? " \u2705" : phase === profile.phase.active ? " \u2190 activa" : "";
-    out.push("", `### ${phase}${mark}`);
-    for (const level of ["required", "recommended", "optional"]) {
-      const items = inPhase.filter((e) => e.level === level);
-      if (!items.length) continue;
-      const label = { required: "Obligatorios", recommended: "Recomendados", optional: "Opcionales elegidos" }[level];
-      out.push("", `#### ${LEVEL_ICON[level]} ${label}`, ...items.map((e) => line(e, byId)));
-    }
-  }
-  const skipped = evaluated.filter((e) => e.state === "skipped");
-  const overridden = evaluated.filter((e) => e.state === "overridden");
-  out.push("", "### \u23ED\uFE0F Omitidos (\u{1F7E1}, con raz\xF3n)", skipped.length ? skipped.map((e) => `- \`${e.item.id}\` \u2014 ${e.reason}`).join("\n") : "\u2014");
-  const relaxed = profile.selections.overrides.filter((o) => o.id.startsWith("threshold:"));
-  const disabled = [...overridden.map((e) => `- \u26A0\uFE0F \`${e.item.id}\` \u2014 ${e.reason}`), ...relaxed.map((o) => `- \u26A0\uFE0F umbral \`${o.id.slice(10)}\` \u2014 ${o.reason}`)];
-  out.push("", "### \u26A0\uFE0F Desactivados (\u{1F534} con override, con raz\xF3n)", disabled.length ? disabled.join("\n") : "\u2014");
-  const warns = warnings(evaluated);
-  if (warns.length) out.push("", "### Avisos", ...warns.map((w) => `- ${w.message}`));
-  out.push("", "## Costos recurrentes estimados", "_Se completan con /mep:quote (hosting, dominio, servicios)._");
-  const refs = evaluated.filter((e) => e.state === "active" && e.item.category === "legal" && e.item.references?.length);
-  out.push("", "## Notas legales", LEGAL_NOTE);
-  for (const e of refs) out.push(`- \`${e.item.id}\`: ${e.item.references.join(" \xB7 ")}`);
-  return out.join("\n") + "\n";
-}
-function writeBrief(root, content) {
-  writeFileSync6(join11(root, BRIEF_FILE), content);
-}
-function slug(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-}
-function writeStackAdrs(root, profile, catalog) {
-  const dir = join11(root, ADR_DIR);
-  mkdirSync6(dir, { recursive: true });
-  const existing = readdirSync5(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
-  const written = [];
-  let next = existing.length ? Number(existing[existing.length - 1].slice(0, 4)) + 1 : 1;
-  for (const g of stackGroups(stack(profile, catalog))) {
-    const decision = g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ");
-    const base = `stack-${slug(g.rule)}`;
-    const previous = existing.filter((f) => f.slice(5).startsWith(base)).pop();
-    if (previous && readFileSync9(join11(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
-`)) continue;
-    const file = `${String(next++).padStart(4, "0")}-${base}.md`;
-    const alternatives = catalog.stackRules.find((r) => r.id === g.rule)?.alternatives ?? [];
-    writeFileSync6(
-      join11(dir, file),
-      [
-        `# Stack: ${decision}`,
-        "",
-        `- **Estado:** aceptada${previous ? ` (reemplaza a ${previous})` : ""}`,
-        `- **Fecha:** ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}`,
-        "",
-        "## Contexto",
-        `Perfil: ${profile.type}; capacidades: ${profile.capabilities.join(", ") || "\u2014"}. Regla: ${g.rule}.`,
-        "",
-        "## Decisi\xF3n",
-        `**Decisi\xF3n:** ${decision}`,
-        "",
-        g.why,
-        "",
-        "## Alternativas",
-        alternatives.length ? alternatives.map((a) => `- ${Object.entries(a).map(([k, v]) => `${k}: ${v}`).join(" \u2014 ")}`).join("\n") : "- \u2014",
-        "",
-        "## Consecuencias",
-        "Cambiarla requiere actualizar `.mep/profile.yaml`, regenerar el brief y un ADR nuevo que reemplace a este.",
-        ""
-      ].join("\n")
-    );
-    written.push(file);
-  }
-  return written;
-}
-var CLAUDE_MARKER = "<!-- mep -->";
-function linkClaudeMd(root, template) {
-  const file = join11(root, "CLAUDE.md");
-  const current = existsSync10(file) ? readFileSync9(file, "utf8") : "";
-  if (current.includes(CLAUDE_MARKER)) return false;
-  const block = `${CLAUDE_MARKER}
-${template.trim()}
-${CLAUDE_MARKER}
-`;
-  writeFileSync6(file, current ? `${current.trimEnd()}
-
-${block}` : block);
-  return true;
-}
-
-// engine/src/report.ts
-var STATUS_ICON = { pass: "\u2705", fail: "\u274C", unknown: "\u2754" };
-function formatProposal(evaluated) {
-  const out = [];
-  for (const level of ["required", "recommended", "optional"]) {
-    const items = evaluated.filter((e) => e.level === level);
-    if (!items.length) continue;
-    const label = { required: "Obligatorios", recommended: "Recomendados", optional: "Opcionales (elige)" }[level];
-    out.push(`
-${LEVEL_ICON[level]} ${label} (${items.length})`);
-    const categories = [...new Set(items.map((e) => e.item.category))].sort();
-    for (const cat of categories) {
-      out.push(`  ${cat}`);
-      for (const e of items.filter((i) => i.item.category === cat)) {
-        out.push(`    - ${e.item.id}${e.item.locked ? " \u{1F512}" : ""} \u2014 ${e.item.title}`);
-      }
-    }
-  }
-  return out.join("\n").trim();
-}
-function stateIcon(r) {
-  if (r.state === "skipped") return "\u23ED\uFE0F";
-  if (r.state === "overridden") return "\u26A0\uFE0F";
-  return STATUS_ICON[r.status];
-}
-function formatCheck(results, profile, catalog, { verbose = false } = {}) {
-  const out = [];
-  const shown = results.filter((r) => r.state !== "offered");
-  for (const phase of catalog.dimensions.phases) {
-    const items = shown.filter((r) => r.item.phase === phase);
-    if (!items.length) continue;
-    const req = items.filter((r) => r.level === "required" && r.state === "active");
-    const done = req.filter((r) => r.status === "pass").length;
-    const mark = profile.phase.closed.includes(phase) ? "\u{1F512} cerrada" : phase === profile.phase.active ? "\u2190 activa" : "";
-    out.push(`
-${phase}  \u{1F534} ${done}/${req.length} ${mark}`.trimEnd());
-    for (const r of items) {
-      if (!verbose && r.status === "pass" && r.state === "active") continue;
-      const detail = r.state === "active" ? failingDetail(r) : r.reason;
-      out.push(`  ${stateIcon(r)} ${LEVEL_ICON[r.level]} ${r.item.id}${detail ? ` \u2014 ${detail}` : ""}`);
-    }
-  }
-  return out.join("\n").trim();
-}
-function counts(results) {
-  const pending = results.filter((r) => r.state === "active" && r.status !== "pass");
-  return {
-    required: pending.filter((r) => r.level === "required").length,
-    recommended: pending.filter((r) => r.level === "recommended").length
-  };
-}
-function panelData(results, profile, catalog) {
-  return {
-    phases: catalog.dimensions.phases,
-    active: profile.phase.active,
-    closed: profile.phase.closed,
-    counts: counts(results),
-    items: results.filter((r) => r.state !== "offered").map((r) => ({
-      id: r.item.id,
-      title: r.item.title,
-      level: r.level,
-      phase: r.item.phase,
-      state: r.state,
-      status: r.status,
-      category: r.item.category,
-      locked: Boolean(r.item.locked),
-      manual: r.item.verify.some((c) => c.type === "manual"),
-      why: r.item.why,
-      how: r.item.how,
-      detail: r.state === "active" ? failingDetail(r) : r.reason ?? "",
-      all: r.checks.flatMap((c) => c.result.ok === true ? [] : c.result.all ?? [])
-    }))
-  };
-}
-
-// engine/src/guard.ts
-var STATE_PATH = /(?:^|[\\/])\.mep[\\/](?:profile\.yaml|log|security[\\/]|reviews[\\/])/;
-var MENTIONS_MEP = /(?:^|[\s"'=\\/(])\.mep(?:$|[\s"'\\/)])/;
-var WRITES = /\b(?:tee|cp|mv|rm|truncate|sed\s+-i|perl\s+-[a-z]*[ip]|git\s+(?:checkout|restore|rm)|node\s+-e|python3?\s+-c|Out-File|Set-Content|Add-Content|Remove-Item|Move-Item|Copy-Item)\b/;
-var REDIRECT_INTO_MEP = /(?:^|[^<])>{1,2}\s*["']?[^\s"']*\.mep[\\/]/;
-var ENGINE = String.raw`(?:mep\.mjs["']?|@engelbertgm\/mep\S*|(?:^|[;&|]\s*|\b(?:npx|bunx|pnpm(?:\s+dlx|\s+exec)?|yarn)\s+)mep)\s+`;
-var ENGINE_CALL = new RegExp(ENGINE);
-var HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`);
-var STATE_HINT = "mep: el estado de mep (.mep/profile.yaml, log, security/, reviews/) solo cambia con la CLI de mep. Usa /mep:add, /mep:skip, /mep:phase o mep review/security record.";
-function guardFile(path) {
-  return STATE_PATH.test(path) ? STATE_HINT : void 0;
-}
-function guardCommand(command) {
-  if (/\bMEP_BYPASS\b/.test(command)) return "mep: MEP_BYPASS es una decisi\xF3n tuya, no del agente: ponla en tu entorno al abrir la sesi\xF3n.";
-  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return "mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:threshold, /mep:resync).";
-  if (HUMAN_ACTION.test(command)) return "mep: esta acci\xF3n es tuya. Escr\xEDbela t\xFA: /mep:confirm <id>, /mep:override <id> <raz\xF3n>, /mep:threshold <clave> <valor> <raz\xF3n> o /mep:resync.";
-  if (REDIRECT_INTO_MEP.test(command)) return STATE_HINT;
-  if (ENGINE_CALL.test(command) && !/[;&|]/.test(command)) return void 0;
-  return MENTIONS_MEP.test(command) && WRITES.test(command) ? STATE_HINT : void 0;
-}
-
-// engine/src/human.ts
-import { execSync as execSync5 } from "node:child_process";
-import { readSync } from "node:fs";
-import { userInfo } from "node:os";
-function gitUser(root) {
-  const get = (key) => {
-    try {
-      return execSync5(`git config ${key}`, { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
-    } catch {
-      return "";
-    }
-  };
-  const name = get("user.name") || userInfo().username;
-  const email = get("user.email");
-  return email ? `${name} <${email}>` : name;
-}
-function readLine() {
-  const buf = Buffer.alloc(256);
-  let line3 = "";
-  try {
-    while (!line3.includes("\n")) {
-      const n = readSync(0, buf, 0, buf.length, null);
-      if (!n) break;
-      line3 += buf.toString("utf8", 0, n);
-    }
-  } catch {
-  }
-  return line3.trim();
-}
-var NOT_HUMAN = "esta acci\xF3n es tuya, no del agente. Escr\xEDbela t\xFA en Claude Code (/mep:confirm, /mep:override, /mep:threshold, /mep:resync) o c\xF3rrela en tu propia terminal.";
-function confirmHuman(flags, id) {
-  if (flags.human === true) return true;
-  if (!process.stdin.isTTY) return false;
-  process.stderr.write(`Escribe "${id}" para confirmar: `);
-  return readLine() === id;
-}
-
-// engine/src/signals.ts
-var import_yaml4 = __toESM(require_dist(), 1);
-import { existsSync as existsSync11, readFileSync as readFileSync10 } from "node:fs";
-import { join as join12 } from "node:path";
-function loadDetectors(catalog, name = "signals.yaml") {
-  const file = join12(catalog.dir, name);
-  return existsSync11(file) ? (0, import_yaml4.parse)(readFileSync10(file, "utf8")) : {};
-}
-function fires(root, d, deps) {
-  if ("dependency" in d) return d.dependency.find((dep) => deps.has(dep));
-  if ("file" in d) return matchFiles(root, d.file)[0];
-  if ("count" in d) {
-    const re2 = new RegExp(d.count, "g");
-    const hit = matchFiles(root, d.glob).find((f) => ((readText(root, f) ?? "").match(re2)?.length ?? 0) >= d.min);
-    return hit ? `${hit} (${d.min}+ coincidencias)` : void 0;
-  }
-  const re = new RegExp(d.grep);
-  return matchFiles(root, d.glob).find((f) => re.test(readText(root, f) ?? ""));
-}
-function detectSignals(root, catalog) {
-  return detect(root, loadDetectors(catalog));
-}
-function detectCapabilities(root, catalog) {
-  return detect(root, loadDetectors(catalog, "detect.yaml"));
-}
-function detect(root, table) {
-  const deps = dependencies(root);
-  const out = {};
-  for (const [signal, detectors] of Object.entries(table)) {
-    for (const d of detectors) {
-      const evidence = fires(root, d, deps);
-      if (evidence) {
-        out[signal] = evidence;
-        break;
-      }
-    }
-  }
-  return out;
-}
-function missingSignals(root, profile, catalog) {
-  return Object.entries(detectSignals(root, catalog)).filter(([signal]) => profile.signals[signal] !== true).map(([signal, evidence]) => ({ signal, evidence }));
-}
-
-// engine/src/audit.ts
-var INTEGRATION_DEPS = /^(stripe|@stripe\/|resend|@sendgrid|postmark|@supabase\/|@clerk\/|algoliasearch|meilisearch|@vercel\/(blob|analytics|kv)|posthog|mixpanel|@sentry\/|openai|@anthropic-ai\/|uploadthing|pusher|ably|mapbox|@react-google-maps|twilio|@upstash\/|sanity|contentful|@mux\/)/;
-function countEntities(root) {
-  const tables = /* @__PURE__ */ new Set();
-  for (const f of matchFiles(root, "**/*.sql")) {
-    for (const m of (readText(root, f) ?? "").matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:"?public"?\.)?"?(\w+)"?/gi)) tables.add(m[1].toLowerCase());
-  }
-  for (const f of matchFiles(root, "**/*.prisma")) {
-    for (const m of (readText(root, f) ?? "").matchAll(/^model\s+(\w+)/gm)) tables.add(m[1].toLowerCase());
-  }
-  return tables.size;
-}
-function countLanguages(root) {
-  const locales = /* @__PURE__ */ new Set();
-  for (const f of listFiles(root)) {
-    const m = f.match(/(?:^|\/)(?:locales|messages|i18n|lang)\/([a-z]{2}(?:[-_][A-Z]{2})?)(?:\.json|\/)/);
-    if (m) locales.add(m[1].slice(0, 2));
-  }
-  return Math.max(1, locales.size);
-}
-function guessType(caps, pages, files) {
-  if (caps.has("payments") && caps.has("ugc")) return "marketplace";
-  if (caps.has("subscriptions") || caps.has("auth") && caps.has("payments")) return "saas";
-  if (caps.has("payments")) return "ecommerce";
-  if (files.some((f) => /(^|\/)(booking|bookings|reservas|appointments|citas)(\/|\.)/.test(f))) return "booking";
-  if (caps.has("auth")) return "internal-app";
-  if (files.some((f) => /(^|\/)(blog|posts)\//.test(f))) return "blog";
-  return pages <= 2 ? "landing" : "corporate";
-}
-function inferProfile(root, catalog) {
-  const evidence = {};
-  const caps = detectCapabilities(root, catalog);
-  for (const [k, v] of Object.entries(caps)) evidence[`capabilities.${k}`] = v;
-  const signals = detectSignals(root, catalog);
-  for (const [k, v] of Object.entries(signals)) evidence[`signals.${k}`] = v;
-  const framework = detectFramework(root);
-  evidence.framework = framework;
-  const pageRoutes2 = routes(root, framework).filter((r) => !/\.(txt|xml|webmanifest)$/.test(r) && !["/404", "/500"].includes(r) && !r.startsWith("/api"));
-  const files = listFiles(root);
-  const capSet = new Set(Object.keys(caps));
-  const type = guessType(capSet, pageRoutes2.length, files);
-  evidence.type = `${capSet.size} capacidades, ${pageRoutes2.length} p\xE1ginas`;
-  const integrations = [...dependencies(root)].filter((d) => INTEGRATION_DEPS.test(d));
-  const deps = dependencies(root);
-  const stack2 = {};
-  if (framework !== "static") stack2.framework = framework;
-  if (deps.has("@supabase/supabase-js")) Object.assign(stack2, { db: "postgresql", db_provider: "supabase" });
-  else if (deps.has("pg") || deps.has("postgres") || deps.has("@neondatabase/serverless")) stack2.db = "postgresql";
-  if (capSet.has("payments") && deps.has("stripe")) stack2.payments = "stripe";
-  else if (capSet.has("payment-links")) stack2.payments = "payment-links";
-  if (files.some((f) => f === "vercel.json" || f.startsWith(".vercel/"))) stack2.hosting = "vercel";
-  const raw = {
-    project: (readText(root, "package.json") ?? "").match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? "proyecto",
-    type,
-    capabilities: [...capSet].filter((c) => catalog.dimensions.capabilities.includes(c)).sort(),
-    signals: Object.fromEntries(Object.keys(signals).map((k) => [k, true])),
-    counts: { pages: Math.max(1, pageRoutes2.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
-    stack: { decided: stack2 }
-  };
-  return { profile: normalizeProfile(raw, catalog), evidence };
-}
-function gapReport(root, profile, catalog) {
-  return verifyItems(root, profile, evaluate(profile, catalog), "full").filter((r) => r.state === "active");
-}
-function compareScopeAndCode(scope, code) {
-  const flags = (p) => /* @__PURE__ */ new Set([...p.capabilities.map((c2) => `capacidad ${c2}`), ...Object.entries(p.signals).filter(([, v]) => v === true).map(([k]) => `se\xF1al ${k}`)]);
-  const s = flags(scope);
-  const c = flags(code);
-  return {
-    codeOnly: [...c].filter((x) => !s.has(x)).sort(),
-    scopeOnly: [...s].filter((x) => !c.has(x)).sort(),
-    typeDiffers: scope.type !== code.type ? { scope: scope.type, code: code.type } : void 0
-  };
-}
-
-// engine/src/explain.ts
-var DIM_LABEL = { type: "tipo", capabilities: "capacidades", markets: "mercados", audience: "audiencia", context: "contexto", signals: "se\xF1ales" };
-function matcherText(m) {
-  if (typeof m === "string") return m;
-  if (Array.isArray(m)) return m.join(" y ");
-  return [m.all && `todas de [${m.all.join(", ")}]`, m.any && `alguna de [${m.any.join(", ")}]`, m.none && `ninguna de [${m.none.join(", ")}]`].filter(Boolean).join(", ");
-}
-function leafText(leaf) {
-  return Object.entries(leaf).map(([k, v]) => k === "signals" ? Object.entries(v).map(([s, val]) => `${s} = ${val}`).join(", ") : `${DIM_LABEL[k] ?? k}: ${matcherText(v)}`).join(" \xB7 ");
-}
-function explainCondition(cond, profile, depth = 0) {
-  const pad = "  ".repeat(depth);
-  const mark = matches(cond, profile) ? "\u2713" : "\u2717";
-  if ("all" in cond && Array.isArray(cond.all)) return [`${pad}${mark} todas:`, ...cond.all.flatMap((c) => explainCondition(c, profile, depth + 1))];
-  if ("any" in cond && Array.isArray(cond.any)) return [`${pad}${mark} alguna:`, ...cond.any.flatMap((c) => explainCondition(c, profile, depth + 1))];
-  if ("not" in cond) return [`${pad}${mark} no:`, ...explainCondition(cond.not, profile, depth + 1)];
-  const parts = Object.entries(cond).flatMap(
-    ([k, v]) => k === "signals" ? Object.entries(v).map(([s, val]) => ({ signals: { [s]: val } })) : [{ [k]: v }]
-  );
-  if (parts.length === 1) return [`${pad}${mark} ${leafText(cond)}`];
-  return [`${pad}${mark} todas:`, ...parts.map((p) => `${pad}  ${matches(p, profile) ? "\u2713" : "\u2717"} ${leafText(p)}`)];
-}
-function explainItem(item, profile) {
-  const applies = matches(item.when, profile);
-  const lines = [`${item.id} \u2014 ${item.title}`, "", applies ? "\u2705 Aplica a este scope." : "\u2796 No aplica a este scope."];
-  lines.push(item.when ? "Condici\xF3n:" : "Condici\xF3n: ninguna (aplica a todo proyecto).");
-  if (item.when) lines.push(...explainCondition(item.when, profile, 1));
-  if (applies) {
-    const level = effectiveLevel(item, profile);
-    lines.push("", `Nivel: ${level}${level !== item.level ? ` (base ${item.level}, sube por el scope)` : ""}`);
-    for (const o of item.level_overrides ?? []) lines.push(`  ${matches(o.when, profile) ? "\u2713" : "\u2717"} \u2192 ${o.level} si ${explainCondition(o.when, profile).join(" ").replace(/\s+/g, " ").trim()}`);
-  }
-  lines.push("", `Por qu\xE9: ${item.why}`);
-  return lines.join("\n");
-}
-function applicability(profile, catalog) {
-  const byLevel = { required: 0, recommended: 0, optional: 0 };
-  const notApplying = [];
-  for (const item of catalog.items) {
-    if (matches(item.when, profile)) byLevel[effectiveLevel(item, profile)]++;
-    else notApplying.push(item.id);
-  }
-  return { applies: catalog.items.length - notApplying.length, byLevel, notApplying, total: catalog.items.length };
-}
-
-// engine/src/scope.ts
-var import_yaml5 = __toESM(require_dist(), 1);
-import { existsSync as existsSync12, readFileSync as readFileSync11, writeFileSync as writeFileSync7 } from "node:fs";
-import { join as join13 } from "node:path";
-var SCOPE_FILE = "SCOPE.md";
-function labels(catalog) {
-  const file = join13(catalog.dir, "labels.yaml");
-  return existsSync12(file) ? (0, import_yaml5.parse)(readFileSync11(file, "utf8")) : {};
-}
-function market(m, l) {
-  const [parent, sub] = m.split(":");
-  return sub ? `${l.markets?.[parent] ?? parent} \xB7 ${sub}` : l.markets?.[m] ?? m;
-}
-var bullets = (xs, empty = "\u2014") => xs.length ? xs.map((x) => `- ${x}`).join("\n") : empty;
-var OFTEN_ASSUMED = {
-  landing: ["auth", "payments", "payment-links", "cms", "i18n", "newsletter", "analytics"],
-  corporate: ["cms", "i18n", "auth", "newsletter", "search"],
-  "local-business": ["payments", "payment-links", "cms", "i18n"],
-  blog: ["cms", "newsletter", "search", "i18n"],
-  portfolio: ["cms", "i18n"],
-  ecommerce: ["subscriptions", "search", "i18n", "ugc", "notifications"],
-  saas: ["admin-panel", "notifications", "i18n", "api-public", "ai-features"],
-  marketplace: ["subscriptions", "realtime", "i18n"],
-  "internal-app": ["notifications", "search", "realtime"],
-  directory: ["search", "ugc", "maps", "payments"],
-  booking: ["payments", "payment-links", "notifications", "i18n"]
-};
-function renderScope(profile, evaluated, catalog) {
-  const l = labels(catalog);
-  const app = applicability(profile, catalog);
-  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && k !== "db_client_access" || k === "db_client_access" && v === true);
-  const notIncluded = (OFTEN_ASSUMED[profile.type] ?? []).filter((c) => !profile.capabilities.includes(c));
-  const offered = evaluated.filter((e) => e.state === "offered").map((e) => e.item.title);
-  const chosen = evaluated.filter((e) => e.state === "active" && e.level === "optional").map((e) => e.item.title);
-  const locales = marketLocales(profile, catalog);
-  const counts2 = profile.counts;
-  const missing = [
-    !profile.markets.length && "mercados (definen idiomas, legales y moneda)",
-    !profile.audience.length && "audiencia (consumidores, empresas, menores, datos sensibles)",
-    counts2.pages === void 0 && "n\xFAmero aproximado de p\xE1ginas"
-  ].filter(Boolean);
-  const required = evaluated.filter((e) => e.state === "active" && e.level === "required");
-  const legal = required.filter((e) => e.item.category === "legal").map((e) => e.item.title);
-  const out = [
-    `<!-- Generado por mep desde .mep/profile.yaml. No editar a mano: el scope se cambia con /mep:add. -->`,
-    `# Scope \u2014 ${profile.project}`,
-    "",
-    profile.summary ? `${profile.summary}
-` : "",
-    "## Qu\xE9 es",
-    `- **Tipo:** ${l.type?.[profile.type] ?? profile.type}`,
-    `- **Para qui\xE9n:** ${profile.audience.map((a) => l.audience?.[a] ?? a).join(", ") || "por definir"}`,
-    `- **Contexto:** ${l.context?.[profile.context] ?? profile.context}`,
-    `- **Mercados:** ${profile.markets.map((m) => market(m, l)).join(", ") || "por definir"}${locales.length ? ` \xB7 idiomas: ${locales.join(", ")}` : ""}`,
-    `- **Tama\xF1o:** ${[counts2.pages && `~${plural(counts2.pages, "p\xE1gina", "p\xE1ginas")}`, counts2.entities && plural(counts2.entities, "tipo de datos", "tipos de datos"), counts2.integrations && plural(counts2.integrations, "integraci\xF3n", "integraciones")].filter(Boolean).join(" \xB7 ") || "por definir"}`,
-    "",
-    "## Qu\xE9 incluye",
-    bullets(profile.capabilities.map((c) => l.capabilities?.[c] ?? c), "- Sitio informativo, sin funcionalidades adicionales"),
-    ...profile.custom_work?.length ? ["", "**Trabajo a la medida:**", bullets(profile.custom_work.map((c) => c.title))] : [],
-    ...chosen.length ? ["", "**Opcionales elegidos:**", bullets(chosen)] : [],
-    "",
-    "## Hechos del proyecto",
-    bullets(signals.map(([k]) => l.signals?.[k] ?? k)),
-    "",
-    "## Qu\xE9 no incluye",
-    bullets([
-      ...notIncluded.map((c) => l.capabilities?.[c] ?? c),
-      ...profile.signals.has_db ? [] : ["Base de datos propia (no hay datos que guardar)"]
-    ]),
-    ...offered.length ? ["", `**Opcionales disponibles, no elegidos:** ${offered.length} (ver BRIEF.md).`] : [],
-    "",
-    "## Tecnolog\xEDa",
-    bullets(stackGroups(stack(profile, catalog)).map((g) => `${g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ")} \u2014 ${g.why}`)),
-    "",
-    "## Lo que exige este scope",
-    `Aplican **${app.applies} de ${app.total}** reglas de mep: \u{1F534} ${plural(app.byLevel.required, "obligatoria", "obligatorias")} \xB7 \u{1F7E1} ${plural(app.byLevel.recommended, "recomendada", "recomendadas")} \xB7 \u26AA ${plural(app.byLevel.optional, "opcional", "opcionales")}. ${app.notApplying.length === 1 ? "La otra no aplica" : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qu\xE9). El detalle est\xE1 en BRIEF.md.`,
-    ...legal.length ? ["", "**Legales y de cumplimiento obligatorios:**", bullets(legal)] : [],
-    "",
-    "## Fase actual",
-    `${profile.phase.active}${profile.phase.closed.length ? ` (cerradas: ${profile.phase.closed.join(", ")})` : ""}`,
-    ...missing.length ? ["", "## Por definir", bullets(missing)] : [],
-    "",
-    "> Checklist orientativo, no sustituye asesor\xEDa legal.",
-    ""
-  ];
-  return out.filter((line3, i, all) => !(line3 === "" && all[i - 1] === "")).join("\n");
-}
-function writeScope(root, content) {
-  writeFileSync7(join13(root, SCOPE_FILE), content);
-}
-function plural(n, one, many) {
-  return `${n} ${n === 1 ? one : many}`;
-}
-
 // engine/src/docs.ts
-import { existsSync as existsSync13, readFileSync as readFileSync12 } from "node:fs";
-import { join as join14 } from "node:path";
+import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
+import { join as join8 } from "node:path";
 import { deflateSync, inflateSync } from "node:zlib";
+var IMAGE_LINK = /!\[([^\]]*)\]\((?:<([^>]+)>|([^)\s]+))(?:\s+"[^"]*")?\)/;
 function loadImages(blocks, baseDir) {
   return blocks.map((b) => {
     if (b.kind !== "image") return b;
+    if (/^https?:\/\//i.test(b.path)) throw new Error(`imagen externa no soportada, desc\xE1rgala junto al documento: ${b.path}`);
     if (!/\.png$/i.test(b.path)) throw new Error(`solo PNG: ${b.path}`);
-    const file = join14(baseDir, b.path);
-    if (!existsSync13(file)) throw new Error(`falta la imagen ${b.path}`);
-    const data = readFileSync12(file);
+    const file = join8(baseDir, b.path);
+    if (!existsSync8(file)) throw new Error(`falta la imagen ${b.path}`);
+    const data = readFileSync7(file);
     const problem = pngProblem(data);
     if (problem) throw new Error(`${problem}: ${b.path}`);
     return { ...b, data };
@@ -9871,7 +8603,8 @@ function decodePng(data) {
 }
 function inline(text) {
   const out = [];
-  const parts = text.replace(/`([^`]*)`/g, "$1").split(/(\*\*[^*]+\*\*)/);
+  const plain = text.replace(/`([^`]*)`/g, "$1").replace(/(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (_, label, url) => /^https?:\/\//i.test(url) ? `${label} (${url})` : label);
+  const parts = plain.split(/(\*\*[^*]+\*\*)/);
   for (const p of parts) {
     if (!p) continue;
     const bold = p.startsWith("**") && p.endsWith("**");
@@ -9891,11 +8624,11 @@ function parseMarkdown(md) {
     const line3 = lines[i].trimEnd();
     const h = line3.match(/^(#{1,3})\s+(.*)$/);
     const li = line3.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/);
-    const img = line3.trim().match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+    const img = line3.trim().match(new RegExp(`^${IMAGE_LINK.source}$`));
     if (!line3.trim()) flush();
     else if (img) {
       flush();
-      blocks.push({ kind: "image", alt: img[1], path: img[2] });
+      blocks.push({ kind: "image", alt: img[1], path: img[2] ?? img[3] });
     } else if (h) {
       flush();
       blocks.push({ kind: "heading", level: h[1].length, text: inline(h[2]) });
@@ -9958,9 +8691,10 @@ function docxBlock(b) {
   }
 }
 var DOCX_TEXT_EMU = Math.round((12240 - 2 * 1134) / 1440 * 914400);
+var DOCX_TEXT_HEIGHT_EMU = Math.round((15840 - 2 * 1134) / 1440 * 914400);
 function docxImage(b, n) {
   const { width, height } = pngSize(b.data);
-  const scale2 = Math.min(1, DOCX_TEXT_EMU / (width * 9525));
+  const scale2 = Math.min(1, DOCX_TEXT_EMU / (width * 9525), DOCX_TEXT_HEIGHT_EMU / (height * 9525));
   const cx = Math.round(width * 9525 * scale2);
   const cy = Math.round(height * 9525 * scale2);
   const pic = `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="image${n}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>`;
@@ -10259,6 +8993,1283 @@ function toPdf(blocks) {
     }
   }
   return pdf.finish();
+}
+
+// engine/src/sql.ts
+var DEFAULT_GLOB = "{supabase/migrations,migrations,db/migrations,prisma/migrations,drizzle}/**/*.sql";
+var SYSTEM_SCHEMAS = /* @__PURE__ */ new Set(["auth", "storage", "extensions", "realtime", "supabase_functions", "graphql", "vault"]);
+var OPERATIONS = ["select", "insert", "update", "delete"];
+function tableName(raw) {
+  const parts = raw.replace(/"/g, "").toLowerCase().split(".");
+  if (parts.length === 2 && SYSTEM_SCHEMAS.has(parts[0])) return void 0;
+  return parts.length === 2 && parts[0] === "public" ? parts[1] : parts.join(".");
+}
+var NAME = '((?:"?[\\w]+"?\\.)?"?[\\w]+"?)';
+function scanMigrations(root, glob = DEFAULT_GLOB) {
+  const sql = matchFiles(root, glob).map((f) => (readText(root, f) ?? "").replace(/--.*$/gm, "")).join("\n");
+  const tables = /* @__PURE__ */ new Set();
+  const rls = /* @__PURE__ */ new Set();
+  const policies = /* @__PURE__ */ new Map();
+  for (const m of sql.matchAll(new RegExp(`create\\s+table\\s+(?:if\\s+not\\s+exists\\s+)?${NAME}`, "gi"))) {
+    const t = tableName(m[1]);
+    if (t) tables.add(t);
+  }
+  for (const m of sql.matchAll(new RegExp(`drop\\s+table\\s+(?:if\\s+exists\\s+)?${NAME}`, "gi"))) {
+    const t = tableName(m[1]);
+    if (t) tables.delete(t);
+  }
+  for (const m of sql.matchAll(new RegExp(`alter\\s+table\\s+(?:only\\s+)?${NAME}\\s+enable\\s+row\\s+level\\s+security`, "gi"))) {
+    const t = tableName(m[1]);
+    if (t) rls.add(t);
+  }
+  for (const m of sql.matchAll(new RegExp(`create\\s+policy\\s+(?:"[^"]*"|\\w+)\\s+on\\s+${NAME}([\\s\\S]*?);`, "gi"))) {
+    const t = tableName(m[1]);
+    if (!t) continue;
+    const op = m[2].match(/\bfor\s+(all|select|insert|update|delete)\b/i)?.[1].toLowerCase() ?? "all";
+    const set = policies.get(t) ?? /* @__PURE__ */ new Set();
+    for (const o of op === "all" ? OPERATIONS : [op]) set.add(o);
+    policies.set(t, set);
+  }
+  return { files: matchFiles(root, glob).length, tables, rls, policies };
+}
+function checkSql(root, check) {
+  const { files, tables, rls, policies } = scanMigrations(root, check.glob);
+  if (files === 0) return { ok: null, detail: "sin migraciones SQL versionadas" };
+  if (check.rule === "rls_enabled") {
+    const missing = [...tables].filter((t) => !rls.has(t)).sort();
+    return missing.length ? { ok: false, violation: true, detail: `tablas sin RLS: ${missing.join(", ")}` } : { ok: true, detail: `RLS activo en ${tables.size} tablas` };
+  }
+  const incomplete = [...tables].filter((t) => rls.has(t)).map((t) => ({ t, missing: OPERATIONS.filter((o) => !policies.get(t)?.has(o)) })).filter((x) => x.missing.length);
+  return incomplete.length ? { ok: false, detail: incomplete.slice(0, 5).map((x) => `${x.t}: sin pol\xEDtica ${x.missing.join("/")}`).join("; ") } : { ok: true, detail: "pol\xEDticas por operaci\xF3n en todas las tablas" };
+}
+
+// engine/src/plan.ts
+var DIR2 = "docs/plan";
+var PLAN_FILES = {
+  prd: `${DIR2}/PRD.md`,
+  trd: `${DIR2}/TRD.md`,
+  flows: `${DIR2}/FLOWS.md`,
+  schema: `${DIR2}/SCHEMA.md`,
+  implementation: `${DIR2}/IMPLEMENTATION.md`
+};
+var list = (items) => items.slice(0, 5).join(", ") + (items.length > 5 ? " \u2026" : "");
+var result = (missing, what, ok) => missing.length ? { ok: false, detail: `${what}: ${list(missing)}` } : { ok: true, detail: ok };
+function section(md, key) {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const start = lines.findIndex((l) => l.trim() === `<!-- mep:${key} -->`);
+  if (start < 0) return void 0;
+  let fenced = false;
+  const end = lines.findIndex((l, i) => {
+    if (i <= start) return false;
+    if (l.trimStart().startsWith("```")) fenced = !fenced;
+    return !fenced && l.startsWith("## ");
+  });
+  return lines.slice(start + 1, end < 0 ? void 0 : end).join("\n");
+}
+function codeHeadings(text) {
+  return [...text.matchAll(/^###\s+`([^`]+)`/gm)].map((m) => m[1]);
+}
+function diagrams(root, md, check, profile) {
+  const missing = [];
+  for (const m of md.replace(/<!--[\s\S]*?-->/g, "").matchAll(new RegExp(IMAGE_LINK.source, "g"))) {
+    const path = m[2] ?? m[3];
+    if (!/^https?:\/\//i.test(path) && !exists(root, posix.join(DIR2, path))) missing.push(path);
+  }
+  const applies = !check.if_capabilities || check.if_capabilities.some((c) => profile.capabilities.includes(c));
+  for (const required of applies ? check.required ?? [] : []) {
+    const found = required.split("|").some((type) => matchFiles(root, `${DIR2}/diagrams/${check.doc}-${type}*.png`).length > 0);
+    if (!found) missing.push(`diagrama ${required.replace(/\|/g, " o ")}`);
+  }
+  return result(missing, "faltan", "diagramas al d\xEDa");
+}
+function checkPlan(root, check, profile) {
+  const file = PLAN_FILES[check.doc];
+  const raw = readText(root, file);
+  if (raw === void 0) return { ok: false, detail: `falta ${file}` };
+  const md = raw.replace(/\r\n/g, "\n");
+  const lower = md.toLowerCase();
+  switch (check.rule) {
+    case "sections":
+      return result((check.sections ?? []).filter((k) => section(md, k) === void 0), `${file} sin las secciones`, `${file} con sus secciones`);
+    case "custom_work":
+      return result((profile.custom_work ?? []).map((w) => w.title).filter((t) => !lower.includes(t.toLowerCase())), `${file} no menciona`, "trabajo a la medida incluido");
+    case "stack": {
+      const plain = (s) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const text = plain(md);
+      const decided = Object.values(profile.stack.decided).filter((v) => v !== "none");
+      return result(decided.filter((v) => !text.includes(plain(v))), `${file} no menciona`, "stack incluido");
+    }
+    case "phases": {
+      const listed = new Set(codeHeadings(section(md, "fases") ?? ""));
+      const wanted = (check.phases ?? []).filter((p) => p !== "build.data" || profile.signals.has_db === true);
+      return result(wanted.filter((p) => !listed.has(p)), `${file} sin las fases`, "una secci\xF3n por sub-etapa");
+    }
+    case "diagrams":
+      return diagrams(root, md, check, profile);
+    case "routes": {
+      const listed = new Set([...(section(md, "pantallas") ?? "").matchAll(/`(\/[^`]*)`/g)].map((m) => m[1]));
+      const loose = new Set(matchFiles(root, "{public,static}/**/*.html").filter((f) => !/(^|\/)index\.html$/.test(f)).map((f) => "/" + f.replace(/^(public|static)\//, "").replace(/\.html$/, "")));
+      const screens = pageRoutes(root).filter((r) => r !== "/404" && r !== "/500" && !loose.has(r));
+      return result(screens.filter((r) => !listed.has(r)), `${file} sin las pantallas`, "todas las pantallas en el inventario");
+    }
+    case "tables": {
+      const inCode = scanMigrations(root).tables;
+      const inDoc = new Set(codeHeadings(section(md, "tablas") ?? "").map(tableName).filter((t) => !!t));
+      const problems = [...[...inCode].filter((t) => !inDoc.has(t)).map((t) => `falta ${t}`), ...[...inDoc].filter((t) => !inCode.has(t)).map((t) => `sobra ${t}`)];
+      return result(problems, `${file} no coincide con las migraciones`, "tablas iguales a las migraciones");
+    }
+  }
+}
+
+// engine/src/quality.ts
+var QUALITY_DEFAULTS = { complexity: 10, max_lines: 300, max_function_lines: 50, max_params: 4 };
+var ESLINT_RULE = { complexity: "complexity", max_lines: "max-lines", max_function_lines: "max-lines-per-function", max_params: "max-params" };
+function thresholds(profile) {
+  return { ...QUALITY_DEFAULTS, ...profile.quality };
+}
+function eslintValue(text, rule) {
+  const name = rule.replace(/-/g, "\\-");
+  const m = text.match(new RegExp(`["']?${name}["']?\\s*:\\s*\\[\\s*["']?(?:error|warn|1|2)["']?\\s*,\\s*(?:\\{[^}]*?\\bmax\\s*:\\s*)?(\\d+)`));
+  return m ? Number(m[1]) : void 0;
+}
+function checkThresholds(root, profile) {
+  const wanted = thresholds(profile);
+  const eslint = matchFiles(root, "{eslint.config.{js,mjs,cjs,ts},.eslintrc,.eslintrc.{json,js,cjs,yml,yaml}}")[0];
+  if (!eslint) {
+    const biome = matchFiles(root, "biome.{json,jsonc}")[0];
+    if (!biome) return { ok: false, detail: "sin config de ESLint ni Biome" };
+    const max = Number((readText(root, biome) ?? "").match(/"maxAllowedComplexity"\s*:\s*(\d+)/)?.[1]);
+    if (!max) return { ok: false, detail: `${biome}: falta noExcessiveCognitiveComplexity con maxAllowedComplexity` };
+    if (max > wanted.complexity) return { ok: false, detail: `${biome}: complejidad ${max} > ${wanted.complexity}` };
+    return { ok: null, detail: "Biome no tiene max-lines ni max-params: revisa el largo de archivos y funciones y el n\xFAmero de par\xE1metros a mano" };
+  }
+  const text = readText(root, eslint) ?? "";
+  const problems = [];
+  for (const key of Object.keys(ESLINT_RULE)) {
+    const value = eslintValue(text, ESLINT_RULE[key]);
+    if (value === void 0) problems.push(`falta ${ESLINT_RULE[key]} (\u2264 ${wanted[key]})`);
+    else if (value > wanted[key]) problems.push(`${ESLINT_RULE[key]} ${value} > ${wanted[key]}`);
+  }
+  return problems.length ? { ok: false, detail: `${eslint}: ${problems.join("; ")}` } : { ok: true, detail: `${eslint}: umbrales al d\xEDa` };
+}
+var RUFF_SETTING = { complexity: "max-complexity", max_params: "max-args", max_function_lines: "max-statements" };
+var RUFF_RULE_SETS = ["C90", "PLR", "S"];
+function checkPythonThresholds(root, profile) {
+  const text = readText(root, "pyproject.toml");
+  if (text === void 0) return { ok: false, detail: "falta pyproject.toml con la configuraci\xF3n de Ruff" };
+  const wanted = thresholds(profile);
+  const problems = [];
+  for (const [key, setting] of Object.entries(RUFF_SETTING)) {
+    const value = Number(text.match(new RegExp(`^\\s*${setting}\\s*=\\s*(\\d+)`, "m"))?.[1]);
+    if (!value) problems.push(`falta ${setting} (\u2264 ${wanted[key]})`);
+    else if (value > wanted[key]) problems.push(`${setting} ${value} > ${wanted[key]}`);
+  }
+  const selected = [...text.matchAll(/^\s*(?:extend-)?select\s*=\s*\[([^\]]*)\]/gm)].flatMap((m) => [...m[1].matchAll(/["']([A-Z0-9]+)["']/g)].map((c) => c[1]));
+  const missing = RUFF_RULE_SETS.filter((set) => !selected.some((code) => code === "ALL" || set.startsWith(code)));
+  if (missing.length) problems.push(`Ruff no selecciona ${missing.join(", ")} (complejidad, refactor y seguridad: ${RUFF_RULE_SETS.join(", ")})`);
+  const long = matchFiles(root, "**/*.py").filter((f) => (readText(root, f) ?? "").split("\n").length > wanted.max_lines);
+  if (long.length) problems.push(`archivos con m\xE1s de ${wanted.max_lines} l\xEDneas: ${long.slice(0, 5).join(", ")}`);
+  return problems.length ? { ok: false, detail: `pyproject.toml: ${problems.join("; ")}` } : { ok: true, detail: "Ruff con los umbrales del perfil" };
+}
+
+// engine/src/design.ts
+var UI = "**/*.{tsx,jsx,astro,vue,svelte,html}";
+var CSS = "**/*.{css,scss}";
+var GENERIC = /* @__PURE__ */ new Set(["serif", "sans-serif", "monospace", "cursive", "fantasy", "system-ui", "ui-sans-serif", "ui-serif", "ui-monospace", "inherit", "initial", "unset", "-apple-system", "blinkmacsystemfont", "segoe ui", "arial", "helvetica", "helvetica neue", "apple color emoji", "segoe ui emoji", "noto color emoji"]);
+var norm = (name) => name.replace(/["']/g, "").replace(/[_-]variable$/i, "").replace(/_/g, " ").trim().toLowerCase();
+function fontFamilies(root) {
+  const out = /* @__PURE__ */ new Set();
+  for (const f of matchFiles(root, "**/*.{ts,tsx,js,jsx,mjs}")) {
+    const text = readText(root, f) ?? "";
+    for (const m of text.matchAll(/import\s*\{([^}]+)\}\s*from\s*["']next\/font\/google["']/g)) {
+      for (const name of m[1].split(",").map((n) => n.trim().split(/\s+as\s+/)[0]).filter(Boolean)) out.add(norm(name));
+    }
+    for (const m of text.matchAll(/localFont\(\s*\{[^}]*?src:\s*["'`][^"'`]*?\/([\w-]+?)(?:-(?:regular|bold|medium|light|variable|\w+))?\.(?:woff2?|ttf|otf)/gi)) out.add(norm(m[1]));
+  }
+  for (const dep of dependencies(root)) {
+    const m = dep.match(/^@fontsource(?:-variable)?\/(.+)$/);
+    if (m) out.add(norm(m[1].replace(/-/g, " ")));
+  }
+  for (const f of matchFiles(root, CSS)) {
+    const text = readText(root, f) ?? "";
+    for (const m of text.matchAll(/@font-face\s*\{[^}]*?font-family:\s*([^;}]+)/g)) out.add(norm(m[1].split(",")[0]));
+    for (const m of text.matchAll(/(?<![-\w])font-family:\s*([^;}]+)/g)) {
+      const first = norm(m[1].split(",")[0]);
+      if (first && !first.startsWith("var(") && !GENERIC.has(first)) out.add(first);
+    }
+  }
+  return [...out].sort();
+}
+var TW_WEIGHT = { thin: "100", extralight: "200", light: "300", normal: "400", medium: "500\u2013600", semibold: "500\u2013600", bold: "700", extrabold: "800", black: "900" };
+function cssWeight(v) {
+  const n = v === "bold" ? 700 : v === "normal" ? 400 : Number(v);
+  return n === 500 || n === 600 ? "500\u2013600" : String(n);
+}
+function fontWeights(root) {
+  const out = /* @__PURE__ */ new Set();
+  for (const f of matchFiles(root, UI)) {
+    for (const m of (readText(root, f) ?? "").matchAll(/\bfont-(thin|extralight|light|normal|medium|semibold|bold|extrabold|black)\b/g)) out.add(TW_WEIGHT[m[1]]);
+  }
+  for (const f of matchFiles(root, CSS)) {
+    for (const m of (readText(root, f) ?? "").matchAll(/font-weight:\s*(\d{3}|bold|normal)\b/g)) out.add(cssWeight(m[1]));
+  }
+  return [...out].sort();
+}
+function checkDesign(root, check) {
+  const found = check.rule === "font_families" ? fontFamilies(root) : fontWeights(root);
+  const label = check.rule === "font_families" ? "familias" : "pesos";
+  return found.length <= check.max ? { ok: true, detail: `${found.length} ${label}${found.length ? `: ${found.join(", ")}` : ""}` } : { ok: false, detail: `${found.length} ${label} (m\xE1ximo ${check.max}): ${found.join(", ")}` };
+}
+
+// engine/src/build.ts
+import { existsSync as existsSync9, readFileSync as readFileSync8, statSync as statSync3 } from "node:fs";
+import { join as join9 } from "node:path";
+import { gzipSync } from "node:zlib";
+var JS_DIRS = [".next/static", "out/_next/static", "dist/assets", "dist/_astro", "build/static/js", ".vercel/output/static"];
+var PUBLIC_DIRS = ["out", "dist", "build", ".next/static", ".vercel/output/static"];
+function filesUnder(root, dirs, ext) {
+  return dirs.filter((d) => existsSync9(join9(root, d))).flatMap((d) => listFiles(join9(root, d), { includeIgnored: true }).filter((f) => ext.test(f)).map((f) => `${d}/${f}`));
+}
+var VITE_SSR = ["vike", "vite-plugin-ssr", "@react-router/dev", "@tanstack/react-start", "@remix-run/dev", "waku", "vite-react-ssg", "react-snap"];
+function serverRendered(root) {
+  const framework = detectFramework(root);
+  if (framework !== "vite-react") return { ok: true, detail: `${framework}: genera HTML en el servidor o en el build` };
+  const deps = dependencies(root);
+  const ssr = VITE_SSR.find((d) => deps.has(d));
+  return ssr ? { ok: true, detail: `Vite + React con ${ssr}` } : { ok: false, detail: 'SPA de Vite + React sin SSR/SSG: "ver c\xF3digo fuente" llega vac\xEDo. Usa Next.js o Astro, agrega SSR/SSG, o justifica la excepci\xF3n con /mep:override.' };
+}
+function maxJsChunk(root, maxKb) {
+  const files = filesUnder(root, JS_DIRS, /\.m?js$/);
+  if (!files.length) return { ok: null, detail: "sin salida de build con JavaScript (corre el build primero)" };
+  const sizes = files.filter((f) => statSync3(join9(root, f)).size < 2e7).map((f) => ({ f, kb: Math.round(gzipSync(readFileSync8(join9(root, f))).length / 1024) })).sort((a, b) => b.kb - a.kb);
+  const big = sizes.filter((s) => s.kb > maxKb);
+  return big.length ? { ok: false, detail: `${big.length} archivo(s) JS sobre ${maxKb} KB gzip: ${big.slice(0, 3).map((s) => `${s.f} (${s.kb} KB)`).join(", ")}` } : { ok: true, detail: `el m\xE1s grande: ${sizes[0].f} (${sizes[0].kb} KB gzip)` };
+}
+function noSourceMaps(root) {
+  const maps = filesUnder(root, PUBLIC_DIRS, /\.(js|css|mjs)\.map$/);
+  return maps.length ? { ok: false, violation: true, detail: `source maps p\xFAblicos: ${maps.slice(0, 3).join(", ")}${maps.length > 3 ? ` (+${maps.length - 3})` : ""}` } : { ok: true, detail: "sin source maps en la salida p\xFAblica" };
+}
+function checkBuild(root, check) {
+  if (check.rule === "server_rendered") return serverRendered(root);
+  if (check.rule === "max_js_chunk") return maxJsChunk(root, check.max_kb ?? 200);
+  return noSourceMaps(root);
+}
+var AI_BOTS = ["GPTBot", "OAI-SearchBot", "ChatGPT-User", "ClaudeBot", "Claude-User", "Claude-SearchBot", "anthropic-ai", "PerplexityBot", "Perplexity-User", "Google-Extended", "Applebot-Extended", "CCBot", "Bytespider", "meta-externalagent"];
+function blockedInTxt(text) {
+  const blocked = [];
+  let agents = [];
+  let inRules = false;
+  for (const raw of text.split("\n")) {
+    const line3 = raw.replace(/#.*/, "").trim();
+    const [key, ...rest] = line3.split(":");
+    const value = rest.join(":").trim();
+    if (/^user-agent$/i.test(key)) {
+      if (inRules) agents = [];
+      agents.push(value);
+      inRules = false;
+    } else if (/^(dis)?allow$/i.test(key)) {
+      inRules = true;
+      if (/^disallow$/i.test(key) && value === "/") {
+        for (const a of agents) if (a === "*" || AI_BOTS.some((b) => b.toLowerCase() === a.toLowerCase())) blocked.push(a);
+      }
+    }
+  }
+  return blocked;
+}
+function checkRobots(root) {
+  const txt = ["public/robots.txt", "static/robots.txt", "out/robots.txt", "dist/robots.txt", ".next/server/app/robots.txt.body"].find((f) => existsSync9(join9(root, f)));
+  if (txt) {
+    const blocked2 = [...new Set(blockedInTxt(readText(root, txt) ?? ""))];
+    return blocked2.length ? { ok: false, detail: `${txt} bloquea el sitio a: ${blocked2.join(", ")}` } : { ok: true, detail: `${txt}: buscadores y asistentes de IA pueden leer el sitio` };
+  }
+  const source = matchFiles(root, "{app,src/app}/robots.{ts,js}")[0];
+  if (!source) return { ok: null, detail: "sin robots.txt" };
+  const text = readText(root, source) ?? "";
+  const rules = text.match(/\{[^{}]*userAgent[^{}]*\}/g) ?? [];
+  const blocked = rules.filter((r) => /disallow:\s*(\[\s*)?["'`]\/["'`]\s*(\]|,|\n|\})/.test(r)).flatMap((r) => [...r.matchAll(/["'`]([\w*-]+)["'`]/g)].map((m) => m[1])).filter((a) => a === "*" || AI_BOTS.some((b) => b.toLowerCase() === a.toLowerCase()));
+  return blocked.length ? { ok: false, detail: `${source} bloquea el sitio a: ${[...new Set(blocked)].join(", ")}` } : { ok: true, detail: `${source}: buscadores y asistentes de IA pueden leer el sitio` };
+}
+
+// engine/src/live.ts
+import { execFileSync } from "node:child_process";
+var FETCH = `
+const [url, redirect] = process.argv.slice(1)
+try {
+  const r = await fetch(url, { redirect, headers: { 'accept-encoding': 'br, gzip', 'user-agent': 'mep-check' }, signal: AbortSignal.timeout(10000) })
+  const body = redirect === 'manual' ? '' : (await r.text()).slice(0, 300000)
+  process.stdout.write(JSON.stringify({ status: r.status, headers: Object.fromEntries(r.headers), cookies: r.headers.getSetCookie(), body }))
+} catch (e) {
+  process.stdout.write(JSON.stringify({ status: 0, headers: {}, cookies: [], body: '', error: String(e?.cause?.code ?? e?.message ?? e) }))
+}`;
+var TXT = `
+const [name] = process.argv.slice(1)
+const { promises } = await import('node:dns')
+promises.resolveTxt(name).then(r => process.stdout.write(JSON.stringify(r.map(x => x.join('')))), e => process.stdout.write(JSON.stringify({ error: e.code })))`;
+var cache = /* @__PURE__ */ new Map();
+function fetchSync(url, redirect = "follow") {
+  const key = `${redirect} ${url}`;
+  const hit = cache.get(key);
+  if (hit) return hit;
+  let res;
+  try {
+    res = JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", FETCH, url, redirect], { encoding: "utf8", timeout: 15e3, stdio: ["ignore", "pipe", "ignore"] }));
+  } catch (e) {
+    res = { status: 0, headers: {}, cookies: [], body: "", error: e.message.split("\n")[0] };
+  }
+  cache.set(key, res);
+  return res;
+}
+function txtSync(name) {
+  try {
+    return JSON.parse(execFileSync(process.execPath, ["--input-type=module", "-e", TXT, name], { encoding: "utf8", timeout: 1e4, stdio: ["ignore", "pipe", "ignore"] }));
+  } catch {
+    return { error: "TIMEOUT" };
+  }
+}
+function liveTarget(profile, env = process.env) {
+  return (env.MEP_URL || profile.urls?.production || profile.urls?.preview)?.replace(/\/+$/, "");
+}
+var skip = (detail) => ({ ok: null, detail, skip: true });
+var NO_URL = "sin URL del sitio: define urls.preview o urls.production en el perfil (/mep:add) o MEP_URL";
+var LEAK = /\bat [\w.<>]+ \(|node_modules\/|Traceback \(most recent|SQLSTATE|PrismaClient\w*Error|stack":|ECONNREFUSED/;
+var PRIVATE = /\/(dashboard|account|cuenta|checkout|carrito|cart|login|iniciar-sesion|signin|signup|registro|admin|api|settings|ajustes)(\/|$)|[?&](q|s|search|query)=/i;
+function headerPresent(res, name) {
+  if (name === "frame-ancestors") return /frame-ancestors/i.test(res.headers["content-security-policy"] ?? "");
+  return res.headers[name.toLowerCase()] !== void 0;
+}
+function checkHeaders(home, names) {
+  const missing = names.filter((entry) => !entry.split("|").some((alt) => headerPresent(home, alt)));
+  return missing.length ? { ok: false, detail: `el sitio no env\xEDa: ${missing.join(", ")}`, all: missing } : { ok: true, detail: `encabezados presentes: ${names.join(", ")}` };
+}
+function checkHsts(home) {
+  const value = home.headers["strict-transport-security"];
+  const age = Number(value?.match(/max-age=(\d+)/i)?.[1] ?? 0);
+  if (!value) return { ok: false, detail: "el sitio no env\xEDa Strict-Transport-Security" };
+  return age >= 15552e3 ? { ok: true, detail: `HSTS max-age=${age}` } : { ok: false, detail: `HSTS max-age=${age}: menos de 180 d\xEDas` };
+}
+function checkCompression(base, home) {
+  const encoding = home.headers["content-encoding"] ?? "";
+  if (!/br|gzip|zstd/.test(encoding)) return { ok: false, detail: "el HTML se sirve sin compresi\xF3n (falta Brotli o gzip)" };
+  const asset = home.body.match(/["'](\/(?:_next\/static|assets|_astro|build)\/[^"'?#\s]+\.(?:js|css))["']/)?.[1];
+  if (!asset) return { ok: true, detail: `HTML con ${encoding}; no se encontr\xF3 un asset con hash que revisar` };
+  const cache2 = fetchSync(base + asset).headers["cache-control"] ?? "";
+  const maxAge = Number(cache2.match(/max-age=(\d+)/)?.[1] ?? 0);
+  return /immutable/.test(cache2) || maxAge >= 31536e3 ? { ok: true, detail: `HTML con ${encoding}; ${asset} con Cache-Control "${cache2}"` } : { ok: false, detail: `${asset} sin cach\xE9 larga: Cache-Control "${cache2 || "ausente"}" (se espera max-age=31536000, immutable)` };
+}
+function checkCookies(base, home, paths) {
+  const cookies = [...home.cookies, ...paths.flatMap((p) => fetchSync(base + p).cookies)];
+  if (!cookies.length) return { ok: true, detail: `sin cookies en ${["/", ...paths].join(", ")}` };
+  const problems = [...new Set(cookies)].flatMap((c) => {
+    const name = c.split("=")[0].trim();
+    const flags = c.toLowerCase();
+    const missing = [!/;\s*secure/.test(flags) && "Secure", !/;\s*samesite=/.test(flags) && "SameSite", /sess|auth|token|sid|jwt/i.test(name) && !/;\s*httponly/.test(flags) && "HttpOnly"].filter(Boolean);
+    return missing.length ? [`${name} sin ${missing.join(", ")}`] : [];
+  });
+  return problems.length ? { ok: false, detail: problems.slice(0, 5).join("; "), all: problems } : { ok: true, detail: `${cookies.length} cookie(s) con Secure, SameSite y HttpOnly donde aplica` };
+}
+function checkErrorPage(base) {
+  const res = fetchSync(`${base}/mep-check-404-${Date.now().toString(36)}`);
+  if (res.status === 200) return { ok: false, detail: "una ruta inexistente responde 200 (404 suave): debe responder 404" };
+  const leak = res.body.match(LEAK)?.[0];
+  return leak ? { ok: false, detail: `la p\xE1gina de error muestra detalles internos ("${leak}")` } : { ok: true, detail: `ruta inexistente \u2192 ${res.status}, sin detalles internos` };
+}
+function checkCanonicalRedirect(base) {
+  const url = new URL(base);
+  if (url.protocol !== "https:") return skip("la URL del sitio no es https://");
+  const problems = [];
+  const http = fetchSync(`http://${url.host}/`, "manual");
+  if (http.status && !(http.status >= 300 && http.status < 400 && /^https:/.test(http.headers.location ?? ""))) problems.push(`http:// responde ${http.status} sin redirigir a https://`);
+  const other = url.host.startsWith("www.") ? url.host.slice(4) : `www.${url.host}`;
+  const alt = fetchSync(`https://${other}/`, "manual");
+  if (alt.status && !(alt.status >= 300 && alt.status < 400 && (alt.headers.location ?? "").includes(url.host))) problems.push(`${other} responde ${alt.status} sin redirigir a ${url.host}`);
+  return problems.length ? { ok: false, detail: problems.join("; ") } : { ok: true, detail: `http:// y ${other} llevan a ${url.origin}` };
+}
+function checkSitemap(base) {
+  const res = fetchSync(`${base}/sitemap.xml`);
+  if (res.status !== 200) return { ok: false, detail: `/sitemap.xml responde ${res.status}` };
+  const locs = [...res.body.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/g)].map((m) => m[1]);
+  if (!locs.length) return { ok: false, detail: "el sitemap no lista ninguna URL" };
+  const problems = [];
+  for (const loc of locs.slice(0, 30)) {
+    let path = loc;
+    try {
+      const u = new URL(loc);
+      path = u.pathname + u.search;
+    } catch {
+    }
+    if (PRIVATE.test(path)) {
+      problems.push(`${path}: p\xE1gina privada o de b\xFAsqueda`);
+      continue;
+    }
+    const page = fetchSync(base + path);
+    if (page.status !== 200) problems.push(`${path}: responde ${page.status}`);
+    else if (/noindex/i.test(page.headers["x-robots-tag"] ?? "") || /<meta[^>]+name=["']robots["'][^>]+noindex/i.test(page.body)) problems.push(`${path}: es noindex`);
+  }
+  return problems.length ? { ok: false, detail: problems.slice(0, 5).join("; "), all: problems } : { ok: true, detail: `${Math.min(locs.length, 30)} URL(s) del sitemap p\xFAblicas e indexables` };
+}
+function checkLive(profile, check, mode, env = process.env) {
+  if (mode === "fast") return skip("se verifica contra el sitio desplegado en /mep:check");
+  const base = liveTarget(profile, env);
+  if (!base) return skip(NO_URL);
+  const home = fetchSync(`${base}/`);
+  if (!home.status) return { ok: null, detail: `no se pudo abrir ${base}: ${home.error ?? "sin respuesta"}` };
+  switch (check.rule) {
+    case "headers":
+      return checkHeaders(home, check.names ?? []);
+    case "hsts":
+      return checkHsts(home);
+    case "compression":
+      return checkCompression(base, home);
+    case "cookies":
+      return checkCookies(base, home, check.paths ?? []);
+    case "error_page":
+      return checkErrorPage(base);
+    case "canonical_redirect":
+      return checkCanonicalRedirect(base);
+    case "sitemap":
+      return checkSitemap(base);
+    case "reachable":
+      return home.status < 400 ? { ok: true, detail: `${base}/ responde ${home.status}` } : { ok: false, detail: `${base}/ responde ${home.status}` };
+  }
+}
+function spfResult(records) {
+  const spf = records.filter((r) => /^v=spf1\b/i.test(r));
+  if (!spf.length) return { ok: false, detail: "sin registro SPF (v=spf1)" };
+  if (spf.length > 1) return { ok: false, detail: `${spf.length} registros SPF: debe haber uno solo` };
+  return /\+all\b/.test(spf[0]) ? { ok: false, detail: "SPF con +all: autoriza a cualquiera a enviar" } : { ok: true, detail: spf[0] };
+}
+function dmarcResult(records) {
+  const dmarc = records.find((r) => /^v=DMARC1\b/i.test(r));
+  if (!dmarc) return { ok: false, detail: "sin registro DMARC en _dmarc" };
+  const policy = dmarc.match(/;\s*p=(\w+)/i)?.[1]?.toLowerCase();
+  if (!policy) return { ok: false, detail: "DMARC sin pol\xEDtica (p=)" };
+  return { ok: true, detail: policy === "none" ? "DMARC p=none: solo monitorea; sube a quarantine o reject cuando el env\xEDo est\xE9 estable" : `DMARC p=${policy}` };
+}
+var DKIM_SELECTORS = ["resend", "google", "default", "selector1", "selector2", "s1", "s2", "k1", "mail", "smtp", "dkim", "pm", "mandrill", "zoho"];
+function checkDns(profile, check, mode, env = process.env) {
+  if (mode === "fast") return skip("se verifica en el DNS en /mep:check");
+  const target = liveTarget(profile, env);
+  const domain = profile.email_domain ?? (target ? new URL(target).hostname.replace(/^www\./, "") : void 0);
+  if (!domain) return skip("sin dominio: define email_domain o urls.production en el perfil (/mep:add)");
+  const lookup = (name) => {
+    const r = txtSync(name);
+    return Array.isArray(r) ? r : [];
+  };
+  if (check.rule === "spf") return spfResult(lookup(domain));
+  if (check.rule === "dmarc") return dmarcResult(lookup(`_dmarc.${domain}`));
+  const selectors = [...profile.email_dkim_selector ? [profile.email_dkim_selector] : [], ...check.selectors ?? DKIM_SELECTORS];
+  const found = selectors.find((s) => lookup(`${s}._domainkey.${domain}`).some((r) => /\bp=\S/.test(r)));
+  return found ? { ok: true, detail: `DKIM en ${found}._domainkey.${domain}` } : { ok: false, detail: `sin DKIM en los selectores comunes de ${domain}; si tu proveedor usa otro, ponlo en email_dkim_selector del perfil` };
+}
+
+// engine/src/security.ts
+import { createHash as createHash3 } from "node:crypto";
+import { mkdirSync as mkdirSync4, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join10 } from "node:path";
+var SECURITY_DIR = join10(MEP_DIR, "security");
+function hashFiles(root, files) {
+  const h = createHash3("sha256");
+  for (const f of [...files].sort()) {
+    h.update(`${f}\0${readText(root, f)?.replace(/\r\n/g, "\n") ?? "<missing>"}\0`);
+  }
+  return h.digest("hex");
+}
+function readReport(root, id) {
+  const text = readText(root, join10(SECURITY_DIR, `${id}.json`));
+  if (!text) return void 0;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return void 0;
+  }
+}
+function reportState(root, id) {
+  const report = readReport(root, id);
+  if (!report) return { valid: false, detail: "sin auditor\xEDa de mep-security" };
+  if (report.result !== "pass") return { valid: false, detail: `auditor\xEDa: ${report.result} \u2014 ${report.notes}` };
+  if (hashFiles(root, report.files) !== report.hash) return { valid: false, detail: "auditor\xEDa vencida: cambiaron los archivos revisados" };
+  return { valid: true, detail: `auditado ${report.date}` };
+}
+function recordReport(root, input) {
+  assertSealed(root);
+  const report = { ...input, hash: hashFiles(root, input.files), date: today(), by: "mep-security" };
+  mkdirSync4(join10(root, SECURITY_DIR), { recursive: true });
+  writeFileSync4(join10(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + "\n");
+  seal(root);
+  return report;
+}
+
+// engine/src/verify.ts
+function getKey(obj, path) {
+  return path.split(".").reduce((o, k) => o && typeof o === "object" ? o[k] : void 0, obj);
+}
+function grep(root, check) {
+  const re = new RegExp(check.pattern, check.flags?.replace("g", ""));
+  const hits = [];
+  for (const file of matchFiles(root, check.glob, check.exclude)) {
+    const lines = (readText(root, file) ?? "").split("\n");
+    lines.forEach((line3, i) => {
+      if (re.test(line3)) hits.push(`${file}:${i + 1}`);
+    });
+    if (hits.length >= 200) break;
+  }
+  if ((check.expect ?? "present") === "present") {
+    return hits.length ? { ok: true, detail: `encontrado en ${hits[0]}` } : { ok: false, detail: `no se encontr\xF3 /${check.pattern}/ en ${check.glob}` };
+  }
+  return hits.length ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(", ")}${hits.length > 5 ? " \u2026" : ""}`, all: hits } : { ok: true, detail: "sin coincidencias" };
+}
+function runCheck(root, check, profile, itemId, mode) {
+  switch (check.type) {
+    case "file_exists": {
+      const paths = Array.isArray(check.path) ? check.path : [check.path];
+      const found = paths.find((p) => /[*{]/.test(p) ? matchFiles(root, p).length > 0 : exists(root, p));
+      return found ? { ok: true, detail: found } : { ok: false, detail: `falta ${paths.join(" o ")}` };
+    }
+    case "route_exists":
+      return routeExists(root, check.path) ? { ok: true, detail: `ruta ${check.path}` } : { ok: false, detail: `falta la ruta ${check.path}` };
+    case "grep":
+      return grep(root, check);
+    case "json_key": {
+      const text = readText(root, check.file);
+      if (text === void 0) return { ok: false, detail: `falta ${check.file}` };
+      let value;
+      try {
+        value = getKey(parseJsonc(text), check.key);
+      } catch {
+        return { ok: false, detail: `${check.file} no es JSON v\xE1lido` };
+      }
+      if (value === void 0) return { ok: false, detail: `${check.file}: falta ${check.key}` };
+      if (check.value !== void 0 && JSON.stringify(value) !== JSON.stringify(check.value)) {
+        return { ok: false, detail: `${check.file}: ${check.key} es ${JSON.stringify(value)}, se espera ${JSON.stringify(check.value)}` };
+      }
+      return { ok: true, detail: `${check.file}: ${check.key}` };
+    }
+    case "command": {
+      if (mode === "fast") return { ok: null, detail: `se verifica en /mep:check: ${check.run}` };
+      try {
+        execSync3(check.run, { cwd: root, stdio: "pipe", timeout: (check.timeout ?? 300) * 1e3 });
+        return { ok: true, detail: `${check.run} \u2713` };
+      } catch (err) {
+        const out = String(err.stdout ?? "") + String(err.stderr ?? "");
+        return { ok: false, detail: `${check.run} fall\xF3: ${out.trim().split("\n").slice(-3).join(" ").slice(0, 300)}` };
+      }
+    }
+    case "html":
+      if (mode === "fast") return { ok: null, detail: "se verifica sobre el build en /mep:check" };
+      return checkHtml(root, check);
+    case "sql":
+      return checkSql(root, check);
+    case "maps": {
+      const errors = check.rule === "registry" ? checkRegistry(root) : checkCodemap(root);
+      return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : ""), all: errors } : { ok: true, detail: `${check.rule} al d\xEDa` };
+    }
+    case "quality":
+      return check.rule === "python" ? checkPythonThresholds(root, profile) : checkThresholds(root, profile);
+    case "design":
+      return checkDesign(root, check);
+    case "build":
+      if (mode === "fast" && check.rule !== "server_rendered") return { ok: null, detail: "se verifica sobre el build en /mep:check" };
+      return checkBuild(root, check);
+    case "robots":
+      return checkRobots(root);
+    case "live":
+      return checkLive(profile, check, mode);
+    case "dns":
+      return checkDns(profile, check, mode);
+    case "plan":
+      return checkPlan(root, check, profile);
+    case "manual": {
+      const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
+      return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
+    }
+  }
+}
+function statusOf(all) {
+  const results = all.filter((r) => !r.skip);
+  if (results.some((r) => r.ok === false)) return "fail";
+  if (!results.length || results.some((r) => r.ok === null)) return "unknown";
+  return "pass";
+}
+function isSecurityItem(e) {
+  return e.item.category === "security";
+}
+function verifyItems(root, profile, evaluated, mode) {
+  return evaluated.map((e) => {
+    if (e.state !== "active") return { ...e, status: "unknown", checks: [], violation: false };
+    const security = isSecurityItem(e);
+    const checks = e.item.verify.filter((check) => !(security && check.type === "manual")).map((check) => ({ check, result: runCheck(root, check, profile, e.item.id, mode) }));
+    const violation = checks.some((c) => c.result.ok === false && c.result.violation === true);
+    let status = statusOf(checks.map((c) => c.result));
+    if (security && status !== "fail") {
+      const audit = reportState(root, e.item.id);
+      checks.push({ check: { type: "manual", prompt: "auditor\xEDa mep-security" }, result: { ok: audit.valid, detail: audit.detail } });
+      if (!audit.valid) status = "fail";
+    }
+    return { ...e, status, checks, violation };
+  });
+}
+function failingDetail(r) {
+  return r.checks.filter((c) => c.result.ok !== true).map((c) => c.result.detail).join("; ");
+}
+
+// engine/src/gate.ts
+var PASS = { block: false, blockers: [], info: [], bypassed: false, message: "" };
+function formatItems(results, max = 15) {
+  const lines = results.slice(0, max).map((r) => `${LEVEL_ICON[r.level]} ${r.item.id} (${r.item.phase}) \u2014 ${r.item.how}
+   \u21B3 ${failingDetail(r) || "pendiente"}`);
+  if (results.length > max) lines.push(`\u2026 y ${results.length - max} m\xE1s (/mep:check)`);
+  return lines.join("\n");
+}
+function gate(root, catalog, kind, env = process.env) {
+  if (!hasProfile(root)) return PASS;
+  const sealed = checkSeal(root);
+  if (!sealed.ok) return { block: true, blockers: [], info: [], bypassed: false, message: `mep bloquea: ${sealed.detail}` };
+  const profile = loadProfile(root, catalog);
+  const mode = kind === "prod" ? "full" : "fast";
+  const results = verifyItems(root, profile, evaluate(profile, catalog), mode).filter((r) => r.state === "active");
+  const closed = new Set(profile.phase.closed);
+  const locked = results.filter((r) => r.item.locked && r.violation);
+  const required = results.filter((r) => r.level === "required");
+  const grace = new Set(profile.selections.grace);
+  const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail" && !grace.has(r.item.id));
+  const blockers = uniq([...locked, ...regressions]);
+  const info = kind === "prod" ? [] : required.filter((r) => r.item.phase === profile.phase.active && r.status !== "pass" && !blockers.includes(r));
+  const bypassed = env.MEP_BYPASS === "1" && blockers.length > 0 && locked.length === 0;
+  if (bypassed) log(root, "bypass", `${kind}: ${blockers.map((b) => b.item.id).join(",")}`);
+  const block = blockers.length > 0 && !bypassed;
+  const label = { stop: "cerrar el trabajo", preview: "el deploy de preview", prod: "el deploy a producci\xF3n" }[kind];
+  const parts = [];
+  if (block) {
+    parts.push(`mep bloquea ${label}: ${blockers.length} \u{1F534} pendiente(s).`);
+    if (locked.length) parts.push("\xCDtems locked violados (no aceptan MEP_BYPASS):");
+    parts.push(formatItems(blockers, kind === "stop" ? 5 : 15));
+  } else if (bypassed) parts.push(`MEP_BYPASS=1: ${blockers.length} \u{1F534} omitidos para ${label} (registrado en .mep/log).`);
+  if (info.length) parts.push(`Pendientes de ${profile.phase.active} (a\xFAn no bloquean):
+${formatItems(info, 5)}`);
+  return { block, blockers, info, bypassed, message: parts.join("\n") };
+}
+function uniq(xs) {
+  return [...new Set(xs)];
+}
+function closePhase(root, catalog, sub, { review = true, env = process.env } = {}) {
+  const profile = loadProfile(root, catalog);
+  const phases = catalog.dimensions.phases;
+  if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. V\xE1lidas: ${phases.join(", ")}`, pending: [], profile };
+  if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya est\xE1 cerrada`, pending: [], profile };
+  const grace = new Set(profile.selections.grace);
+  const relevant = evaluate(profile, catalog).filter((e) => e.item.phase === sub || grace.has(e.item.id));
+  const quality = review ? reviewState(root, sub, env) : { valid: true, detail: "" };
+  const results = verifyItems(root, profile, relevant, "full");
+  const pending = results.filter(
+    (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass"
+  );
+  if (pending.length || !quality.valid) {
+    const parts = [`No se puede cerrar ${sub}:`];
+    if (pending.length) parts.push(`${pending.length} \u{1F534} sin cumplir.
+${formatItems(pending)}`);
+    if (!quality.valid) parts.push(`Revisi\xF3n de calidad: ${quality.detail}`);
+    return { closed: false, message: parts.join("\n"), pending, profile };
+  }
+  profile.phase.closed = phases.filter((p) => p === sub || profile.phase.closed.includes(p));
+  profile.phase.active = phases.find((p) => !profile.phase.closed.includes(p)) ?? sub;
+  profile.selections.grace = [];
+  saveProfile(root, profile);
+  log(root, "phase-close", review ? sub : `${sub} (adopci\xF3n, sin revisi\xF3n de calidad)`);
+  return { closed: true, message: `\u2705 ${sub} cerrada. Sus \u{1F534} quedan protegidos contra regresiones. Sub-etapa activa: ${profile.phase.active}.`, pending: [], profile };
+}
+var CACHE_TTL_MS = 12e4;
+function gitState(root) {
+  try {
+    return execSync4('git rev-parse HEAD && git status --porcelain -- . ":!.mep"', { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString();
+  } catch {
+    return "no-git";
+  }
+}
+function cachedGate(root, catalog, kind, env = process.env) {
+  if (!hasProfile(root)) return PASS;
+  const key = createHash4("sha256").update(`${kind}\0${env.MEP_BYPASS ?? ""}\0${gitState(root)}\0${readFileSync9(join11(root, MEP_DIR, "profile.yaml"), "utf8")}\0${stateHash(root)}`).digest("hex");
+  const dir = join11(root, MEP_DIR, ".cache");
+  const file = join11(dir, `gate-${kind}.json`);
+  if (existsSync10(file)) {
+    const cached = JSON.parse(readFileSync9(file, "utf8"));
+    if (cached.key === key && Date.now() - cached.time < CACHE_TTL_MS) return cached;
+  }
+  const { block, message } = gate(root, catalog, kind, env);
+  mkdirSync5(dir, { recursive: true });
+  writeFileSync5(join11(root, MEP_DIR, ".gitignore"), ".cache/\n");
+  writeFileSync5(file, JSON.stringify({ key, time: Date.now(), block, message }));
+  return { block, message };
+}
+function prReviewGate(root, env = process.env) {
+  if (!hasProfile(root)) return { block: false, message: "" };
+  const state = reviewState(root, PR_REVIEW, env);
+  return state.valid ? { block: false, message: "" } : { block: true, message: `mep: antes del PR a main, revisi\xF3n de calidad de la rama: ${state.detail}` };
+}
+
+// engine/src/render.ts
+import { existsSync as existsSync11, mkdirSync as mkdirSync6, readdirSync as readdirSync5, readFileSync as readFileSync10, writeFileSync as writeFileSync6 } from "node:fs";
+import { join as join12 } from "node:path";
+var BRIEF_FILE = "BRIEF.md";
+var ADR_DIR = "docs/decisions";
+var LEGAL_NOTE = "> Checklist orientativo, no sustituye asesor\xEDa legal.";
+function describeCheck(c) {
+  switch (c.type) {
+    case "file_exists":
+      return `existe ${Array.isArray(c.path) ? c.path.join(" o ") : c.path}`;
+    case "route_exists":
+      return `ruta ${c.path}`;
+    case "grep":
+      return `${c.expect === "absent" ? "sin" : "contiene"} /${c.pattern}/ en ${c.glob}`;
+    case "json_key":
+      return `${c.file} \u2192 ${c.key}${c.value !== void 0 ? ` = ${JSON.stringify(c.value)}` : ""}`;
+    case "command":
+      return `\`${c.run}\` sale con 0`;
+    case "html":
+      return `HTML del build: ${c.rule}${c.name ?? c.property ?? c.rel ? ` ${c.name ?? c.property ?? c.rel}` : ""}`;
+    case "sql":
+      return `migraciones SQL: ${c.rule}`;
+    case "maps":
+      return c.rule === "registry" ? "REGISTRY.md al d\xEDa (mep registry --check)" : "CODEMAP.md al d\xEDa";
+    case "quality":
+      return c.rule === "python" ? "Ruff con los umbrales del perfil en pyproject.toml" : "umbrales de complejidad y largo en la config del linter";
+    case "build":
+      return { max_js_chunk: `JS por archivo \u2264 ${c.max_kb ?? 200} KB gzip`, no_source_maps: "sin source maps p\xFAblicos", server_rendered: "HTML renderizado en servidor o build" }[c.rule];
+    case "robots":
+      return "robots.txt no bloquea buscadores ni asistentes de IA";
+    case "design":
+      return `${c.rule === "font_families" ? "familias tipogr\xE1ficas" : "pesos de texto"} \u2264 ${c.max}`;
+    case "live":
+      return { headers: `el sitio env\xEDa ${(c.names ?? []).join(", ")}`, hsts: "el sitio env\xEDa HSTS \u2265 180 d\xEDas", compression: "el sitio sirve con Brotli/gzip y assets con cach\xE9 inmutable", cookies: "las cookies del sitio llevan Secure, SameSite y HttpOnly", error_page: "una ruta inexistente da 404 sin detalles internos", canonical_redirect: "http:// y www redirigen al dominio can\xF3nico", sitemap: "el sitemap lista solo p\xE1ginas p\xFAblicas e indexables", reachable: "el sitio desplegado responde" }[c.rule];
+    case "dns":
+      return `DNS: ${c.rule.toUpperCase()}`;
+    case "plan":
+      return `docs/plan: ${c.doc} (${c.rule})`;
+    case "manual":
+      return `manual: ${c.prompt}`;
+  }
+}
+function checkbox(e, results) {
+  const r = results?.get(e.item.id);
+  return r?.status === "pass" ? "[x]" : "[ ]";
+}
+function line(e, results) {
+  const lock = e.item.locked ? " \u{1F512}" : "";
+  const verify = e.item.verify.map(describeCheck).join(" \xB7 ");
+  return `- ${checkbox(e, results)} \`${e.item.id}\`${lock} \u2014 ${e.item.title} \u2014 ${verify}`;
+}
+function profileSection(p, locales) {
+  const signals = Object.entries(p.signals).filter(([, v]) => v !== false).map(([k, v]) => v === true ? k : `${k}=${v}`);
+  return [
+    `- **Tipo:** ${p.type}${p.preset ? ` (preset ${p.preset})` : ""}`,
+    `- **Capacidades:** ${p.capabilities.join(", ") || "\u2014"}`,
+    `- **Mercados:** ${p.markets.join(", ") || "\u2014"}${locales.length ? ` \xB7 idiomas: ${locales.join(", ")}` : ""}`,
+    `- **Audiencia:** ${p.audience.join(", ") || "\u2014"}`,
+    `- **Contexto:** ${p.context}`,
+    `- **Se\xF1ales:** ${signals.join(", ") || "\u2014"}`,
+    `- **Conteos:** ${Object.entries(p.counts).map(([k, v]) => `${k} ${v}`).join(" \xB7 ") || "\u2014"}`
+  ].join("\n");
+}
+function stackSection(decisions) {
+  if (!decisions.length) return "_Sin decisiones de stack._";
+  return stackGroups(decisions).map((g) => `- ${g.decisions.map((d) => `**${d.key}:** ${d.value}${d.decided ? "" : " _(recomendado)_"}`).join(" \xB7 ")} \u2014 ${g.why}`).join("\n");
+}
+function renderBrief(profile, evaluated, catalog, results) {
+  const byId = results ? new Map(results.map((r) => [r.item.id, r])) : void 0;
+  const out = [
+    `<!-- Generado por mep desde .mep/profile.yaml (cat\xE1logo ${profile.catalog_version}). No editar a mano: usa /mep:add, /mep:skip, /mep:override. -->`,
+    `# Brief \u2014 ${profile.project}`,
+    "",
+    "> El resumen del scope en lenguaje claro est\xE1 en [SCOPE.md](SCOPE.md).",
+    "",
+    "## Perfil",
+    profileSection(profile, marketLocales(profile, catalog)),
+    "",
+    "## Stack (decisi\xF3n + por qu\xE9)",
+    stackSection(stack(profile, catalog)),
+    "",
+    "## Fase actual",
+    `- **Cerradas:** ${profile.phase.closed.join(", ") || "\u2014"}`,
+    `- **Activa:** ${profile.phase.active}`,
+    "",
+    "## Checklist"
+  ];
+  for (const phase of catalog.dimensions.phases) {
+    const inPhase = evaluated.filter((e) => e.item.phase === phase && e.state === "active");
+    if (!inPhase.length) continue;
+    const mark = profile.phase.closed.includes(phase) ? " \u2705" : phase === profile.phase.active ? " \u2190 activa" : "";
+    out.push("", `### ${phase}${mark}`);
+    for (const level of ["required", "recommended", "optional"]) {
+      const items = inPhase.filter((e) => e.level === level);
+      if (!items.length) continue;
+      const label = { required: "Obligatorios", recommended: "Recomendados", optional: "Opcionales elegidos" }[level];
+      out.push("", `#### ${LEVEL_ICON[level]} ${label}`, ...items.map((e) => line(e, byId)));
+    }
+  }
+  const skipped = evaluated.filter((e) => e.state === "skipped");
+  const overridden = evaluated.filter((e) => e.state === "overridden");
+  out.push("", "### \u23ED\uFE0F Omitidos (\u{1F7E1}, con raz\xF3n)", skipped.length ? skipped.map((e) => `- \`${e.item.id}\` \u2014 ${e.reason}`).join("\n") : "\u2014");
+  const relaxed = profile.selections.overrides.filter((o) => o.id.startsWith("threshold:"));
+  const disabled = [...overridden.map((e) => `- \u26A0\uFE0F \`${e.item.id}\` \u2014 ${e.reason}`), ...relaxed.map((o) => `- \u26A0\uFE0F umbral \`${o.id.slice(10)}\` \u2014 ${o.reason}`)];
+  out.push("", "### \u26A0\uFE0F Desactivados (\u{1F534} con override, con raz\xF3n)", disabled.length ? disabled.join("\n") : "\u2014");
+  const warns = warnings(evaluated);
+  if (warns.length) out.push("", "### Avisos", ...warns.map((w) => `- ${w.message}`));
+  out.push("", "## Costos recurrentes estimados", "_Se completan con /mep:quote (hosting, dominio, servicios)._");
+  const refs = evaluated.filter((e) => e.state === "active" && e.item.category === "legal" && e.item.references?.length);
+  out.push("", "## Notas legales", LEGAL_NOTE);
+  for (const e of refs) out.push(`- \`${e.item.id}\`: ${e.item.references.join(" \xB7 ")}`);
+  return out.join("\n") + "\n";
+}
+function writeBrief(root, content) {
+  writeFileSync6(join12(root, BRIEF_FILE), content);
+}
+function slug(s) {
+  return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+function writeStackAdrs(root, profile, catalog) {
+  const dir = join12(root, ADR_DIR);
+  mkdirSync6(dir, { recursive: true });
+  const existing = readdirSync5(dir).filter((f) => /^\d{4}-.*\.md$/.test(f)).sort();
+  const written = [];
+  let next = existing.length ? Number(existing[existing.length - 1].slice(0, 4)) + 1 : 1;
+  for (const g of stackGroups(stack(profile, catalog))) {
+    const decision = g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ");
+    const base = `stack-${slug(g.rule)}`;
+    const previous = existing.filter((f) => f.slice(5).startsWith(base)).pop();
+    if (previous && readFileSync10(join12(dir, previous), "utf8").includes(`**Decisi\xF3n:** ${decision}
+`)) continue;
+    const file = `${String(next++).padStart(4, "0")}-${base}.md`;
+    const alternatives = catalog.stackRules.find((r) => r.id === g.rule)?.alternatives ?? [];
+    writeFileSync6(
+      join12(dir, file),
+      [
+        `# Stack: ${decision}`,
+        "",
+        `- **Estado:** aceptada${previous ? ` (reemplaza a ${previous})` : ""}`,
+        `- **Fecha:** ${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}`,
+        "",
+        "## Contexto",
+        `Perfil: ${profile.type}; capacidades: ${profile.capabilities.join(", ") || "\u2014"}. Regla: ${g.rule}.`,
+        "",
+        "## Decisi\xF3n",
+        `**Decisi\xF3n:** ${decision}`,
+        "",
+        g.why,
+        "",
+        "## Alternativas",
+        alternatives.length ? alternatives.map((a) => `- ${Object.entries(a).map(([k, v]) => `${k}: ${v}`).join(" \u2014 ")}`).join("\n") : "- \u2014",
+        "",
+        "## Consecuencias",
+        "Cambiarla requiere actualizar `.mep/profile.yaml`, regenerar el brief y un ADR nuevo que reemplace a este.",
+        ""
+      ].join("\n")
+    );
+    written.push(file);
+  }
+  return written;
+}
+var CLAUDE_MARKER = "<!-- mep -->";
+function linkClaudeMd(root, template) {
+  const file = join12(root, "CLAUDE.md");
+  const current = existsSync11(file) ? readFileSync10(file, "utf8") : "";
+  if (current.includes(CLAUDE_MARKER)) return false;
+  const block = `${CLAUDE_MARKER}
+${template.trim()}
+${CLAUDE_MARKER}
+`;
+  writeFileSync6(file, current ? `${current.trimEnd()}
+
+${block}` : block);
+  return true;
+}
+
+// engine/src/report.ts
+var STATUS_ICON = { pass: "\u2705", fail: "\u274C", unknown: "\u2754" };
+function formatProposal(evaluated) {
+  const out = [];
+  for (const level of ["required", "recommended", "optional"]) {
+    const items = evaluated.filter((e) => e.level === level);
+    if (!items.length) continue;
+    const label = { required: "Obligatorios", recommended: "Recomendados", optional: "Opcionales (elige)" }[level];
+    out.push(`
+${LEVEL_ICON[level]} ${label} (${items.length})`);
+    const categories = [...new Set(items.map((e) => e.item.category))].sort();
+    for (const cat of categories) {
+      out.push(`  ${cat}`);
+      for (const e of items.filter((i) => i.item.category === cat)) {
+        out.push(`    - ${e.item.id}${e.item.locked ? " \u{1F512}" : ""} \u2014 ${e.item.title}`);
+      }
+    }
+  }
+  return out.join("\n").trim();
+}
+function stateIcon(r) {
+  if (r.state === "skipped") return "\u23ED\uFE0F";
+  if (r.state === "overridden") return "\u26A0\uFE0F";
+  return STATUS_ICON[r.status];
+}
+function formatCheck(results, profile, catalog, { verbose = false } = {}) {
+  const out = [];
+  const shown = results.filter((r) => r.state !== "offered");
+  for (const phase of catalog.dimensions.phases) {
+    const items = shown.filter((r) => r.item.phase === phase);
+    if (!items.length) continue;
+    const req = items.filter((r) => r.level === "required" && r.state === "active");
+    const done = req.filter((r) => r.status === "pass").length;
+    const mark = profile.phase.closed.includes(phase) ? "\u{1F512} cerrada" : phase === profile.phase.active ? "\u2190 activa" : "";
+    out.push(`
+${phase}  \u{1F534} ${done}/${req.length} ${mark}`.trimEnd());
+    for (const r of items) {
+      if (!verbose && r.status === "pass" && r.state === "active") continue;
+      const detail = r.state === "active" ? failingDetail(r) : r.reason;
+      out.push(`  ${stateIcon(r)} ${LEVEL_ICON[r.level]} ${r.item.id}${detail ? ` \u2014 ${detail}` : ""}`);
+    }
+  }
+  return out.join("\n").trim();
+}
+function counts(results) {
+  const pending = results.filter((r) => r.state === "active" && r.status !== "pass");
+  return {
+    required: pending.filter((r) => r.level === "required").length,
+    recommended: pending.filter((r) => r.level === "recommended").length
+  };
+}
+function panelData(results, profile, catalog) {
+  return {
+    phases: catalog.dimensions.phases,
+    active: profile.phase.active,
+    closed: profile.phase.closed,
+    counts: counts(results),
+    items: results.filter((r) => r.state !== "offered").map((r) => ({
+      id: r.item.id,
+      title: r.item.title,
+      level: r.level,
+      phase: r.item.phase,
+      state: r.state,
+      status: r.status,
+      category: r.item.category,
+      locked: Boolean(r.item.locked),
+      manual: r.item.verify.some((c) => c.type === "manual"),
+      why: r.item.why,
+      how: r.item.how,
+      detail: r.state === "active" ? failingDetail(r) : r.reason ?? "",
+      all: r.checks.flatMap((c) => c.result.ok === true ? [] : c.result.all ?? [])
+    }))
+  };
+}
+
+// engine/src/guard.ts
+var STATE_PATH = /(?:^|[\\/])\.mep[\\/](?:profile\.yaml|log|security[\\/]|reviews[\\/])/;
+var MENTIONS_MEP = /(?:^|[\s"'=\\/(])\.mep(?:$|[\s"'\\/)])/;
+var WRITES = /\b(?:tee|cp|mv|rm|truncate|sed\s+-i|perl\s+-[a-z]*[ip]|git\s+(?:checkout|restore|rm)|node\s+-e|python3?\s+-c|Out-File|Set-Content|Add-Content|Remove-Item|Move-Item|Copy-Item)\b/;
+var REDIRECT_INTO_MEP = /(?:^|[^<])>{1,2}\s*["']?[^\s"']*\.mep[\\/]/;
+var ENGINE = String.raw`(?:mep\.mjs["']?|@engelbertgm\/mep\S*|(?:^|[;&|]\s*|\b(?:npx|bunx|pnpm(?:\s+dlx|\s+exec)?|yarn)\s+)mep)\s+`;
+var ENGINE_CALL = new RegExp(ENGINE);
+var HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`);
+var STATE_HINT = "mep: el estado de mep (.mep/profile.yaml, log, security/, reviews/) solo cambia con la CLI de mep. Usa /mep:add, /mep:skip, /mep:phase o mep review/security record.";
+function guardFile(path) {
+  return STATE_PATH.test(path) ? STATE_HINT : void 0;
+}
+function guardCommand(command) {
+  if (/\bMEP_BYPASS\b/.test(command)) return "mep: MEP_BYPASS es una decisi\xF3n tuya, no del agente: ponla en tu entorno al abrir la sesi\xF3n.";
+  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return "mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:threshold, /mep:resync).";
+  if (HUMAN_ACTION.test(command)) return "mep: esta acci\xF3n es tuya. Escr\xEDbela t\xFA: /mep:confirm <id>, /mep:override <id> <raz\xF3n>, /mep:threshold <clave> <valor> <raz\xF3n> o /mep:resync.";
+  if (REDIRECT_INTO_MEP.test(command)) return STATE_HINT;
+  if (ENGINE_CALL.test(command) && !/[;&|]/.test(command)) return void 0;
+  return MENTIONS_MEP.test(command) && WRITES.test(command) ? STATE_HINT : void 0;
+}
+
+// engine/src/human.ts
+import { execSync as execSync5 } from "node:child_process";
+import { readSync } from "node:fs";
+import { userInfo } from "node:os";
+function gitUser(root) {
+  const get = (key) => {
+    try {
+      return execSync5(`git config ${key}`, { cwd: root, stdio: ["ignore", "pipe", "ignore"] }).toString().trim();
+    } catch {
+      return "";
+    }
+  };
+  const name = get("user.name") || userInfo().username;
+  const email = get("user.email");
+  return email ? `${name} <${email}>` : name;
+}
+function readLine() {
+  const buf = Buffer.alloc(256);
+  let line3 = "";
+  try {
+    while (!line3.includes("\n")) {
+      const n = readSync(0, buf, 0, buf.length, null);
+      if (!n) break;
+      line3 += buf.toString("utf8", 0, n);
+    }
+  } catch {
+  }
+  return line3.trim();
+}
+var NOT_HUMAN = "esta acci\xF3n es tuya, no del agente. Escr\xEDbela t\xFA en Claude Code (/mep:confirm, /mep:override, /mep:threshold, /mep:resync) o c\xF3rrela en tu propia terminal.";
+function confirmHuman(flags, id) {
+  if (flags.human === true) return true;
+  if (!process.stdin.isTTY) return false;
+  process.stderr.write(`Escribe "${id}" para confirmar: `);
+  return readLine() === id;
+}
+
+// engine/src/signals.ts
+var import_yaml4 = __toESM(require_dist(), 1);
+import { existsSync as existsSync12, readFileSync as readFileSync11 } from "node:fs";
+import { join as join13 } from "node:path";
+function loadDetectors(catalog, name = "signals.yaml") {
+  const file = join13(catalog.dir, name);
+  return existsSync12(file) ? (0, import_yaml4.parse)(readFileSync11(file, "utf8")) : {};
+}
+function fires(root, d, deps) {
+  if ("dependency" in d) return d.dependency.find((dep) => deps.has(dep));
+  if ("file" in d) return matchFiles(root, d.file)[0];
+  if ("count" in d) {
+    const re2 = new RegExp(d.count, "g");
+    const hit = matchFiles(root, d.glob).find((f) => ((readText(root, f) ?? "").match(re2)?.length ?? 0) >= d.min);
+    return hit ? `${hit} (${d.min}+ coincidencias)` : void 0;
+  }
+  const re = new RegExp(d.grep);
+  return matchFiles(root, d.glob).find((f) => re.test(readText(root, f) ?? ""));
+}
+function detectSignals(root, catalog) {
+  return detect(root, loadDetectors(catalog));
+}
+function detectCapabilities(root, catalog) {
+  return detect(root, loadDetectors(catalog, "detect.yaml"));
+}
+function detect(root, table) {
+  const deps = dependencies(root);
+  const out = {};
+  for (const [signal, detectors] of Object.entries(table)) {
+    for (const d of detectors) {
+      const evidence = fires(root, d, deps);
+      if (evidence) {
+        out[signal] = evidence;
+        break;
+      }
+    }
+  }
+  return out;
+}
+function missingSignals(root, profile, catalog) {
+  return Object.entries(detectSignals(root, catalog)).filter(([signal]) => profile.signals[signal] !== true).map(([signal, evidence]) => ({ signal, evidence }));
+}
+
+// engine/src/audit.ts
+var INTEGRATION_DEPS = /^(stripe|@stripe\/|resend|@sendgrid|postmark|@supabase\/|@clerk\/|algoliasearch|meilisearch|@vercel\/(blob|analytics|kv)|posthog|mixpanel|@sentry\/|openai|@anthropic-ai\/|uploadthing|pusher|ably|mapbox|@react-google-maps|twilio|@upstash\/|sanity|contentful|@mux\/)/;
+function countEntities(root) {
+  const tables = /* @__PURE__ */ new Set();
+  for (const f of matchFiles(root, "**/*.sql")) {
+    for (const m of (readText(root, f) ?? "").matchAll(/create\s+table\s+(?:if\s+not\s+exists\s+)?(?:"?public"?\.)?"?(\w+)"?/gi)) tables.add(m[1].toLowerCase());
+  }
+  for (const f of matchFiles(root, "**/*.prisma")) {
+    for (const m of (readText(root, f) ?? "").matchAll(/^model\s+(\w+)/gm)) tables.add(m[1].toLowerCase());
+  }
+  return tables.size;
+}
+function countLanguages(root) {
+  const locales = /* @__PURE__ */ new Set();
+  for (const f of listFiles(root)) {
+    const m = f.match(/(?:^|\/)(?:locales|messages|i18n|lang)\/([a-z]{2}(?:[-_][A-Z]{2})?)(?:\.json|\/)/);
+    if (m) locales.add(m[1].slice(0, 2));
+  }
+  return Math.max(1, locales.size);
+}
+function guessType(caps, pages, files) {
+  if (caps.has("payments") && caps.has("ugc")) return "marketplace";
+  if (caps.has("subscriptions") || caps.has("auth") && caps.has("payments")) return "saas";
+  if (caps.has("payments")) return "ecommerce";
+  if (files.some((f) => /(^|\/)(booking|bookings|reservas|appointments|citas)(\/|\.)/.test(f))) return "booking";
+  if (caps.has("auth")) return "internal-app";
+  if (files.some((f) => /(^|\/)(blog|posts)\//.test(f))) return "blog";
+  return pages <= 2 ? "landing" : "corporate";
+}
+function inferProfile(root, catalog) {
+  const evidence = {};
+  const caps = detectCapabilities(root, catalog);
+  for (const [k, v] of Object.entries(caps)) evidence[`capabilities.${k}`] = v;
+  const signals = detectSignals(root, catalog);
+  for (const [k, v] of Object.entries(signals)) evidence[`signals.${k}`] = v;
+  const framework = detectFramework(root);
+  evidence.framework = framework;
+  const pageRoutes2 = routes(root, framework).filter((r) => !/\.(txt|xml|webmanifest)$/.test(r) && !["/404", "/500"].includes(r) && !r.startsWith("/api"));
+  const files = listFiles(root);
+  const capSet = new Set(Object.keys(caps));
+  const type = guessType(capSet, pageRoutes2.length, files);
+  evidence.type = `${capSet.size} capacidades, ${pageRoutes2.length} p\xE1ginas`;
+  const integrations = [...dependencies(root)].filter((d) => INTEGRATION_DEPS.test(d));
+  const deps = dependencies(root);
+  const stack2 = {};
+  if (framework !== "static") stack2.framework = framework;
+  if (deps.has("@supabase/supabase-js")) Object.assign(stack2, { db: "postgresql", db_provider: "supabase" });
+  else if (deps.has("pg") || deps.has("postgres") || deps.has("@neondatabase/serverless")) stack2.db = "postgresql";
+  if (capSet.has("payments") && deps.has("stripe")) stack2.payments = "stripe";
+  else if (capSet.has("payment-links")) stack2.payments = "payment-links";
+  if (files.some((f) => f === "vercel.json" || f.startsWith(".vercel/"))) stack2.hosting = "vercel";
+  const raw = {
+    project: (readText(root, "package.json") ?? "").match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? "proyecto",
+    type,
+    capabilities: [...capSet].filter((c) => catalog.dimensions.capabilities.includes(c)).sort(),
+    signals: Object.fromEntries(Object.keys(signals).map((k) => [k, true])),
+    counts: { pages: Math.max(1, pageRoutes2.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
+    stack: { decided: stack2 }
+  };
+  return { profile: normalizeProfile(raw, catalog), evidence };
+}
+function gapReport(root, profile, catalog) {
+  return verifyItems(root, profile, evaluate(profile, catalog), "full").filter((r) => r.state === "active");
+}
+function compareScopeAndCode(scope, code) {
+  const flags = (p) => /* @__PURE__ */ new Set([...p.capabilities.map((c2) => `capacidad ${c2}`), ...Object.entries(p.signals).filter(([, v]) => v === true).map(([k]) => `se\xF1al ${k}`)]);
+  const s = flags(scope);
+  const c = flags(code);
+  return {
+    codeOnly: [...c].filter((x) => !s.has(x)).sort(),
+    scopeOnly: [...s].filter((x) => !c.has(x)).sort(),
+    typeDiffers: scope.type !== code.type ? { scope: scope.type, code: code.type } : void 0
+  };
+}
+
+// engine/src/explain.ts
+var DIM_LABEL = { type: "tipo", capabilities: "capacidades", markets: "mercados", audience: "audiencia", context: "contexto", signals: "se\xF1ales" };
+function matcherText(m) {
+  if (typeof m === "string") return m;
+  if (Array.isArray(m)) return m.join(" y ");
+  return [m.all && `todas de [${m.all.join(", ")}]`, m.any && `alguna de [${m.any.join(", ")}]`, m.none && `ninguna de [${m.none.join(", ")}]`].filter(Boolean).join(", ");
+}
+function leafText(leaf) {
+  return Object.entries(leaf).map(([k, v]) => k === "signals" ? Object.entries(v).map(([s, val]) => `${s} = ${val}`).join(", ") : `${DIM_LABEL[k] ?? k}: ${matcherText(v)}`).join(" \xB7 ");
+}
+function explainCondition(cond, profile, depth = 0) {
+  const pad = "  ".repeat(depth);
+  const mark = matches(cond, profile) ? "\u2713" : "\u2717";
+  if ("all" in cond && Array.isArray(cond.all)) return [`${pad}${mark} todas:`, ...cond.all.flatMap((c) => explainCondition(c, profile, depth + 1))];
+  if ("any" in cond && Array.isArray(cond.any)) return [`${pad}${mark} alguna:`, ...cond.any.flatMap((c) => explainCondition(c, profile, depth + 1))];
+  if ("not" in cond) return [`${pad}${mark} no:`, ...explainCondition(cond.not, profile, depth + 1)];
+  const parts = Object.entries(cond).flatMap(
+    ([k, v]) => k === "signals" ? Object.entries(v).map(([s, val]) => ({ signals: { [s]: val } })) : [{ [k]: v }]
+  );
+  if (parts.length === 1) return [`${pad}${mark} ${leafText(cond)}`];
+  return [`${pad}${mark} todas:`, ...parts.map((p) => `${pad}  ${matches(p, profile) ? "\u2713" : "\u2717"} ${leafText(p)}`)];
+}
+function explainItem(item, profile) {
+  const applies = matches(item.when, profile);
+  const lines = [`${item.id} \u2014 ${item.title}`, "", applies ? "\u2705 Aplica a este scope." : "\u2796 No aplica a este scope."];
+  lines.push(item.when ? "Condici\xF3n:" : "Condici\xF3n: ninguna (aplica a todo proyecto).");
+  if (item.when) lines.push(...explainCondition(item.when, profile, 1));
+  if (applies) {
+    const level = effectiveLevel(item, profile);
+    lines.push("", `Nivel: ${level}${level !== item.level ? ` (base ${item.level}, sube por el scope)` : ""}`);
+    for (const o of item.level_overrides ?? []) lines.push(`  ${matches(o.when, profile) ? "\u2713" : "\u2717"} \u2192 ${o.level} si ${explainCondition(o.when, profile).join(" ").replace(/\s+/g, " ").trim()}`);
+  }
+  lines.push("", `Por qu\xE9: ${item.why}`);
+  return lines.join("\n");
+}
+function applicability(profile, catalog) {
+  const byLevel = { required: 0, recommended: 0, optional: 0 };
+  const notApplying = [];
+  for (const item of catalog.items) {
+    if (matches(item.when, profile)) byLevel[effectiveLevel(item, profile)]++;
+    else notApplying.push(item.id);
+  }
+  return { applies: catalog.items.length - notApplying.length, byLevel, notApplying, total: catalog.items.length };
+}
+
+// engine/src/scope.ts
+var import_yaml5 = __toESM(require_dist(), 1);
+import { existsSync as existsSync13, readFileSync as readFileSync12, writeFileSync as writeFileSync7 } from "node:fs";
+import { join as join14 } from "node:path";
+var SCOPE_FILE = "SCOPE.md";
+function labels(catalog) {
+  const file = join14(catalog.dir, "labels.yaml");
+  return existsSync13(file) ? (0, import_yaml5.parse)(readFileSync12(file, "utf8")) : {};
+}
+function market(m, l) {
+  const [parent, sub] = m.split(":");
+  return sub ? `${l.markets?.[parent] ?? parent} \xB7 ${sub}` : l.markets?.[m] ?? m;
+}
+var bullets = (xs, empty = "\u2014") => xs.length ? xs.map((x) => `- ${x}`).join("\n") : empty;
+var OFTEN_ASSUMED = {
+  landing: ["auth", "payments", "payment-links", "cms", "i18n", "newsletter", "analytics"],
+  corporate: ["cms", "i18n", "auth", "newsletter", "search"],
+  "local-business": ["payments", "payment-links", "cms", "i18n"],
+  blog: ["cms", "newsletter", "search", "i18n"],
+  portfolio: ["cms", "i18n"],
+  ecommerce: ["subscriptions", "search", "i18n", "ugc", "notifications"],
+  saas: ["admin-panel", "notifications", "i18n", "api-public", "ai-features"],
+  marketplace: ["subscriptions", "realtime", "i18n"],
+  "internal-app": ["notifications", "search", "realtime"],
+  directory: ["search", "ugc", "maps", "payments"],
+  booking: ["payments", "payment-links", "notifications", "i18n"]
+};
+function renderScope(profile, evaluated, catalog) {
+  const l = labels(catalog);
+  const app = applicability(profile, catalog);
+  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && k !== "db_client_access" || k === "db_client_access" && v === true);
+  const notIncluded = (OFTEN_ASSUMED[profile.type] ?? []).filter((c) => !profile.capabilities.includes(c));
+  const offered = evaluated.filter((e) => e.state === "offered").map((e) => e.item.title);
+  const chosen = evaluated.filter((e) => e.state === "active" && e.level === "optional").map((e) => e.item.title);
+  const locales = marketLocales(profile, catalog);
+  const counts2 = profile.counts;
+  const missing = [
+    !profile.markets.length && "mercados (definen idiomas, legales y moneda)",
+    !profile.audience.length && "audiencia (consumidores, empresas, menores, datos sensibles)",
+    counts2.pages === void 0 && "n\xFAmero aproximado de p\xE1ginas"
+  ].filter(Boolean);
+  const required = evaluated.filter((e) => e.state === "active" && e.level === "required");
+  const legal = required.filter((e) => e.item.category === "legal").map((e) => e.item.title);
+  const out = [
+    `<!-- Generado por mep desde .mep/profile.yaml. No editar a mano: el scope se cambia con /mep:add. -->`,
+    `# Scope \u2014 ${profile.project}`,
+    "",
+    profile.summary ? `${profile.summary}
+` : "",
+    "## Qu\xE9 es",
+    `- **Tipo:** ${l.type?.[profile.type] ?? profile.type}`,
+    `- **Para qui\xE9n:** ${profile.audience.map((a) => l.audience?.[a] ?? a).join(", ") || "por definir"}`,
+    `- **Contexto:** ${l.context?.[profile.context] ?? profile.context}`,
+    `- **Mercados:** ${profile.markets.map((m) => market(m, l)).join(", ") || "por definir"}${locales.length ? ` \xB7 idiomas: ${locales.join(", ")}` : ""}`,
+    `- **Tama\xF1o:** ${[counts2.pages && `~${plural(counts2.pages, "p\xE1gina", "p\xE1ginas")}`, counts2.entities && plural(counts2.entities, "tipo de datos", "tipos de datos"), counts2.integrations && plural(counts2.integrations, "integraci\xF3n", "integraciones")].filter(Boolean).join(" \xB7 ") || "por definir"}`,
+    "",
+    "## Qu\xE9 incluye",
+    bullets(profile.capabilities.map((c) => l.capabilities?.[c] ?? c), "- Sitio informativo, sin funcionalidades adicionales"),
+    ...profile.custom_work?.length ? ["", "**Trabajo a la medida:**", bullets(profile.custom_work.map((c) => c.title))] : [],
+    ...chosen.length ? ["", "**Opcionales elegidos:**", bullets(chosen)] : [],
+    "",
+    "## Hechos del proyecto",
+    bullets(signals.map(([k]) => l.signals?.[k] ?? k)),
+    "",
+    "## Qu\xE9 no incluye",
+    bullets([
+      ...notIncluded.map((c) => l.capabilities?.[c] ?? c),
+      ...profile.signals.has_db ? [] : ["Base de datos propia (no hay datos que guardar)"]
+    ]),
+    ...offered.length ? ["", `**Opcionales disponibles, no elegidos:** ${offered.length} (ver BRIEF.md).`] : [],
+    "",
+    "## Tecnolog\xEDa",
+    bullets(stackGroups(stack(profile, catalog)).map((g) => `${g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ")} \u2014 ${g.why}`)),
+    "",
+    "## Lo que exige este scope",
+    `Aplican **${app.applies} de ${app.total}** reglas de mep: \u{1F534} ${plural(app.byLevel.required, "obligatoria", "obligatorias")} \xB7 \u{1F7E1} ${plural(app.byLevel.recommended, "recomendada", "recomendadas")} \xB7 \u26AA ${plural(app.byLevel.optional, "opcional", "opcionales")}. ${app.notApplying.length === 1 ? "La otra no aplica" : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qu\xE9). El detalle est\xE1 en BRIEF.md.`,
+    ...legal.length ? ["", "**Legales y de cumplimiento obligatorios:**", bullets(legal)] : [],
+    "",
+    "## Fase actual",
+    `${profile.phase.active}${profile.phase.closed.length ? ` (cerradas: ${profile.phase.closed.join(", ")})` : ""}`,
+    ...missing.length ? ["", "## Por definir", bullets(missing)] : [],
+    "",
+    "> Checklist orientativo, no sustituye asesor\xEDa legal.",
+    ""
+  ];
+  return out.filter((line3, i, all) => !(line3 === "" && all[i - 1] === "")).join("\n");
+}
+function writeScope(root, content) {
+  writeFileSync7(join14(root, SCOPE_FILE), content);
+}
+function plural(n, one, many) {
+  return `${n} ${n === 1 ? one : many}`;
 }
 
 // engine/src/export.ts

@@ -16,10 +16,14 @@ export type Block =
   | { kind: 'image'; alt: string; path: string; data?: Buffer }
   | { kind: 'pagebreak' }
 
+/** `![alt](path)`, `![alt](path "title")` or `![alt](<path with spaces>)`: group 1 alt, group 2 or 3 the path. */
+export const IMAGE_LINK = /!\[([^\]]*)\]\((?:<([^>]+)>|([^)\s]+))(?:\s+"[^"]*")?\)/
+
 /** Reads each image block's PNG, relative to the Markdown file's folder. */
 export function loadImages(blocks: Block[], baseDir: string): Block[] {
   return blocks.map(b => {
     if (b.kind !== 'image') return b
+    if (/^https?:\/\//i.test(b.path)) throw new Error(`imagen externa no soportada, descárgala junto al documento: ${b.path}`)
     if (!/\.png$/i.test(b.path)) throw new Error(`solo PNG: ${b.path}`)
     const file = join(baseDir, b.path)
     if (!existsSync(file)) throw new Error(`falta la imagen ${b.path}`)
@@ -87,7 +91,9 @@ function decodePng(data: Buffer): { width: number; height: number; colors: 1 | 3
 
 export function inline(text: string): Inline[] {
   const out: Inline[] = []
-  const parts = text.replace(/`([^`]*)`/g, '$1').split(/(\*\*[^*]+\*\*)/)
+  // Links become their text; an external one keeps its address, since a document cannot be clicked once printed.
+  const plain = text.replace(/`([^`]*)`/g, '$1').replace(/(?<!!)\[([^\]]+)\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g, (_, label: string, url: string) => (/^https?:\/\//i.test(url) ? `${label} (${url})` : label))
+  const parts = plain.split(/(\*\*[^*]+\*\*)/)
   for (const p of parts) {
     if (!p) continue
     const bold = p.startsWith('**') && p.endsWith('**')
@@ -108,11 +114,11 @@ export function parseMarkdown(md: string): Block[] {
     const line = lines[i].trimEnd()
     const h = line.match(/^(#{1,3})\s+(.*)$/)
     const li = line.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/)
-    const img = line.trim().match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/)
+    const img = line.trim().match(new RegExp(`^${IMAGE_LINK.source}$`))
     if (!line.trim()) flush()
     else if (img) {
       flush()
-      blocks.push({ kind: 'image', alt: img[1], path: img[2] })
+      blocks.push({ kind: 'image', alt: img[1], path: img[2] ?? img[3] })
     } else if (h) {
       flush()
       blocks.push({ kind: 'heading', level: h[1].length as 1 | 2 | 3, text: inline(h[2]) })
@@ -184,12 +190,13 @@ function docxBlock(b: Block): string {
   }
 }
 
-// Text width of the page (12240 twips − 2 × 1134 margin) in EMU; images are sized at 96 dpi and shrunk to fit.
+// Text area of the page (12240 × 15840 twips − 2 × 1134 margin) in EMU; images are sized at 96 dpi and shrunk to fit.
 const DOCX_TEXT_EMU = Math.round(((12240 - 2 * 1134) / 1440) * 914400)
+const DOCX_TEXT_HEIGHT_EMU = Math.round(((15840 - 2 * 1134) / 1440) * 914400)
 
 function docxImage(b: Extract<Block, { kind: 'image' }>, n: number): string {
   const { width, height } = pngSize(b.data!)
-  const scale = Math.min(1, DOCX_TEXT_EMU / (width * 9525))
+  const scale = Math.min(1, DOCX_TEXT_EMU / (width * 9525), DOCX_TEXT_HEIGHT_EMU / (height * 9525))
   const cx = Math.round(width * 9525 * scale)
   const cy = Math.round(height * 9525 * scale)
   const pic = `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="image${n}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>`

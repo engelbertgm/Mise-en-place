@@ -2,6 +2,15 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.3.1
+
+Python code quality (catalog 2026.10.10) and export fixes:
+
+- **Python projects** (detected by `pyproject.toml`, `requirements*.txt`, `uv.lock` or `setup.py`) get the same guarantees as JS ones: Ruff with the profile's complexity, argument and statement limits plus its security rules, mypy --strict, pytest, a lockfile with pip-audit, and vulture (recommended). The engine reads `pyproject.toml` and counts the length of every `.py` file.
+- `.venv`, `venv` and the Python caches are no longer scanned by any check.
+- **Export:** Markdown links print as their text (external ones keep the address); image lines accept a title and `<paths with spaces>`; external images fail with a clear message; tall images fit the page in Word.
+- **Planning docs:** a `## ` line inside a code block no longer ends a section; loose `.html` files in `public/` (site verification) are not counted as screens.
+
 ## 0.3.0
 
 Planning documents (catalog 2026.10.9):

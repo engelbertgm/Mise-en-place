@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, test } from 'node:test'
-import { PLAN_FILES, checkPlan } from '../engine/src/plan.ts'
+import { PLAN_FILES, checkPlan, section } from '../engine/src/plan.ts'
 import type { Check, Profile } from '../engine/src/types.ts'
 import { loadCatalog } from '../engine/src/catalog.ts'
 import { renderCodemap } from '../engine/src/maps.ts'
@@ -157,6 +157,35 @@ describe('final review fixes', () => {
       'app/page.tsx': 'export default function P() {}',
       'app/not-found.tsx': 'export default function N() {}',
       'app/error.tsx': 'export default function E() {}',
+      'docs/plan/FLOWS.md': '## Pantallas\n<!-- mep:pantallas -->\n- `/`: inicio\n',
+    }
+    const r = run(files, { doc: 'flows', rule: 'routes' })
+    assert.equal(r.ok, true, r.detail)
+  })
+})
+
+describe('deferred minors', () => {
+  test('section() ignores ## lines inside fenced code blocks', () => {
+    const md = '## Tablas\n<!-- mep:tablas -->\n```sql\n## not a heading\n```\n### `orders`\n## Relaciones\n'
+    assert.match(section(md, 'tablas') ?? '', /### `orders`/)
+  })
+
+  test('diagrams: titled and angle-bracket image links count; external images are not local files', () => {
+    const files = {
+      'docs/plan/PRD.md': '![j](diagrams/prd-journey.png "Recorrido")\n![s](<diagrams/prd story.png>)\n![x](https://example.com/x.png)\n',
+      'docs/plan/diagrams/prd-journey.png': 'png',
+    }
+    const r = run(files, { doc: 'prd', rule: 'diagrams', required: ['journey'] })
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /diagrams\/prd story\.png/)
+    assert.doesNotMatch(r.detail, /example\.com|prd-journey/)
+  })
+
+  test('routes: static .html files in public/ are not screens', () => {
+    const files = {
+      'package.json': '{"dependencies":{"next":"15.0.0"}}',
+      'app/page.tsx': 'export default function P() {}',
+      'public/google1234.html': 'google-site-verification',
       'docs/plan/FLOWS.md': '## Pantallas\n<!-- mep:pantallas -->\n- `/`: inicio\n',
     }
     const r = run(files, { doc: 'flows', rule: 'routes' })

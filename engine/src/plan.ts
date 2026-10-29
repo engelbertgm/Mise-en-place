@@ -1,4 +1,5 @@
 import { posix } from 'node:path'
+import { IMAGE_LINK } from './docs.ts'
 import { exists, matchFiles, readText } from './files.ts'
 import { pageRoutes } from './framework.ts'
 import { scanMigrations, tableName } from './sql.ts'
@@ -28,7 +29,13 @@ export function section(md: string, key: string): string | undefined {
   const lines = md.replace(/\r\n/g, '\n').split('\n')
   const start = lines.findIndex(l => l.trim() === `<!-- mep:${key} -->`)
   if (start < 0) return undefined
-  const end = lines.findIndex((l, i) => i > start && l.startsWith('## '))
+  // A `## ` line inside a fenced code block is code, not the next section.
+  let fenced = false
+  const end = lines.findIndex((l, i) => {
+    if (i <= start) return false
+    if (l.trimStart().startsWith('```')) fenced = !fenced
+    return !fenced && l.startsWith('## ')
+  })
   return lines.slice(start + 1, end < 0 ? undefined : end).join('\n')
 }
 
@@ -40,8 +47,9 @@ export function codeHeadings(text: string): string[] {
 function diagrams(root: string, md: string, check: PlanCheck, profile: Profile): CheckResult {
   const missing: string[] = []
   // Template comments show example links (diagrams/prd-<tipo>.png); only real images count.
-  for (const m of md.replace(/<!--[\s\S]*?-->/g, '').matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
-    if (!exists(root, posix.join(DIR, m[1]))) missing.push(m[1])
+  for (const m of md.replace(/<!--[\s\S]*?-->/g, '').matchAll(new RegExp(IMAGE_LINK.source, 'g'))) {
+    const path = m[2] ?? m[3]
+    if (!/^https?:\/\//i.test(path) && !exists(root, posix.join(DIR, path))) missing.push(path)
   }
   const applies = !check.if_capabilities || check.if_capabilities.some(c => profile.capabilities.includes(c))
   for (const required of applies ? (check.required ?? []) : []) {
@@ -78,8 +86,10 @@ export function checkPlan(root: string, check: PlanCheck, profile: Profile): Che
       return diagrams(root, md, check, profile)
     case 'routes': {
       const listed = new Set([...(section(md, 'pantallas') ?? '').matchAll(/`(\/[^`]*)`/g)].map(m => m[1]))
-      // Error pages (not-found, error) are not screens of a flow.
-      const screens = pageRoutes(root).filter(r => r !== '/404' && r !== '/500')
+      // Error pages (not-found, error) and loose .html files in public/ or static/ (site verification) are not screens.
+      // index.html stays: in a Vite or CRA app it is the app shell.
+      const loose = new Set(matchFiles(root, '{public,static}/**/*.html').filter(f => !/(^|\/)index\.html$/.test(f)).map(f => '/' + f.replace(/^(public|static)\//, '').replace(/\.html$/, '')))
+      const screens = pageRoutes(root).filter(r => r !== '/404' && r !== '/500' && !loose.has(r))
       return result(screens.filter(r => !listed.has(r)), `${file} sin las pantallas`, 'todas las pantallas en el inventario')
     }
     case 'tables': {
