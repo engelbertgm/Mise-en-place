@@ -1,7 +1,10 @@
-import { deflateSync } from 'node:zlib'
+import { existsSync, readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { deflateSync, inflateSync } from 'node:zlib'
 
 // A small Markdown subset → .docx and .pdf, with no dependencies, so /mep:export works on any machine.
-// Supported: # ## ### headings, paragraphs, - and 1. lists, | tables |, > quotes, --- page breaks, **bold**.
+// Supported: # ## ### headings, paragraphs, - and 1. lists, | tables |, > quotes, --- page breaks, **bold**,
+// and PNG images on a line of their own: ![alt](path.png).
 
 export type Inline = { text: string; bold: boolean }
 export type Block =
@@ -10,7 +13,65 @@ export type Block =
   | { kind: 'quote'; text: Inline[] }
   | { kind: 'list'; ordered: boolean; items: Inline[][] }
   | { kind: 'table'; rows: Inline[][][] }
+  | { kind: 'image'; alt: string; path: string; data?: Buffer }
   | { kind: 'pagebreak' }
+
+/** Reads each image block's PNG, relative to the Markdown file's folder. */
+export function loadImages(blocks: Block[], baseDir: string): Block[] {
+  return blocks.map(b => {
+    if (b.kind !== 'image') return b
+    if (!/\.png$/i.test(b.path)) throw new Error(`solo PNG: ${b.path}`)
+    const file = join(baseDir, b.path)
+    if (!existsSync(file)) throw new Error(`falta la imagen ${b.path}`)
+    return { ...b, data: readFileSync(file) }
+  })
+}
+
+// ── PNG (8-bit gray, RGB, gray+alpha and RGBA, not interlaced: what diagram exports produce) ──
+
+export function pngSize(data: Buffer): { width: number; height: number } {
+  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) }
+}
+
+/** Decoded pixels: color bytes (1 or 3 per pixel) and, when the PNG has it, an alpha byte per pixel. */
+function decodePng(data: Buffer): { width: number; height: number; colors: 1 | 3; color: Buffer; alpha?: Buffer } {
+  const { width, height } = pngSize(data)
+  const depth = data[24]
+  const type = data[25]
+  const channels = ({ 0: 1, 2: 3, 4: 2, 6: 4 } as Record<number, number>)[type]
+  if (depth !== 8 || !channels || data[28] !== 0) throw new Error('PNG no soportado: usa 8 bits por canal, sin paleta ni entrelazado')
+  const idat: Buffer[] = []
+  for (let pos = 8; pos < data.length; ) {
+    const len = data.readUInt32BE(pos)
+    if (data.toString('latin1', pos + 4, pos + 8) === 'IDAT') idat.push(data.subarray(pos + 8, pos + 8 + len))
+    pos += 12 + len
+  }
+  const raw = inflateSync(Buffer.concat(idat))
+  const stride = width * channels
+  const pixels = Buffer.alloc(stride * height)
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)]
+    for (let x = 0; x < stride; x++) {
+      const cur = raw[y * (stride + 1) + 1 + x]
+      const a = x >= channels ? pixels[y * stride + x - channels] : 0
+      const b = y > 0 ? pixels[(y - 1) * stride + x] : 0
+      const c = x >= channels && y > 0 ? pixels[(y - 1) * stride + x - channels] : 0
+      const p = a + b - c
+      const paeth = Math.abs(p - a) <= Math.abs(p - b) && Math.abs(p - a) <= Math.abs(p - c) ? a : Math.abs(p - b) <= Math.abs(p - c) ? b : c
+      const pred = [0, a, b, (a + b) >> 1, paeth][filter] ?? 0
+      pixels[y * stride + x] = (cur + pred) & 0xff
+    }
+  }
+  const colors = channels >= 3 ? 3 : 1
+  if (channels === colors) return { width, height, colors, color: pixels }
+  const color = Buffer.alloc(width * height * colors)
+  const alpha = Buffer.alloc(width * height)
+  for (let i = 0; i < width * height; i++) {
+    pixels.copy(color, i * colors, i * channels, i * channels + colors)
+    alpha[i] = pixels[i * channels + colors]
+  }
+  return { width, height, colors, color, alpha }
+}
 
 export function inline(text: string): Inline[] {
   const out: Inline[] = []
@@ -35,8 +96,12 @@ export function parseMarkdown(md: string): Block[] {
     const line = lines[i].trimEnd()
     const h = line.match(/^(#{1,3})\s+(.*)$/)
     const li = line.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/)
+    const img = line.trim().match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/)
     if (!line.trim()) flush()
-    else if (h) {
+    else if (img) {
+      flush()
+      blocks.push({ kind: 'image', alt: img[1], path: img[2] })
+    } else if (h) {
       flush()
       blocks.push({ kind: 'heading', level: h[1].length as 1 | 2 | 3, text: inline(h[2]) })
     } else if (/^-{3,}$/.test(line.trim())) {
@@ -102,7 +167,21 @@ function docxBlock(b: Block): string {
     }
     case 'pagebreak':
       return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>'
+    case 'image':
+      return '' // docxImage, which needs the image's number
   }
+}
+
+// Text width of the page (12240 twips − 2 × 1134 margin) in EMU; images are sized at 96 dpi and shrunk to fit.
+const DOCX_TEXT_EMU = Math.round(((12240 - 2 * 1134) / 1440) * 914400)
+
+function docxImage(b: Extract<Block, { kind: 'image' }>, n: number): string {
+  const { width, height } = pngSize(b.data!)
+  const scale = Math.min(1, DOCX_TEXT_EMU / (width * 9525))
+  const cx = Math.round(width * 9525 * scale)
+  const cy = Math.round(height * 9525 * scale)
+  const pic = `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="image${n}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>`
+  return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Imagen ${n}" descr="${xml(b.alt)}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">${pic}</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`
 }
 
 const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
@@ -117,14 +196,23 @@ const STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 </w:styles>`
 
 export function toDocx(blocks: Block[]): Buffer {
-  const body = blocks.map(docxBlock).join('')
-  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`
+  const media: [string, Buffer][] = []
+  const body = blocks
+    .map(b => {
+      if (b.kind !== 'image') return docxBlock(b)
+      media.push([`word/media/image${media.length + 1}.png`, b.data!])
+      return docxImage(b, media.length)
+    })
+    .join('')
+  const imageRels = media.map((_, i) => `<Relationship Id="rIdImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${i + 1}.png"/>`).join('')
+  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`
   return zip([
-    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
+    ['[Content_Types].xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
     ['_rels/.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`],
-    ['word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ['word/_rels/document.xml.rels', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imageRels}</Relationships>`],
     ['word/document.xml', document],
     ['word/styles.xml', STYLES],
+    ...media,
   ])
 }
 
@@ -142,12 +230,12 @@ function crc32(buf: Buffer): number {
   return (c ^ 0xffffffff) >>> 0
 }
 
-function zip(files: [string, string][]): Buffer {
+function zip(files: [string, string | Buffer][]): Buffer {
   const locals: Buffer[] = []
   const centrals: Buffer[] = []
   let offset = 0
   for (const [name, content] of files) {
-    const data = Buffer.from(content, 'utf8')
+    const data = typeof content === 'string' ? Buffer.from(content, 'utf8') : content
     const nameBuf = Buffer.from(name, 'utf8')
     const crc = crc32(data)
     const local = Buffer.alloc(30)
@@ -255,10 +343,29 @@ function pdfString(codes: number[]): string {
   return '(' + codes.map(c => (c === 0x28 || c === 0x29 || c === 0x5c ? '\\' + String.fromCharCode(c) : c < 32 || c > 126 ? '\\' + c.toString(8).padStart(3, '0') : String.fromCharCode(c))).join('') + ')'
 }
 
+const pdfStream = (dict: string, data: Buffer) => {
+  const z = deflateSync(data)
+  return Buffer.concat([Buffer.from(`<< ${dict} /Length ${z.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'), z, Buffer.from('\nendstream', 'latin1')])
+}
+
 class PdfWriter {
   pages: string[] = []
   ops: string[] = []
+  images: ReturnType<typeof decodePng>[] = []
   y = PAGE_H - MARGIN
+
+  /** An image at the text width or smaller (96 dpi), on the next page if it does not fit. */
+  image(data: Buffer) {
+    const img = decodePng(data)
+    this.images.push(img)
+    const scale = Math.min(0.75, (PAGE_W - 2 * MARGIN) / img.width, (PAGE_H - 2 * MARGIN) / img.height)
+    const w = img.width * scale
+    const h = img.height * scale
+    this.ensure(h)
+    this.y -= h
+    this.ops.push(`q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${MARGIN} ${this.y.toFixed(2)} cm /Im${this.images.length} Do Q`)
+    this.y -= 10
+  }
 
   newPage() {
     if (this.ops.length) this.pages.push(this.ops.join('\n'))
@@ -327,13 +434,24 @@ class PdfWriter {
     add('') // pages, filled below
     add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>')
     add('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>')
+    const xobjects = this.images.map((img, i) => {
+      const size = `/Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /BitsPerComponent 8`
+      let mask = ''
+      if (img.alpha) {
+        add(pdfStream(`${size} /ColorSpace /DeviceGray`, img.alpha))
+        mask = ` /SMask ${objects.length} 0 R`
+      }
+      add(pdfStream(`${size} /ColorSpace /${img.colors === 3 ? 'DeviceRGB' : 'DeviceGray'}${mask}`, img.color))
+      return `/Im${i + 1} ${objects.length} 0 R`
+    })
+    const resources = `/Font << /F1 3 0 R /F2 4 0 R >>${xobjects.length ? ` /XObject << ${xobjects.join(' ')} >>` : ''}`
     const kids: number[] = []
     this.pages.forEach((content, i) => {
       const footer = `BT /F1 8 Tf 0.5 g ${PAGE_W - MARGIN - 20} 30 Td (${i + 1}/${this.pages.length}) Tj ET`
       const stream = deflateSync(Buffer.from(`${content}\n${footer}`, 'latin1'))
       add(Buffer.concat([Buffer.from(`<< /Length ${stream.length} /Filter /FlateDecode >>\nstream\n`, 'latin1'), stream, Buffer.from('\nendstream', 'latin1')]))
       const contentId = objects.length
-      add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`)
+      add(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << ${resources} >> /Contents ${contentId} 0 R >>`)
       kids.push(objects.length)
     })
     objects[1] = `<< /Type /Pages /Kids [${kids.map(k => `${k} 0 R`).join(' ')}] /Count ${kids.length} >>`
@@ -371,6 +489,9 @@ export function toPdf(blocks: Block[]): Buffer {
         break
       case 'table':
         pdf.table(b.rows)
+        break
+      case 'image':
+        pdf.image(b.data!)
         break
       case 'pagebreak':
         pdf.newPage()

@@ -2,10 +2,11 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { deflateSync } from 'node:zlib'
 import { describe, test } from 'node:test'
 import { gapReport, inferProfile } from '../engine/src/audit.ts'
 import { loadCatalog } from '../engine/src/catalog.ts'
-import { parseMarkdown, toDocx, toPdf } from '../engine/src/docs.ts'
+import { loadImages, parseMarkdown, toDocx, toPdf } from '../engine/src/docs.ts'
 import { exportData, recordExport } from '../engine/src/export.ts'
 import { closePhase, gate } from '../engine/src/gate.ts'
 import { recordReview } from '../engine/src/review.ts'
@@ -209,5 +210,76 @@ describe('/mep:export', () => {
     assert.ok(data.acceptance_criteria.length > 0)
     recordExport(root, p2, real, 'es', [], undefined, 1)
     assert.equal(exportData(root, p2, real, 'es').version, 2)
+  })
+})
+
+describe('images in the client documents', () => {
+  // A valid w×h PNG, RGB (color type 2) or RGBA (6), every row with filter 0.
+  function png(w: number, h: number, alpha: boolean): Buffer {
+    const crcTable = Array.from({ length: 256 }, (_, n) => {
+      let c = n
+      for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1
+      return c >>> 0
+    })
+    const crc = (b: Buffer) => {
+      let c = 0xffffffff
+      for (const x of b) c = crcTable[(c ^ x) & 0xff] ^ (c >>> 8)
+      return (c ^ 0xffffffff) >>> 0
+    }
+    const chunk = (type: string, data: Buffer) => {
+      const td = Buffer.concat([Buffer.from(type), data])
+      const len = Buffer.alloc(4)
+      len.writeUInt32BE(data.length)
+      const c = Buffer.alloc(4)
+      c.writeUInt32BE(crc(td))
+      return Buffer.concat([len, td, c])
+    }
+    const ihdr = Buffer.alloc(13)
+    ihdr.writeUInt32BE(w, 0)
+    ihdr.writeUInt32BE(h, 4)
+    ihdr[8] = 8
+    ihdr[9] = alpha ? 6 : 2
+    const row = Buffer.concat([Buffer.from([0]), Buffer.alloc(w * (alpha ? 4 : 3), 200)])
+    const raw = Buffer.concat(Array.from({ length: h }, () => row))
+    return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', ihdr), chunk('IDAT', deflateSync(raw)), chunk('IEND', Buffer.alloc(0))])
+  }
+  const dir = () => {
+    const root = makeRepo()
+    writeFileSync(join(root, 'rgb.png'), png(2, 2, false))
+    writeFileSync(join(root, 'rgba.png'), png(2, 2, true))
+    return root
+  }
+  const md = '# Plan\n\n![Gantt](rgb.png)\n\n![Recorrido](rgba.png)\n'
+
+  test('markdown image line becomes an image block', () => {
+    assert.deepEqual(parseMarkdown('![Gantt](diagrams/implementation-gantt.png)'), [{ kind: 'image', alt: 'Gantt', path: 'diagrams/implementation-gantt.png' }])
+  })
+
+  test('docx embeds the PNG', () => {
+    const docx = toDocx(loadImages(parseMarkdown(md), dir()))
+    assert.ok(docx.includes(Buffer.from('word/media/image1.png')))
+    assert.ok(docx.includes(Buffer.from('word/media/image2.png')))
+    assert.ok(docx.includes(Buffer.from('Extension="png"')))
+    assert.ok(docx.includes(Buffer.from('r:embed="rIdImg1"')))
+  })
+
+  test('pdf embeds RGB and RGBA PNGs', () => {
+    const pdf = toPdf(loadImages(parseMarkdown(md), dir())).toString('latin1')
+    assert.equal(pdf.match(/\/Subtype \/Image/g)?.length, 3) // two images and one alpha mask
+    assert.match(pdf, /\/SMask/)
+    assert.match(pdf, /\/XObject << \/Im1 \d+ 0 R \/Im2 \d+ 0 R >>/)
+  })
+
+  test('missing image fails with its path', () => {
+    assert.throws(() => loadImages(parseMarkdown('![x](diagrams/x.png)'), makeRepo()), /falta la imagen diagrams\/x\.png/)
+    assert.throws(() => loadImages(parseMarkdown('![x](x.jpg)'), makeRepo({ 'x.jpg': 'x' })), /solo PNG: x\.jpg/)
+  })
+
+  test('mep export stops on a missing image and names it', () => {
+    const root = makeRepo({ 'docs/client/implementation-v1.md': '# Plan\n\n![Gantt](missing.png)\n' })
+    withProfile(root, real, { project: 'x', type: 'saas' })
+    const r = spawnSync('node', [CLI, 'export', '--in', 'docs/client/implementation-v1.md'], { cwd: root, encoding: 'utf8' })
+    assert.notEqual(r.status, 0)
+    assert.match(r.stdout + r.stderr, /falta la imagen missing\.png/)
   })
 })

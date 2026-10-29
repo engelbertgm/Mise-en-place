@@ -23,7 +23,8 @@ import { verifyItems } from './verify.ts'
 import { compareScopeAndCode, gapReport, inferProfile } from './audit.ts'
 import { applicability, explainItem } from './explain.ts'
 import { renderScope, writeScope } from './scope.ts'
-import { parseMarkdown, toDocx, toPdf } from './docs.ts'
+import { loadImages, parseMarkdown, toDocx, toPdf } from './docs.ts'
+import type { Block } from './docs.ts'
 import { exportData, recordExport } from './export.ts'
 import { checkCodemap, checkRegistry, writeCodemap, writeRegistry } from './maps.ts'
 import { calibrate, formatClient, formatInternal, loadRates, logTime, quote, saveQuote } from './quote.ts'
@@ -597,7 +598,12 @@ function main(): void {
       const input = args.flags.in as string | undefined
       if (!input || !existsSync(join(root, input))) fail('Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]')
       const format = String(args.flags.format ?? 'both')
-      const blocks = parseMarkdown(readFileSync(join(root, input), 'utf8'))
+      let blocks: Block[] = []
+      try {
+        blocks = loadImages(parseMarkdown(readFileSync(join(root, input), 'utf8')), join(root, dirname(input)))
+      } catch (e) {
+        fail(`No se pudo exportar ${input}: ${(e as Error).message}`)
+      }
       const base = join(root, dirname(input), basename(input).replace(/\.md$/, ''))
       const files: string[] = []
       if (format === 'docx' || format === 'both') {
