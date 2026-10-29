@@ -433,3 +433,75 @@
     - { type: grep, pattern: "transports\\.File\\b|pino\\.destination\\(\\s*[\"'][^\"']+\\.log|appendFile(?:Sync)?\\([^)]*\\.log", glob: "**/*.{ts,js,mjs}", expect: absent }
     - { type: file_exists, path: ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb", "bun.lock"] }
     - { type: file_exists, path: [".nvmrc", ".node-version", ".tool-versions"] }
+
+# ── Agregados en 2026.10.10: Python ──
+
+- id: py-lint-format
+  title: "Python: Ruff (lint y formato) con los umbrales del perfil y reglas de seguridad"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.10"
+  when: { signals: { has_python: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Ruff reemplaza a flake8, Black, isort y casi todo bandit en una sola herramienta; con los mismos umbrales que el JS, \"código simple\" significa lo mismo en todo el proyecto (KISS, SOLID)."
+  how: "En pyproject.toml: [tool.ruff.lint] select con C90, PLR y S; max-complexity, max-args y max-statements en los umbrales del perfil. ruff check y ruff format --check en CI. Relajar un umbral requiere razón: mep threshold."
+  verify:
+    - { type: quality, rule: python }
+    - { type: command, run: "uv run ruff check .", timeout: 300 }
+    - { type: command, run: "uv run ruff format --check .", timeout: 300 }
+
+- id: py-strict-types
+  title: "Python: tipos estrictos con mypy --strict (o pyright strict) y 0 errores"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.10"
+  when: { signals: { has_python: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Los tipos estrictos atrapan una clase entera de errores sin escribir tests, igual que strict en TypeScript."
+  how: "strict = true en [tool.mypy] (o typeCheckingMode = \"strict\" en pyright) y el chequeo corriendo en CI."
+  verify:
+    - { type: grep, pattern: '^\s*strict\s*=\s*true|typeCheckingMode\s*=\s*"strict"|"typeCheckingMode"\s*:\s*"strict"', glob: "{pyproject.toml,mypy.ini,setup.cfg,pyrightconfig.json}" }
+    - { type: command, run: "uv run mypy .", timeout: 600 }
+
+- id: py-tests
+  title: "Python: lógica de negocio con tests en pytest"
+  category: quality
+  level: required
+  phase: build.features
+  since: "2026.10.10"
+  when: { signals: { has_python: true } }
+  effort: { size: M, hours: [2, 8], scales_with: entities }
+  why: "Sin tests, cada cambio rompe algo en silencio; pytest es el estándar y corre en CI."
+  how: "Tests en tests/ (test_*.py) para la lógica de negocio; pytest corriendo en CI. Cobertura recomendada con pytest-cov (--cov-fail-under=70)."
+  verify:
+    - { type: file_exists, path: ["tests/**/test_*.py", "tests/**/*_test.py", "**/tests/test_*.py"] }
+    - { type: command, run: "uv run pytest -q", timeout: 900 }
+
+- id: py-deps-audit
+  title: "Python: dependencias fijadas con lockfile y sin vulnerabilidades conocidas (pip-audit)"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.10"
+  when: { signals: { has_python: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Sin lockfile cada instalación puede traer versiones distintas; pip-audit avisa de las dependencias con vulnerabilidades publicadas."
+  how: "uv con uv.lock versionado (o poetry.lock); pip-audit en CI."
+  verify:
+    - { type: file_exists, path: ["uv.lock", "poetry.lock", "pdm.lock"] }
+    - { type: command, run: "uv run pip-audit", timeout: 300 }
+
+- id: py-dead-code
+  title: "Python: sin código muerto (vulture)"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.10.10"
+  when: { signals: { has_python: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Funciones y variables sin uso confunden y pesan (YAGNI); el duplicado ya lo revisa jscpd, que también lee Python."
+  how: "vulture con --min-confidence 80 en CI; lo que sea falso positivo va en una whitelist versionada."
+  verify:
+    - { type: command, run: "uv run vulture . --min-confidence 80 --exclude .venv,venv", timeout: 300 }

@@ -7733,7 +7733,7 @@ function diff(before, after, catalog) {
 // engine/src/files.ts
 import { existsSync as existsSync2, readdirSync as readdirSync2, readFileSync as readFileSync2, statSync } from "node:fs";
 import { join as join2, relative, sep } from "node:path";
-var IGNORED_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", ".mep", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", "test-results", "playwright-report", "blob-report", "storybook-static"]);
+var IGNORED_DIRS = /* @__PURE__ */ new Set(["node_modules", ".git", ".next", ".vercel", ".turbo", ".mep", "dist", "build", "out", "coverage", ".astro", ".svelte-kit", "test-results", "playwright-report", "blob-report", "storybook-static", ".venv", "venv", "__pycache__", ".mypy_cache", ".ruff_cache", ".pytest_cache"]);
 var MAX_FILE_BYTES = 1e6;
 function globToRegExp(glob) {
   return new RegExp(`^${globSource(glob)}$`);
@@ -8686,6 +8686,25 @@ function checkThresholds(root, profile) {
   }
   return problems.length ? { ok: false, detail: `${eslint}: ${problems.join("; ")}` } : { ok: true, detail: `${eslint}: umbrales al d\xEDa` };
 }
+var RUFF_SETTING = { complexity: "max-complexity", max_params: "max-args", max_function_lines: "max-statements" };
+var RUFF_RULE_SETS = ["C90", "PLR", "S"];
+function checkPythonThresholds(root, profile) {
+  const text = readText(root, "pyproject.toml");
+  if (text === void 0) return { ok: false, detail: "falta pyproject.toml con la configuraci\xF3n de Ruff" };
+  const wanted = thresholds(profile);
+  const problems = [];
+  for (const [key, setting] of Object.entries(RUFF_SETTING)) {
+    const value = Number(text.match(new RegExp(`^\\s*${setting}\\s*=\\s*(\\d+)`, "m"))?.[1]);
+    if (!value) problems.push(`falta ${setting} (\u2264 ${wanted[key]})`);
+    else if (value > wanted[key]) problems.push(`${setting} ${value} > ${wanted[key]}`);
+  }
+  const selected = [...text.matchAll(/^\s*(?:extend-)?select\s*=\s*\[([^\]]*)\]/gm)].flatMap((m) => [...m[1].matchAll(/["']([A-Z0-9]+)["']/g)].map((c) => c[1]));
+  const missing = RUFF_RULE_SETS.filter((set) => !selected.some((code) => code === "ALL" || set.startsWith(code)));
+  if (missing.length) problems.push(`Ruff no selecciona ${missing.join(", ")} (complejidad, refactor y seguridad: ${RUFF_RULE_SETS.join(", ")})`);
+  const long = matchFiles(root, "**/*.py").filter((f) => (readText(root, f) ?? "").split("\n").length > wanted.max_lines);
+  if (long.length) problems.push(`archivos con m\xE1s de ${wanted.max_lines} l\xEDneas: ${long.slice(0, 5).join(", ")}`);
+  return problems.length ? { ok: false, detail: `pyproject.toml: ${problems.join("; ")}` } : { ok: true, detail: "Ruff con los umbrales del perfil" };
+}
 
 // engine/src/design.ts
 var UI = "**/*.{tsx,jsx,astro,vue,svelte,html}";
@@ -9079,7 +9098,7 @@ function runCheck(root, check, profile, itemId, mode) {
       return errors.length ? { ok: false, detail: errors.slice(0, 5).join("; ") + (errors.length > 5 ? ` (+${errors.length - 5})` : ""), all: errors } : { ok: true, detail: `${check.rule} al d\xEDa` };
     }
     case "quality":
-      return checkThresholds(root, profile);
+      return check.rule === "python" ? checkPythonThresholds(root, profile) : checkThresholds(root, profile);
     case "design":
       return checkDesign(root, check);
     case "build":
@@ -9246,7 +9265,7 @@ function describeCheck(c) {
     case "maps":
       return c.rule === "registry" ? "REGISTRY.md al d\xEDa (mep registry --check)" : "CODEMAP.md al d\xEDa";
     case "quality":
-      return "umbrales de complejidad y largo en la config del linter";
+      return c.rule === "python" ? "Ruff con los umbrales del perfil en pyproject.toml" : "umbrales de complejidad y largo en la config del linter";
     case "build":
       return { max_js_chunk: `JS por archivo \u2264 ${c.max_kb ?? 200} KB gzip`, no_source_maps: "sin source maps p\xFAblicos", server_rendered: "HTML renderizado en servidor o build" }[c.rule];
     case "robots":

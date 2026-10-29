@@ -5,7 +5,7 @@ import { checkHtml } from './html.ts'
 import { checkCodemap, checkRegistry } from './maps.ts'
 import { checkPlan } from './plan.ts'
 import { checkSql } from './sql.ts'
-import { checkThresholds } from './quality.ts'
+import { checkPythonThresholds, checkThresholds } from './quality.ts'
 import { checkDesign } from './design.ts'
 import { checkBuild, checkRobots } from './build.ts'
 import { checkDns, checkLive } from './live.ts'
@@ -86,7 +86,7 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return errors.length ? { ok: false, detail: errors.slice(0, 5).join('; ') + (errors.length > 5 ? ` (+${errors.length - 5})` : ''), all: errors } : { ok: true, detail: `${check.rule} al día` }
     }
     case 'quality':
-      return checkThresholds(root, profile)
+      return check.rule === 'python' ? checkPythonThresholds(root, profile) : checkThresholds(root, profile)
     case 'design':
       return checkDesign(root, check)
     case 'build':

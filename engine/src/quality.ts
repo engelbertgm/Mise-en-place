@@ -40,3 +40,26 @@ export function checkThresholds(root: string, profile: Profile): CheckResult {
   }
   return problems.length ? { ok: false, detail: `${eslint}: ${problems.join('; ')}` } : { ok: true, detail: `${eslint}: umbrales al día` }
 }
+
+// Ruff settings that carry the profile thresholds. Ruff has no max-lines for a module, so file length is counted here.
+const RUFF_SETTING: Partial<Record<QualityKey, string>> = { complexity: 'max-complexity', max_params: 'max-args', max_function_lines: 'max-statements' }
+const RUFF_RULE_SETS = ['C90', 'PLR', 'S'] // complexity, pylint refactor (args, statements), bandit security
+
+/** Ruff in pyproject.toml enforces the profile's thresholds (or stricter) and the C90, PLR and S rule sets; no .py file is longer than max_lines. */
+export function checkPythonThresholds(root: string, profile: Profile): CheckResult {
+  const text = readText(root, 'pyproject.toml')
+  if (text === undefined) return { ok: false, detail: 'falta pyproject.toml con la configuración de Ruff' }
+  const wanted = thresholds(profile)
+  const problems: string[] = []
+  for (const [key, setting] of Object.entries(RUFF_SETTING) as [QualityKey, string][]) {
+    const value = Number(text.match(new RegExp(`^\\s*${setting}\\s*=\\s*(\\d+)`, 'm'))?.[1])
+    if (!value) problems.push(`falta ${setting} (≤ ${wanted[key]})`)
+    else if (value > wanted[key]) problems.push(`${setting} ${value} > ${wanted[key]}`)
+  }
+  const selected = [...text.matchAll(/^\s*(?:extend-)?select\s*=\s*\[([^\]]*)\]/gm)].flatMap(m => [...m[1].matchAll(/["']([A-Z0-9]+)["']/g)].map(c => c[1]))
+  const missing = RUFF_RULE_SETS.filter(set => !selected.some(code => code === 'ALL' || set.startsWith(code)))
+  if (missing.length) problems.push(`Ruff no selecciona ${missing.join(', ')} (complejidad, refactor y seguridad: ${RUFF_RULE_SETS.join(', ')})`)
+  const long = matchFiles(root, '**/*.py').filter(f => (readText(root, f) ?? '').split('\n').length > wanted.max_lines)
+  if (long.length) problems.push(`archivos con más de ${wanted.max_lines} líneas: ${long.slice(0, 5).join(', ')}`)
+  return problems.length ? { ok: false, detail: `pyproject.toml: ${problems.join('; ')}` } : { ok: true, detail: 'Ruff con los umbrales del perfil' }
+}

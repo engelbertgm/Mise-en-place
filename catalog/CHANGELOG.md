@@ -2,6 +2,19 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.10
+
+Calidad de código en Python, con las mismas garantías que en JS:
+
+- **Nueva señal `has_python`:** se detecta con `pyproject.toml`, `requirements*.txt`, `uv.lock` o `setup.py`. Los ítems de Python aplican solo con ella.
+- **Nuevos ítems:**
+  - 🔴 `py-lint-format`: Ruff (lint y formato) con C90, PLR y S, y los umbrales del perfil (`max-complexity`, `max-args`, `max-statements`); el motor cuenta además el largo de cada archivo .py (nueva regla `quality` `python`).
+  - 🔴 `py-strict-types`: mypy --strict (o pyright strict).
+  - 🔴 `py-tests`: pytest sobre la lógica de negocio.
+  - 🔴 `py-deps-audit`: lockfile (uv.lock, poetry.lock o pdm.lock) y pip-audit.
+  - 🟡 `py-dead-code`: vulture.
+- Las carpetas `.venv`, `venv` y los cachés de Python (`__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`) ya no se revisan.
+
 ## 2026.10.9
 
 Documentos de planeación en `docs/plan/`, escritos por Claude desde `templates/plan/` y verificados por el motor:

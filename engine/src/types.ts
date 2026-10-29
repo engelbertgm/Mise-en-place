@@ -30,7 +30,7 @@ export type Check =
   | { type: 'html'; rule: HtmlRule; name?: string; property?: string; rel?: string }
   | { type: 'sql'; rule: 'rls_enabled' | 'policies_per_operation'; glob?: string }
   | { type: 'maps'; rule: 'registry' | 'codemap' }
-  | { type: 'quality'; rule: 'thresholds' }
+  | { type: 'quality'; rule: 'thresholds' | 'python' }
   | { type: 'design'; rule: 'font_families' | 'font_weights'; max: number }
   | { type: 'build'; rule: 'max_js_chunk' | 'no_source_maps' | 'server_rendered'; max_kb?: number }
   | { type: 'robots'; rule: 'allows_ai' }

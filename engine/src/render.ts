@@ -29,7 +29,7 @@ function describeCheck(c: Check): string {
     case 'maps':
       return c.rule === 'registry' ? 'REGISTRY.md al día (mep registry --check)' : 'CODEMAP.md al día'
     case 'quality':
-      return 'umbrales de complejidad y largo en la config del linter'
+      return c.rule === 'python' ? 'Ruff con los umbrales del perfil en pyproject.toml' : 'umbrales de complejidad y largo en la config del linter'
     case 'build':
       return { max_js_chunk: `JS por archivo ≤ ${c.max_kb ?? 200} KB gzip`, no_source_maps: 'sin source maps públicos', server_rendered: 'HTML renderizado en servidor o build' }[c.rule]
     case 'robots':

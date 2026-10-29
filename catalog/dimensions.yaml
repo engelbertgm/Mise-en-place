@@ -23,6 +23,7 @@ signals:
   has_destructive_actions: { values: [true, false], default: false }
   has_embeds: { values: [true, false], default: false }
   has_nonessential_cookies: { values: [true, false], default: false }
+  has_python: { values: [true, false], default: false }
   team: { values: [solo, team], default: solo }
 
 # Sub-etapas en orden. Al cerrar una, la activa pasa a la siguiente.
