@@ -6350,15 +6350,15 @@ var require_parser = __commonJS({
     var node_process = __require("process");
     var cst = require_cst();
     var lexer = require_lexer();
-    function includesToken(list, type) {
-      for (let i = 0; i < list.length; ++i)
-        if (list[i].type === type)
+    function includesToken(list2, type) {
+      for (let i = 0; i < list2.length; ++i)
+        if (list2[i].type === type)
           return true;
       return false;
     }
-    function findNonEmptyIndex(list) {
-      for (let i = 0; i < list.length; ++i) {
-        switch (list[i].type) {
+    function findNonEmptyIndex(list2) {
+      for (let i = 0; i < list2.length; ++i) {
+        switch (list2[i].type) {
           case "space":
           case "comment":
           case "newline":
@@ -7369,8 +7369,8 @@ var require_dist = __commonJS({
 // engine/src/cli.ts
 var import_yaml8 = __toESM(require_dist(), 1);
 import { execSync as execSync6 } from "node:child_process";
-import { existsSync as existsSync15, mkdirSync as mkdirSync9, readFileSync as readFileSync14, writeFileSync as writeFileSync10 } from "node:fs";
-import { basename, dirname as dirname3, join as join16, resolve as resolve2 } from "node:path";
+import { existsSync as existsSync16, mkdirSync as mkdirSync9, readFileSync as readFileSync15, writeFileSync as writeFileSync10 } from "node:fs";
+import { basename, dirname as dirname3, join as join17, resolve as resolve2 } from "node:path";
 
 // engine/src/catalog.ts
 var import_yaml = __toESM(require_dist(), 1);
@@ -7380,7 +7380,7 @@ import { fileURLToPath } from "node:url";
 var LEVELS = ["required", "recommended", "optional"];
 var SIZES = ["XS", "S", "M", "L", "XL"];
 var SCALES = ["pages", "entities", "languages", "markets", "integrations"];
-var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "build", "robots", "live", "dns", "manual"];
+var CHECK_TYPES = ["file_exists", "route_exists", "grep", "json_key", "command", "html", "sql", "maps", "quality", "design", "build", "robots", "live", "dns", "manual", "plan"];
 function defaultCatalogDir() {
   if (process.env.MEP_CATALOG) return resolve(process.env.MEP_CATALOG);
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -7472,7 +7472,8 @@ function validateCheck(check, where) {
     robots: ["rule"],
     live: ["rule"],
     dns: ["rule"],
-    manual: ["prompt"]
+    manual: ["prompt"],
+    plan: ["doc", "rule"]
   };
   const errors = required[check.type].filter((f) => check[f] === void 0).map((f) => `${where}: verify ${check.type} needs "${f}"`);
   if (check.type === "grep") {
@@ -7651,7 +7652,7 @@ function evaluate(profile, catalog) {
   const skipped = new Map(profile.selections.recommended_skipped.map((s) => [s.id, s.reason]));
   const overridden = new Map(profile.selections.overrides.map((s) => [s.id, s.reason]));
   const optional = new Set(profile.selections.optional_added);
-  const result = [];
+  const result2 = [];
   for (const item of catalog.items) {
     if (!matches(item.when, profile)) continue;
     const level = effectiveLevel(item, profile);
@@ -7665,9 +7666,9 @@ function evaluate(profile, catalog) {
       state = "overridden";
       reason = overridden.get(item.id);
     }
-    result.push({ item, level, state, reason });
+    result2.push({ item, level, state, reason });
   }
-  return result.sort(
+  return result2.sort(
     (a, b) => phaseOrder.indexOf(a.item.phase) - phaseOrder.indexOf(b.item.phase) || LEVEL_RANK[b.level] - LEVEL_RANK[a.level] || a.item.id.localeCompare(b.item.id)
   );
 }
@@ -8204,6 +8205,9 @@ function routes(root, framework = detectFramework(root)) {
   }[framework]();
   return [.../* @__PURE__ */ new Set([...byFramework, ...staticRoutes(files)])].sort();
 }
+function pageRoutes(root, framework = detectFramework(root)) {
+  return routes(root, framework).filter((r) => !r.startsWith("/api") && !/\.(txt|xml|webmanifest)$/.test(r));
+}
 function routeExists(root, path) {
   const clean = path.replace(/\/$/, "") || "/";
   if (exists(root, `public${clean}`) || exists(root, `static${clean}`)) return true;
@@ -8475,7 +8479,7 @@ function renderCodemap(root, catalog) {
   const { folders: table, conventions: byFramework } = codemapData(catalog);
   const framework = detectFramework(root);
   const allRoutes = routes(root, framework);
-  const pages = allRoutes.filter((r) => !r.startsWith("/api") && !/\.(txt|xml|webmanifest)$/.test(r));
+  const pages = pageRoutes(root, framework);
   const api = allRoutes.filter((r) => r.startsWith("/api"));
   const find = (glob) => matchFiles(root, glob);
   const entryPoints = [
@@ -8529,6 +8533,9 @@ function checkCodemap(root) {
   return folders(root).filter((f) => !text.includes(`\`${f}/\``)).map((f) => `${CODEMAP_FILE} no lista la carpeta ${f}/ (corre: mep codemap)`);
 }
 
+// engine/src/plan.ts
+import { posix } from "node:path";
+
 // engine/src/sql.ts
 var DEFAULT_GLOB = "{supabase/migrations,migrations,db/migrations,prisma/migrations,drizzle}/**/*.sql";
 var SYSTEM_SCHEMAS = /* @__PURE__ */ new Set(["auth", "storage", "extensions", "realtime", "supabase_functions", "graphql", "vault"]);
@@ -8539,7 +8546,7 @@ function tableName(raw) {
   return parts.length === 2 && parts[0] === "public" ? parts[1] : parts.join(".");
 }
 var NAME = '((?:"?[\\w]+"?\\.)?"?[\\w]+"?)';
-function scan(root, glob) {
+function scanMigrations(root, glob = DEFAULT_GLOB) {
   const sql = matchFiles(root, glob).map((f) => (readText(root, f) ?? "").replace(/--.*$/gm, "")).join("\n");
   const tables = /* @__PURE__ */ new Set();
   const rls = /* @__PURE__ */ new Set();
@@ -8567,7 +8574,7 @@ function scan(root, glob) {
   return { files: matchFiles(root, glob).length, tables, rls, policies };
 }
 function checkSql(root, check) {
-  const { files, tables, rls, policies } = scan(root, check.glob ?? DEFAULT_GLOB);
+  const { files, tables, rls, policies } = scanMigrations(root, check.glob);
   if (files === 0) return { ok: null, detail: "sin migraciones SQL versionadas" };
   if (check.rule === "rls_enabled") {
     const missing = [...tables].filter((t) => !rls.has(t)).sort();
@@ -8575,6 +8582,72 @@ function checkSql(root, check) {
   }
   const incomplete = [...tables].filter((t) => rls.has(t)).map((t) => ({ t, missing: OPERATIONS.filter((o) => !policies.get(t)?.has(o)) })).filter((x) => x.missing.length);
   return incomplete.length ? { ok: false, detail: incomplete.slice(0, 5).map((x) => `${x.t}: sin pol\xEDtica ${x.missing.join("/")}`).join("; ") } : { ok: true, detail: "pol\xEDticas por operaci\xF3n en todas las tablas" };
+}
+
+// engine/src/plan.ts
+var DIR2 = "docs/plan";
+var PLAN_FILES = {
+  prd: `${DIR2}/PRD.md`,
+  trd: `${DIR2}/TRD.md`,
+  flows: `${DIR2}/FLOWS.md`,
+  schema: `${DIR2}/SCHEMA.md`,
+  implementation: `${DIR2}/IMPLEMENTATION.md`
+};
+var list = (items) => items.slice(0, 5).join(", ") + (items.length > 5 ? " \u2026" : "");
+var result = (missing, what, ok) => missing.length ? { ok: false, detail: `${what}: ${list(missing)}` } : { ok: true, detail: ok };
+function section(md, key) {
+  const lines = md.replace(/\r\n/g, "\n").split("\n");
+  const start = lines.findIndex((l) => l.trim() === `<!-- mep:${key} -->`);
+  if (start < 0) return void 0;
+  const end = lines.findIndex((l, i) => i > start && l.startsWith("## "));
+  return lines.slice(start + 1, end < 0 ? void 0 : end).join("\n");
+}
+function codeHeadings(text) {
+  return [...text.matchAll(/^###\s+`([^`]+)`/gm)].map((m) => m[1]);
+}
+function diagrams(root, md, check, profile) {
+  const missing = [];
+  for (const m of md.matchAll(/!\[[^\]]*\]\(([^)\s]+)\)/g)) {
+    if (!exists(root, posix.join(DIR2, m[1]))) missing.push(m[1]);
+  }
+  const applies = !check.if_capabilities || check.if_capabilities.some((c) => profile.capabilities.includes(c));
+  for (const required of applies ? check.required ?? [] : []) {
+    const found = required.split("|").some((type) => matchFiles(root, `${DIR2}/diagrams/${check.doc}-${type}*.png`).length > 0);
+    if (!found) missing.push(`diagrama ${required.replace(/\|/g, " o ")}`);
+  }
+  return result(missing, "faltan", "diagramas al d\xEDa");
+}
+function checkPlan(root, check, profile) {
+  const file = PLAN_FILES[check.doc];
+  const raw = readText(root, file);
+  if (raw === void 0) return { ok: false, detail: `falta ${file}` };
+  const md = raw.replace(/\r\n/g, "\n");
+  const lower = md.toLowerCase();
+  switch (check.rule) {
+    case "sections":
+      return result((check.sections ?? []).filter((k) => section(md, k) === void 0), `${file} sin las secciones`, `${file} con sus secciones`);
+    case "custom_work":
+      return result((profile.custom_work ?? []).map((w) => w.title).filter((t) => !lower.includes(t.toLowerCase())), `${file} no menciona`, "trabajo a la medida incluido");
+    case "stack":
+      return result(Object.values(profile.stack.decided).filter((v) => !lower.includes(v.toLowerCase())), `${file} no menciona`, "stack incluido");
+    case "phases": {
+      const listed = new Set(codeHeadings(section(md, "fases") ?? ""));
+      const wanted = (check.phases ?? []).filter((p) => p !== "build.data" || profile.signals.has_db === true);
+      return result(wanted.filter((p) => !listed.has(p)), `${file} sin las fases`, "una secci\xF3n por sub-etapa");
+    }
+    case "diagrams":
+      return diagrams(root, md, check, profile);
+    case "routes": {
+      const listed = new Set([...(section(md, "pantallas") ?? "").matchAll(/`(\/[^`]*)`/g)].map((m) => m[1]));
+      return result(pageRoutes(root).filter((r) => !listed.has(r)), `${file} sin las pantallas`, "todas las pantallas en el inventario");
+    }
+    case "tables": {
+      const inCode = scanMigrations(root).tables;
+      const inDoc = new Set(codeHeadings(section(md, "tablas") ?? "").map(tableName).filter((t) => !!t));
+      const problems = [...[...inCode].filter((t) => !inDoc.has(t)).map((t) => `falta ${t}`), ...[...inDoc].filter((t) => !inCode.has(t)).map((t) => `sobra ${t}`)];
+      return result(problems, `${file} no coincide con las migraciones`, "tablas iguales a las migraciones");
+    }
+  }
 }
 
 // engine/src/quality.ts
@@ -9013,6 +9086,8 @@ function runCheck(root, check, profile, itemId, mode) {
       return checkLive(profile, check, mode);
     case "dns":
       return checkDns(profile, check, mode);
+    case "plan":
+      return checkPlan(root, check, profile);
     case "manual": {
       const confirmed = profile.selections.manual_confirmed.find((c) => c.id === itemId);
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` };
@@ -9177,6 +9252,8 @@ function describeCheck(c) {
       return { headers: `el sitio env\xEDa ${(c.names ?? []).join(", ")}`, hsts: "el sitio env\xEDa HSTS \u2265 180 d\xEDas", compression: "el sitio sirve con Brotli/gzip y assets con cach\xE9 inmutable", cookies: "las cookies del sitio llevan Secure, SameSite y HttpOnly", error_page: "una ruta inexistente da 404 sin detalles internos", canonical_redirect: "http:// y www redirigen al dominio can\xF3nico", sitemap: "el sitemap lista solo p\xE1ginas p\xFAblicas e indexables", reachable: "el sitio desplegado responde" }[c.rule];
     case "dns":
       return `DNS: ${c.rule.toUpperCase()}`;
+    case "plan":
+      return `docs/plan: ${c.doc} (${c.rule})`;
     case "manual":
       return `manual: ${c.prompt}`;
   }
@@ -9528,11 +9605,11 @@ function inferProfile(root, catalog) {
   for (const [k, v] of Object.entries(signals)) evidence[`signals.${k}`] = v;
   const framework = detectFramework(root);
   evidence.framework = framework;
-  const pageRoutes = routes(root, framework).filter((r) => !/\.(txt|xml|webmanifest)$/.test(r) && !["/404", "/500"].includes(r) && !r.startsWith("/api"));
+  const pageRoutes2 = routes(root, framework).filter((r) => !/\.(txt|xml|webmanifest)$/.test(r) && !["/404", "/500"].includes(r) && !r.startsWith("/api"));
   const files = listFiles(root);
   const capSet = new Set(Object.keys(caps));
-  const type = guessType(capSet, pageRoutes.length, files);
-  evidence.type = `${capSet.size} capacidades, ${pageRoutes.length} p\xE1ginas`;
+  const type = guessType(capSet, pageRoutes2.length, files);
+  evidence.type = `${capSet.size} capacidades, ${pageRoutes2.length} p\xE1ginas`;
   const integrations = [...dependencies(root)].filter((d) => INTEGRATION_DEPS.test(d));
   const deps = dependencies(root);
   const stack2 = {};
@@ -9547,7 +9624,7 @@ function inferProfile(root, catalog) {
     type,
     capabilities: [...capSet].filter((c) => catalog.dimensions.capabilities.includes(c)).sort(),
     signals: Object.fromEntries(Object.keys(signals).map((k) => [k, true])),
-    counts: { pages: Math.max(1, pageRoutes.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
+    counts: { pages: Math.max(1, pageRoutes2.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
     stack: { decided: stack2 }
   };
   return { profile: normalizeProfile(raw, catalog), evidence };
@@ -9706,7 +9783,59 @@ function plural(n, one, many) {
 }
 
 // engine/src/docs.ts
-import { deflateSync } from "node:zlib";
+import { existsSync as existsSync13, readFileSync as readFileSync12 } from "node:fs";
+import { join as join14 } from "node:path";
+import { deflateSync, inflateSync } from "node:zlib";
+function loadImages(blocks, baseDir) {
+  return blocks.map((b) => {
+    if (b.kind !== "image") return b;
+    if (!/\.png$/i.test(b.path)) throw new Error(`solo PNG: ${b.path}`);
+    const file = join14(baseDir, b.path);
+    if (!existsSync13(file)) throw new Error(`falta la imagen ${b.path}`);
+    return { ...b, data: readFileSync12(file) };
+  });
+}
+function pngSize(data) {
+  return { width: data.readUInt32BE(16), height: data.readUInt32BE(20) };
+}
+function decodePng(data) {
+  const { width, height } = pngSize(data);
+  const depth = data[24];
+  const type = data[25];
+  const channels = { 0: 1, 2: 3, 4: 2, 6: 4 }[type];
+  if (depth !== 8 || !channels || data[28] !== 0) throw new Error("PNG no soportado: usa 8 bits por canal, sin paleta ni entrelazado");
+  const idat = [];
+  for (let pos = 8; pos < data.length; ) {
+    const len = data.readUInt32BE(pos);
+    if (data.toString("latin1", pos + 4, pos + 8) === "IDAT") idat.push(data.subarray(pos + 8, pos + 8 + len));
+    pos += 12 + len;
+  }
+  const raw = inflateSync(Buffer.concat(idat));
+  const stride = width * channels;
+  const pixels = Buffer.alloc(stride * height);
+  for (let y = 0; y < height; y++) {
+    const filter = raw[y * (stride + 1)];
+    for (let x = 0; x < stride; x++) {
+      const cur = raw[y * (stride + 1) + 1 + x];
+      const a = x >= channels ? pixels[y * stride + x - channels] : 0;
+      const b = y > 0 ? pixels[(y - 1) * stride + x] : 0;
+      const c = x >= channels && y > 0 ? pixels[(y - 1) * stride + x - channels] : 0;
+      const p = a + b - c;
+      const paeth = Math.abs(p - a) <= Math.abs(p - b) && Math.abs(p - a) <= Math.abs(p - c) ? a : Math.abs(p - b) <= Math.abs(p - c) ? b : c;
+      const pred = [0, a, b, a + b >> 1, paeth][filter] ?? 0;
+      pixels[y * stride + x] = cur + pred & 255;
+    }
+  }
+  const colors = channels >= 3 ? 3 : 1;
+  if (channels === colors) return { width, height, colors, color: pixels };
+  const color = Buffer.alloc(width * height * colors);
+  const alpha = Buffer.alloc(width * height);
+  for (let i = 0; i < width * height; i++) {
+    pixels.copy(color, i * colors, i * channels, i * channels + colors);
+    alpha[i] = pixels[i * channels + colors];
+  }
+  return { width, height, colors, color, alpha };
+}
 function inline(text) {
   const out = [];
   const parts = text.replace(/`([^`]*)`/g, "$1").split(/(\*\*[^*]+\*\*)/);
@@ -9729,8 +9858,12 @@ function parseMarkdown(md) {
     const line3 = lines[i].trimEnd();
     const h = line3.match(/^(#{1,3})\s+(.*)$/);
     const li = line3.match(/^\s*(?:[-*]|(\d+)\.)\s+(.*)$/);
+    const img = line3.trim().match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
     if (!line3.trim()) flush();
-    else if (h) {
+    else if (img) {
+      flush();
+      blocks.push({ kind: "image", alt: img[1], path: img[2] });
+    } else if (h) {
       flush();
       blocks.push({ kind: "heading", level: h[1].length, text: inline(h[2]) });
     } else if (/^-{3,}$/.test(line3.trim())) {
@@ -9787,7 +9920,18 @@ function docxBlock(b) {
     }
     case "pagebreak":
       return '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
+    case "image":
+      return "";
   }
+}
+var DOCX_TEXT_EMU = Math.round((12240 - 2 * 1134) / 1440 * 914400);
+function docxImage(b, n) {
+  const { width, height } = pngSize(b.data);
+  const scale2 = Math.min(1, DOCX_TEXT_EMU / (width * 9525));
+  const cx = Math.round(width * 9525 * scale2);
+  const cy = Math.round(height * 9525 * scale2);
+  const pic = `<pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="${n}" name="image${n}.png"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg${n}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic>`;
+  return `<w:p><w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="${cx}" cy="${cy}"/><wp:docPr id="${n}" name="Imagen ${n}" descr="${xml(b.alt)}"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture">${pic}</a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>`;
 }
 var STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
@@ -9800,14 +9944,21 @@ var STYLES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <w:style w:type="paragraph" w:styleId="ListParagraph"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:pPr><w:spacing w:after="60"/></w:pPr></w:style>
 </w:styles>`;
 function toDocx(blocks) {
-  const body = blocks.map(docxBlock).join("");
-  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
+  const media = [];
+  const body = blocks.map((b) => {
+    if (b.kind !== "image") return docxBlock(b);
+    media.push([`word/media/image${media.length + 1}.png`, b.data]);
+    return docxImage(b, media.length);
+  }).join("");
+  const imageRels = media.map((_, i) => `<Relationship Id="rIdImg${i + 1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image${i + 1}.png"/>`).join("");
+  const document = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"><w:body>${body}<w:sectPr><w:pgSz w:w="12240" w:h="15840"/><w:pgMar w:top="1134" w:right="1134" w:bottom="1134" w:left="1134" w:header="708" w:footer="708" w:gutter="0"/></w:sectPr></w:body></w:document>`;
   return zip([
-    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
+    ["[Content_Types].xml", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/></Types>`],
     ["_rels/.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>`],
-    ["word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>`],
+    ["word/_rels/document.xml.rels", `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>${imageRels}</Relationships>`],
     ["word/document.xml", document],
-    ["word/styles.xml", STYLES]
+    ["word/styles.xml", STYLES],
+    ...media
   ]);
 }
 var CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
@@ -9825,7 +9976,7 @@ function zip(files) {
   const centrals = [];
   let offset = 0;
   for (const [name, content] of files) {
-    const data = Buffer.from(content, "utf8");
+    const data = typeof content === "string" ? Buffer.from(content, "utf8") : content;
     const nameBuf = Buffer.from(name, "utf8");
     const crc = crc32(data);
     const local = Buffer.alloc(30);
@@ -9913,10 +10064,29 @@ var MARGIN = 56;
 function pdfString(codes) {
   return "(" + codes.map((c) => c === 40 || c === 41 || c === 92 ? "\\" + String.fromCharCode(c) : c < 32 || c > 126 ? "\\" + c.toString(8).padStart(3, "0") : String.fromCharCode(c)).join("") + ")";
 }
+var pdfStream = (dict, data) => {
+  const z = deflateSync(data);
+  return Buffer.concat([Buffer.from(`<< ${dict} /Length ${z.length} /Filter /FlateDecode >>
+stream
+`, "latin1"), z, Buffer.from("\nendstream", "latin1")]);
+};
 var PdfWriter = class {
   pages = [];
   ops = [];
+  images = [];
   y = PAGE_H - MARGIN;
+  /** An image at the text width or smaller (96 dpi), on the next page if it does not fit. */
+  image(data) {
+    const img = decodePng(data);
+    this.images.push(img);
+    const scale2 = Math.min(0.75, (PAGE_W - 2 * MARGIN) / img.width, (PAGE_H - 2 * MARGIN) / img.height);
+    const w = img.width * scale2;
+    const h = img.height * scale2;
+    this.ensure(h);
+    this.y -= h;
+    this.ops.push(`q ${w.toFixed(2)} 0 0 ${h.toFixed(2)} ${MARGIN} ${this.y.toFixed(2)} cm /Im${this.images.length} Do Q`);
+    this.y -= 10;
+  }
   newPage() {
     if (this.ops.length) this.pages.push(this.ops.join("\n"));
     this.ops = [];
@@ -9979,6 +10149,17 @@ var PdfWriter = class {
     add2("");
     add2("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>");
     add2("<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>");
+    const xobjects = this.images.map((img, i) => {
+      const size = `/Type /XObject /Subtype /Image /Width ${img.width} /Height ${img.height} /BitsPerComponent 8`;
+      let mask = "";
+      if (img.alpha) {
+        add2(pdfStream(`${size} /ColorSpace /DeviceGray`, img.alpha));
+        mask = ` /SMask ${objects.length} 0 R`;
+      }
+      add2(pdfStream(`${size} /ColorSpace /${img.colors === 3 ? "DeviceRGB" : "DeviceGray"}${mask}`, img.color));
+      return `/Im${i + 1} ${objects.length} 0 R`;
+    });
+    const resources = `/Font << /F1 3 0 R /F2 4 0 R >>${xobjects.length ? ` /XObject << ${xobjects.join(" ")} >>` : ""}`;
     const kids = [];
     this.pages.forEach((content, i) => {
       const footer = `BT /F1 8 Tf 0.5 g ${PAGE_W - MARGIN - 20} 30 Td (${i + 1}/${this.pages.length}) Tj ET`;
@@ -9988,7 +10169,7 @@ ${footer}`, "latin1"));
 stream
 `, "latin1"), stream, Buffer.from("\nendstream", "latin1")]));
       const contentId = objects.length;
-      add2(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << /Font << /F1 3 0 R /F2 4 0 R >> >> /Contents ${contentId} 0 R >>`);
+      add2(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PAGE_W} ${PAGE_H}] /Resources << ${resources} >> /Contents ${contentId} 0 R >>`);
       kids.push(objects.length);
     });
     objects[1] = `<< /Type /Pages /Kids [${kids.map((k) => `${k} 0 R`).join(" ")}] /Count ${kids.length} >>`;
@@ -10036,6 +10217,9 @@ function toPdf(blocks) {
       case "table":
         pdf.table(b.rows);
         break;
+      case "image":
+        pdf.image(b.data);
+        break;
       case "pagebreak":
         pdf.newPage();
         break;
@@ -10046,12 +10230,12 @@ function toPdf(blocks) {
 
 // engine/src/export.ts
 var import_yaml6 = __toESM(require_dist(), 1);
-import { existsSync as existsSync13, mkdirSync as mkdirSync7, readFileSync as readFileSync12, writeFileSync as writeFileSync8 } from "node:fs";
-import { dirname as dirname2, join as join14 } from "node:path";
-var EXPORTS_FILE = join14(MEP_DIR, "exports.yaml");
+import { existsSync as existsSync14, mkdirSync as mkdirSync7, readFileSync as readFileSync13, writeFileSync as writeFileSync8 } from "node:fs";
+import { dirname as dirname2, join as join15 } from "node:path";
+var EXPORTS_FILE = join15(MEP_DIR, "exports.yaml");
 function exportHistory(root) {
-  const file = join14(root, EXPORTS_FILE);
-  return existsSync13(file) ? (0, import_yaml6.parse)(readFileSync12(file, "utf8")) ?? [] : [];
+  const file = join15(root, EXPORTS_FILE);
+  return existsSync14(file) ? (0, import_yaml6.parse)(readFileSync13(file, "utf8")) ?? [] : [];
 }
 function exportData(root, profile, catalog, lang, q, priced = q !== void 0) {
   const evaluated = evaluate(profile, catalog);
@@ -10103,18 +10287,18 @@ function recordExport(root, profile, catalog, lang, files, total, version) {
     total,
     files
   };
-  mkdirSync7(dirname2(join14(root, EXPORTS_FILE)), { recursive: true });
-  writeFileSync8(join14(root, EXPORTS_FILE), (0, import_yaml6.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
+  mkdirSync7(dirname2(join15(root, EXPORTS_FILE)), { recursive: true });
+  writeFileSync8(join15(root, EXPORTS_FILE), (0, import_yaml6.stringify)([...history, record].sort((a, b) => a.version - b.version), { lineWidth: 0 }));
   return record;
 }
 
 // engine/src/quote.ts
 var import_yaml7 = __toESM(require_dist(), 1);
-import { existsSync as existsSync14, mkdirSync as mkdirSync8, readFileSync as readFileSync13, readdirSync as readdirSync6, writeFileSync as writeFileSync9, appendFileSync as appendFileSync2 } from "node:fs";
+import { existsSync as existsSync15, mkdirSync as mkdirSync8, readFileSync as readFileSync14, readdirSync as readdirSync6, writeFileSync as writeFileSync9, appendFileSync as appendFileSync2 } from "node:fs";
 import { homedir as homedir2 } from "node:os";
-import { join as join15 } from "node:path";
+import { join as join16 } from "node:path";
 function configDir(env = process.env) {
-  return env.MEP_CONFIG_DIR ?? join15(homedir2(), ".config", "mep-check");
+  return env.MEP_CONFIG_DIR ?? join16(homedir2(), ".config", "mep-check");
 }
 var SIZE_HOURS = { XS: [0.5, 1], S: [1, 3], M: [3, 8], L: [8, 20], XL: [20, 40] };
 var DEFAULT_RATES = {
@@ -10139,14 +10323,14 @@ maintenance_plans:    # precio mensual; horas incluidas por mes
   premium:  { price: 0, hours: 0 }   # + monitoreo y soporte prioritario
 `;
 function loadRates(env = process.env) {
-  const file = join15(configDir(env), "rates.yaml");
+  const file = join16(configDir(env), "rates.yaml");
   let created = false;
-  if (!existsSync14(file)) {
+  if (!existsSync15(file)) {
     mkdirSync8(configDir(env), { recursive: true });
     writeFileSync9(file, RATES_TEMPLATE);
     created = true;
   }
-  const raw = (0, import_yaml7.parse)(readFileSync13(file, "utf8")) ?? {};
+  const raw = (0, import_yaml7.parse)(readFileSync14(file, "utf8")) ?? {};
   const rates = { ...DEFAULT_RATES, ...raw, maintenance_plans: { ...DEFAULT_RATES.maintenance_plans, ...raw.maintenance_plans } };
   return { rates, created, configured: rates.hourly_rate > 0 };
 }
@@ -10171,9 +10355,9 @@ function loaded(hours, rates) {
   return scale(hours, (1 + rates.pm_overhead) * (1 + rates.risk_buffer));
 }
 function recurringCosts(profile, catalog) {
-  const file = join15(catalog.dir, "costs.yaml");
-  if (!existsSync14(file)) return [];
-  const table = (0, import_yaml7.parse)(readFileSync13(file, "utf8"));
+  const file = join16(catalog.dir, "costs.yaml");
+  if (!existsSync15(file)) return [];
+  const table = (0, import_yaml7.parse)(readFileSync14(file, "utf8"));
   const out = Object.entries(table.always ?? {}).map(([key, c]) => ({ key, ...c }));
   for (const d of stack(profile, catalog)) {
     const cost = table.stack?.[`${d.key}.${d.value}`];
@@ -10266,25 +10450,25 @@ function projectKey(profile) {
   return (profile.project || "proyecto").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "proyecto";
 }
 function saveQuote(profile, q, rates, env = process.env) {
-  const dir = join15(configDir(env), "quotes", projectKey(profile));
+  const dir = join16(configDir(env), "quotes", projectKey(profile));
   mkdirSync8(dir, { recursive: true });
-  const file = join15(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
+  const file = join16(dir, `${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-")}.yaml`);
   writeFileSync9(file, (0, import_yaml7.stringify)({ profile: profile.project, catalog_version: profile.catalog_version, rates, quote: q }, { lineWidth: 0 }));
   return file;
 }
 function logTime(profile, id, hours, env = process.env) {
-  const dir = join15(configDir(env), "actuals");
+  const dir = join16(configDir(env), "actuals");
   mkdirSync8(dir, { recursive: true });
-  const file = join15(dir, `${projectKey(profile)}.yaml`);
+  const file = join16(dir, `${projectKey(profile)}.yaml`);
   appendFileSync2(file, (0, import_yaml7.stringify)([{ id, hours, date: (/* @__PURE__ */ new Date()).toISOString().slice(0, 10), catalog_version: profile.catalog_version }]));
   return file;
 }
 function calibrate(catalog, env = process.env, minSamples = 3) {
-  const dir = join15(configDir(env), "actuals");
-  if (!existsSync14(dir)) return [];
+  const dir = join16(configDir(env), "actuals");
+  if (!existsSync15(dir)) return [];
   const byId = /* @__PURE__ */ new Map();
   for (const f of readdirSync6(dir).filter((f2) => f2.endsWith(".yaml"))) {
-    for (const row of (0, import_yaml7.parse)(readFileSync13(join15(dir, f), "utf8")) ?? []) {
+    for (const row of (0, import_yaml7.parse)(readFileSync14(join16(dir, f), "utf8")) ?? []) {
       byId.set(row.id, [...byId.get(row.id) ?? [], row.hours]);
     }
   }
@@ -10343,8 +10527,8 @@ function parseArgs(argv) {
   return out;
 }
 function readInput(source) {
-  if (source === void 0 || source === true || source === "-") return readFileSync14(0, "utf8");
-  return readFileSync14(source, "utf8");
+  if (source === void 0 || source === true || source === "-") return readFileSync15(0, "utf8");
+  return readFileSync15(source, "utf8");
 }
 function proposedProfile(args, catalog) {
   const raw = (0, import_yaml8.parse)(readInput(args.flags.from)) ?? {};
@@ -10396,7 +10580,7 @@ function currentBranch(root) {
 }
 function hookInput() {
   try {
-    return JSON.parse(readFileSync14(0, "utf8") || "{}");
+    return JSON.parse(readFileSync15(0, "utf8") || "{}");
   } catch {
     return {};
   }
@@ -10423,13 +10607,13 @@ function closePassingPhases(root, catalog) {
   return closed;
 }
 function installResponsiveTest(root, catalog) {
-  const target = join16(root, "tests", "responsive.spec.ts");
-  if (existsSync15(target)) return void 0;
+  const target = join17(root, "tests", "responsive.spec.ts");
+  if (existsSync16(target)) return void 0;
   mkdirSync9(dirname3(target), { recursive: true });
-  writeFileSync10(target, readFileSync14(join16(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
-  const pkgFile = join16(root, "package.json");
-  if (existsSync15(pkgFile)) {
-    const text = readFileSync14(pkgFile, "utf8");
+  writeFileSync10(target, readFileSync15(join17(pluginRoot(catalog), "templates", "tests", "responsive.spec.ts"), "utf8"));
+  const pkgFile = join17(root, "package.json");
+  if (existsSync16(pkgFile)) {
+    const text = readFileSync15(pkgFile, "utf8");
     const pkg = JSON.parse(text);
     if (!pkg.scripts?.["test:responsive"]) {
       pkg.scripts = { ...pkg.scripts, "test:responsive": "playwright test tests/responsive.spec.ts" };
@@ -10458,8 +10642,8 @@ function runHook(event, root, catalog) {
       return;
     }
     case "stop": {
-      const result = gate(cwd, catalog, "stop");
-      if (result.block && !input.stop_hook_active) json({ decision: "block", reason: result.message });
+      const result2 = gate(cwd, catalog, "stop");
+      if (result2.block && !input.stop_hook_active) json({ decision: "block", reason: result2.message });
       return;
     }
     case "pre-bash": {
@@ -10474,9 +10658,9 @@ function runHook(event, root, catalog) {
       }
       const kind = deployKind(command, currentBranch(cwd));
       if (!kind) return;
-      const result = cachedGate(cwd, catalog, kind);
-      if (result.block) {
-        json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: result.message } });
+      const result2 = cachedGate(cwd, catalog, kind);
+      if (result2.block) {
+        json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: result2.message } });
       }
       return;
     }
@@ -10519,11 +10703,11 @@ function main() {
       saveProfile(root, profile);
       regenerate(root, profile, catalog);
       const adrs = writeStackAdrs(root, profile, catalog);
-      const linked = linkClaudeMd(root, readFileSync14(join16(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
-      const ci = join16(root, ".github", "workflows", "mep.yml");
-      if (!existsSync15(ci)) {
+      const linked = linkClaudeMd(root, readFileSync15(join17(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
+      const ci = join17(root, ".github", "workflows", "mep.yml");
+      if (!existsSync16(ci)) {
         mkdirSync9(dirname3(ci), { recursive: true });
-        writeFileSync10(ci, readFileSync14(join16(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
+        writeFileSync10(ci, readFileSync15(join17(pluginRoot(catalog), "templates", "ci", "mep.yml"), "utf8"));
       }
       const responsive = installResponsiveTest(root, catalog);
       log(root, "init", `${profile.type} (${profile.capabilities.join(",")})`);
@@ -10594,10 +10778,10 @@ ${signals.map((s) => `  - ${s.signal} (${s.evidence})`).join("\n")}`);
     case "verify": {
       if (!hasProfile(root)) return print("mep: sin .mep/profile.yaml, nada que verificar.");
       const kind = args.flags.prod ? "prod" : "stop";
-      const result = args.flags["no-cache"] ? gate(root, catalog, kind) : cachedGate(root, catalog, kind);
+      const result2 = args.flags["no-cache"] ? gate(root, catalog, kind) : cachedGate(root, catalog, kind);
       const review = args.flags.pr ? prReviewGate(root) : { block: false, message: "" };
-      print([result.message, review.message].filter(Boolean).join("\n") || "\u2705 mep: sin \u{1F534} pendientes que bloqueen.");
-      process.exitCode = result.block || review.block ? 1 : 0;
+      print([result2.message, review.message].filter(Boolean).join("\n") || "\u2705 mep: sin \u{1F534} pendientes que bloqueen.");
+      process.exitCode = result2.block || review.block ? 1 : 0;
       return;
     }
     case "changes": {
@@ -10628,10 +10812,10 @@ ${signals.map((s) => `  - ${s.signal} (${s.evidence})`).join("\n")}`);
       const profile = requireProfile(root, catalog);
       if (rest[0] === "close") {
         if (!rest[1]) fail("Uso: mep phase close <sub-etapa>");
-        const result = closePhase(root, catalog, rest[1]);
-        if (result.closed) regenerate(root, result.profile, catalog);
-        print(result.message);
-        process.exitCode = result.closed ? 0 : 1;
+        const result2 = closePhase(root, catalog, rest[1]);
+        if (result2.closed) regenerate(root, result2.profile, catalog);
+        print(result2.message);
+        process.exitCode = result2.closed ? 0 : 1;
         return;
       }
       const results = verifyItems(root, profile, evaluate(profile, catalog), "full");
@@ -10739,18 +10923,18 @@ ${state.valid ? "\u2705" : "\u274C"} ${sub} \u2014 ${state.detail}`);
       requireProfile(root, catalog);
       if (rest[0] === "record") {
         const id = args.flags.id;
-        const result = args.flags.result;
-        if (!id || !["pass", "fail", "risk"].includes(result)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."');
+        const result2 = args.flags.result;
+        if (!id || !["pass", "fail", "risk"].includes(result2)) fail('Uso: mep security record --id <id> --result pass|fail|risk --files a,b --notes "..."');
         const item = catalog.items.find((i) => i.id === id && i.category === "security");
         if (!item) fail(`${id} no es un \xEDtem de seguridad`);
         const given = String(args.flags.files ?? "").split(",").map((f) => f.trim()).filter(Boolean);
-        const missing = given.filter((f) => !matchFiles(root, f).length && !existsSync15(join16(root, f)));
+        const missing = given.filter((f) => !matchFiles(root, f).length && !existsSync16(join17(root, f)));
         if (missing.length) fail(`archivos inexistentes: ${missing.join(", ")}`);
         const forced = (item.sensitive ?? []).flatMap((g) => catalog.sensitiveGroups[g]).flatMap((p) => matchFiles(root, p));
         const files = [.../* @__PURE__ */ new Set([...given, ...forced])].sort();
-        recordReport(root, { id, result, files, notes: String(args.flags.notes ?? "") });
-        log(root, "security", `${id} ${result} (${files.length} archivo(s))`);
-        return print(`reporte de ${id}: ${result} \xB7 cubre ${files.length} archivo(s)${forced.length ? ` (${forced.length} por sus grupos sensibles)` : ""}`);
+        recordReport(root, { id, result: result2, files, notes: String(args.flags.notes ?? "") });
+        log(root, "security", `${id} ${result2} (${files.length} archivo(s))`);
+        return print(`reporte de ${id}: ${result2} \xB7 cubre ${files.length} archivo(s)${forced.length ? ` (${forced.length} por sus grupos sensibles)` : ""}`);
       }
       const profile = loadProfile(root, catalog);
       const ids = evaluate(profile, catalog).filter((e) => e.state === "active" && e.item.category === "security").map((e) => e.item.id);
@@ -10807,14 +10991,14 @@ Pendientes: \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended}`,
       const updates = catalogUpdates(profile, catalog);
       if (args.flags.json) return json(updates.map((u) => ({ id: u.item.id, change: u.change, level: u.level, phase: u.item.phase, inClosedPhase: u.inClosedPhase })));
       if (!updates.length && profile.catalog_version === catalog.version) return print(`Cat\xE1logo al d\xEDa (${catalog.version}).`);
-      const list = updates.map((u) => `${u.change === "new" ? "\uFF0B" : "\u270E"} ${LEVEL_ICON[u.level]} ${u.item.id} (${u.item.phase}${u.inClosedPhase ? ", sub-etapa cerrada" : ""}) \u2014 ${u.item.title}`);
+      const list2 = updates.map((u) => `${u.change === "new" ? "\uFF0B" : "\u270E"} ${LEVEL_ICON[u.level]} ${u.item.id} (${u.item.phase}${u.inClosedPhase ? ", sub-etapa cerrada" : ""}) \u2014 ${u.item.title}`);
       const head = `Cat\xE1logo ${profile.catalog_version} \u2192 ${catalog.version}: ${updates.length} \xEDtem(s) nuevos o modificados que aplican a este perfil.`;
-      if (!args.flags.apply) return print([head, ...list].join("\n"));
+      if (!args.flags.apply) return print([head, ...list2].join("\n"));
       const { profile: next, graced } = applyUpdate(profile, catalog);
       saveProfile(root, next);
       regenerate(root, next, catalog);
       log(root, "update", `${profile.catalog_version}->${catalog.version} grace:${graced.join(",")}`);
-      return print([head, ...list, "", `\u2705 Perfil en cat\xE1logo ${catalog.version}.`, graced.length ? `Periodo de gracia (no bloquean hasta el siguiente cierre o el deploy a producci\xF3n): ${graced.join(", ")}` : ""].filter(Boolean).join("\n"));
+      return print([head, ...list2, "", `\u2705 Perfil en cat\xE1logo ${catalog.version}.`, graced.length ? `Periodo de gracia (no bloquean hasta el siguiente cierre o el deploy a producci\xF3n): ${graced.join(", ")}` : ""].filter(Boolean).join("\n"));
     }
     case "registry": {
       if (args.flags.check) {
@@ -10873,10 +11057,15 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
     case "export": {
       const profile = requireProfile(root, catalog);
       const input = args.flags.in;
-      if (!input || !existsSync15(join16(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
+      if (!input || !existsSync16(join17(root, input))) fail("Uso: mep export --in docs/client/brief-vN.md [--format docx|pdf|both] [--lang es]");
       const format = String(args.flags.format ?? "both");
-      const blocks = parseMarkdown(readFileSync14(join16(root, input), "utf8"));
-      const base = join16(root, dirname3(input), basename(input).replace(/\.md$/, ""));
+      let blocks = [];
+      try {
+        blocks = loadImages(parseMarkdown(readFileSync15(join17(root, input), "utf8")), join17(root, dirname3(input)));
+      } catch (e) {
+        fail(`No se pudo exportar ${input}: ${e.message}`);
+      }
+      const base = join17(root, dirname3(input), basename(input).replace(/\.md$/, ""));
       const files = [];
       if (format === "docx" || format === "both") {
         writeFileSync10(`${base}.docx`, toDocx(blocks));

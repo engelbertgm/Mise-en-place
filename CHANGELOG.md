@@ -2,6 +2,17 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.3.0
+
+Planning documents (catalog 2026.10.9):
+
+- **Five documents in `docs/plan/`:** PRD, TRD and IMPLEMENTATION written by `/mep:scope`; FLOWS at the start of `foundation.design`; SCHEMA at the start of `build.data` when there is a database. Fixed templates in `templates/plan/`, with sections found by `<!-- mep:key -->` markers so headings can be in any language.
+- **Diagrams with diagram-design** (now required for these documents): journey, architecture, Gantt, flowcharts, sequence and database schema, saved as HTML and PNG in `docs/plan/diagrams/`.
+- **The engine keeps them honest:** new `plan` check type and five 🔴 items (`plan-prd`, `plan-trd`, `plan-implementation`, `plan-flows`, `plan-schema`). FLOWS must list every page route of the code and SCHEMA the same tables as the migrations.
+- **Client versions:** `/mep:export` writes non-technical PRD, FLOWS and IMPLEMENTATION for client projects, reusing only client-safe diagrams. The .docx and .pdf export now embeds PNG images.
+- **Existing projects** get the items through `/mep:update`, which also writes the missing documents.
+- Fix: `pnpm validate` passes again (`mep.tools` declared in the panel state types).
+
 ## 0.2.2
 
 Guidelines and code-quality guardrails (catalog 2026.10.8):

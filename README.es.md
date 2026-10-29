@@ -6,8 +6,8 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.2.2-informational.svg)](.claude-plugin/plugin.json)
-[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.8-informational.svg)](catalog/CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versión-0.3.0-informational.svg)](.claude-plugin/plugin.json)
+[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.9-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Funciona con baladero](https://img.shields.io/badge/funciona_con-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
@@ -67,20 +67,36 @@ Los bloqueos de mep aguantan también los atajos del propio agente, no solo erro
 
 En la misma máquina nada es a prueba de todo; un truco deliberado igual queda a la vista en ese resumen.
 
+### Documentos de planeación
+
+mep mantiene un plan escrito en `docs/plan/`, así cada sesión construye contra el mismo plan y no contra lo que recuerda:
+
+| Documento | Qué responde | Se escribe |
+| --- | --- | --- |
+| `PRD.md` | Qué se construye, para quién y cómo se mide el éxito | `/mep:scope` |
+| `TRD.md` | Stack, arquitectura, entornos y requisitos no funcionales | `/mep:scope` |
+| `IMPLEMENTATION.md` | Fases, hitos y calendario | `/mep:scope` |
+| `FLOWS.md` | Cada pantalla y cada recorrido principal del usuario | al empezar `foundation.design` |
+| `SCHEMA.md` | Tablas, relaciones, autenticación y seguridad por fila | al empezar `build.data` (solo con base de datos) |
+
+Cada uno tiene secciones fijas y diagramas hechos con [diagram-design](https://github.com/cathrynlavery/diagram-design). El motor comprueba que existan y que coincidan con el código: una ruta de página que falta en `FLOWS.md`, o una tabla de las migraciones que falta en `SCHEMA.md`, regresa el ítem a pendiente. En proyectos para clientes, `/mep:export` genera además versiones sin jerga del PRD, los flujos y la implementación, con los diagramas aptos para el cliente.
+
 ## Funciona con
 
 | Plugin | Cómo se complementan |
 | --- | --- |
 | [ponytail](https://github.com/DietrichGebert/ponytail) | Aplica el mantra de código en cada cambio. `/ponytail-review` reemplaza la revisión de calidad de mep al cerrar una sub-etapa. El motor detecta Ponytail y exige la revisión registrada (`mep review record`), sin "must fix" y sobre el código actual, antes de cerrar |
+| [diagram-design](https://github.com/cathrynlavery/diagram-design) | Dibuja los diagramas de los documentos de planeación (recorrido, arquitectura, flujos, secuencia, esquema de datos, Gantt). Requerido para escribirlos; su exportación a PNG necesita Python y Playwright |
 | [baladero](https://github.com/engelbertgm/Baladero) | HUD en vivo para Claude Code: modelo, git, barras de contexto y uso, herramientas, pendientes y el costo de cada tarea. La línea de estado y el panel de mep muestran el checklist; Baladero muestra lo que la sesión gasta en cumplirlo |
 
-Los dos son opcionales. mep funciona solo.
+ponytail y baladero son opcionales. diagram-design es requerido para los documentos de planeación.
 
 ## Requisitos
 
 - Claude Code (los mods necesitan la versión 2.1.287 o posterior; las anteriores usan los hooks incluidos)
 - Node.js 20 o posterior
 - Proyectos en un repositorio git
+- El plugin [diagram-design](https://github.com/cathrynlavery/diagram-design) (2.6.136 o posterior), con Python y Playwright para exportar a PNG, para escribir los documentos de planeación
 - Recomendado: el plugin [ponytail](https://github.com/DietrichGebert/ponytail). mep funciona sin él y usa su propia revisión de calidad
 
 ## Instalación
@@ -288,7 +304,8 @@ tu-proyecto/
 ├── REGISTRY.md                # piezas reutilizables
 ├── docs/
 │   ├── decisions/             # ADRs, empezando por las decisiones de stack
-│   └── client/brief-vN.*      # brief para el cliente (.md, .docx, .pdf)
+│   ├── plan/                  # PRD, TRD, FLOWS, SCHEMA, IMPLEMENTATION + diagrams/
+│   └── client/                # brief y documentos de plan para el cliente (.md, .docx, .pdf)
 ├── tests/responsive.spec.ts   # 360–2560 px, sin scroll horizontal ni elementos encimados (Playwright)
 └── .github/workflows/mep.yml  # mep verify --prod como check obligatorio
 
