@@ -1,5 +1,7 @@
 import { posix } from 'node:path'
 import { exists, matchFiles, readText } from './files.ts'
+import { pageRoutes } from './framework.ts'
+import { scanMigrations, tableName } from './sql.ts'
 import type { Check, CheckResult, Profile } from './types.ts'
 
 // Planning documents in docs/plan/. Claude writes them from templates/plan/; the engine only checks them.
@@ -68,7 +70,15 @@ export function checkPlan(root: string, check: PlanCheck, profile: Profile): Che
     }
     case 'diagrams':
       return diagrams(root, md, check, profile)
-    default:
-      return { ok: null, detail: `regla ${check.rule} sin implementar` }
+    case 'routes': {
+      const listed = new Set([...(section(md, 'pantallas') ?? '').matchAll(/`(\/[^`]*)`/g)].map(m => m[1]))
+      return result(pageRoutes(root).filter(r => !listed.has(r)), `${file} sin las pantallas`, 'todas las pantallas en el inventario')
+    }
+    case 'tables': {
+      const inCode = scanMigrations(root).tables
+      const inDoc = new Set(codeHeadings(section(md, 'tablas') ?? '').map(tableName).filter((t): t is string => !!t))
+      const problems = [...[...inCode].filter(t => !inDoc.has(t)).map(t => `falta ${t}`), ...[...inDoc].filter(t => !inCode.has(t)).map(t => `sobra ${t}`)]
+      return result(problems, `${file} no coincide con las migraciones`, 'tablas iguales a las migraciones')
+    }
   }
 }

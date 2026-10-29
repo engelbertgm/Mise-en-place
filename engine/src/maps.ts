@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from '
 import { join } from 'node:path'
 import { parse } from 'yaml'
 import { matchFiles, readText } from './files.ts'
-import { detectFramework, routes } from './framework.ts'
+import { detectFramework, pageRoutes, routes } from './framework.ts'
 import type { Catalog } from './types.ts'
 
 export const REGISTRY_FILE = 'REGISTRY.md'
@@ -182,7 +182,7 @@ export function renderCodemap(root: string, catalog: Catalog): string {
   const { folders: table, conventions: byFramework } = codemapData(catalog)
   const framework = detectFramework(root)
   const allRoutes = routes(root, framework)
-  const pages = allRoutes.filter(r => !r.startsWith('/api') && !/\.(txt|xml|webmanifest)$/.test(r))
+  const pages = pageRoutes(root, framework)
   const api = allRoutes.filter(r => r.startsWith('/api'))
   const find = (glob: string) => matchFiles(root, glob)
   const entryPoints: [string, string[]][] = [

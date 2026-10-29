@@ -107,6 +107,11 @@ export function routes(root: string, framework = detectFramework(root)): string[
   return [...new Set([...byFramework, ...staticRoutes(files)])].sort()
 }
 
+/** Page routes only: no API routes and no generated files (robots.txt, sitemap.xml, manifest). */
+export function pageRoutes(root: string, framework = detectFramework(root)): string[] {
+  return routes(root, framework).filter(r => !r.startsWith('/api') && !/\.(txt|xml|webmanifest)$/.test(r))
+}
+
 export function routeExists(root: string, path: string): boolean {
   const clean = path.replace(/\/$/, '') || '/'
   if (exists(root, `public${clean}`) || exists(root, `static${clean}`)) return true

@@ -3,7 +3,9 @@ import assert from 'node:assert/strict'
 import { describe, test } from 'node:test'
 import { checkPlan } from '../engine/src/plan.ts'
 import type { Check, Profile } from '../engine/src/types.ts'
-import { makeRepo, profile, testCatalog } from './helpers.ts'
+import { loadCatalog } from '../engine/src/catalog.ts'
+import { renderCodemap } from '../engine/src/maps.ts'
+import { REAL_CATALOG, makeRepo, profile, testCatalog } from './helpers.ts'
 
 type PlanCheck = Extract<Check, { type: 'plan' }>
 const catalog = testCatalog([])
@@ -67,5 +69,41 @@ describe('plan documents', () => {
     const check = { doc: 'flows', rule: 'diagrams', required: ['sequence'], if_capabilities: ['auth', 'payments'] } satisfies Omit<PlanCheck, 'type'>
     assert.equal(run(files, check, prof({ capabilities: [] })).ok, true)
     assert.equal(run(files, check, prof({ capabilities: ['auth'] })).ok, false)
+  })
+})
+
+describe('plan drift against the code', () => {
+  const app = {
+    'package.json': '{"dependencies":{"next":"15.0.0"}}',
+    'app/page.tsx': 'export default function P() {}',
+    'app/(marketing)/precios/page.tsx': 'export default function P() {}',
+    'app/blog/[slug]/page.tsx': 'export default function P() {}',
+    'app/api/x/route.ts': 'export function GET() {}',
+  }
+  const flows = (screens: string[]) => ({ 'docs/plan/FLOWS.md': `## Pantallas\n<!-- mep:pantallas -->\n${screens.map(s => `- \`${s}\`: algo`).join('\n')}\n## Flujos\n<!-- mep:flujos -->\n` })
+
+  test('routes: every page route appears in code in the pantallas section', () => {
+    assert.equal(run({ ...app, ...flows(['/', '/precios', '/blog/[slug]']) }, { doc: 'flows', rule: 'routes' }).ok, true)
+    const r = run({ ...app, ...flows(['/', '/precios']) }, { doc: 'flows', rule: 'routes' })
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /\/blog\/\[slug\]/)
+    assert.doesNotMatch(r.detail, /api/)
+  })
+
+  test('tables: migrations and SCHEMA list the same tables, normalized', () => {
+    const migration = { 'supabase/migrations/001.sql': 'create table public."Orders" (id int);\ncreate table profiles (id int);\n' }
+    const schema = (names: string[]) => ({ 'docs/plan/SCHEMA.md': `## Tablas\n<!-- mep:tablas -->\n${names.map(n => `### \`${n}\`\n`).join('')}## Relaciones\n<!-- mep:relaciones -->\n` })
+    assert.equal(run({ ...migration, ...schema(['orders', 'profiles']) }, { doc: 'schema', rule: 'tables' }).ok, true)
+    const extra = run({ ...migration, ...schema(['orders', 'profiles', 'invoices']) }, { doc: 'schema', rule: 'tables' })
+    assert.equal(extra.ok, false)
+    assert.match(extra.detail, /sobra invoices/)
+    const missing = run({ ...migration, ...schema(['orders']) }, { doc: 'schema', rule: 'tables' })
+    assert.equal(missing.ok, false)
+    assert.match(missing.detail, /falta profiles/)
+  })
+
+  test('codemap lists the same pages after the pageRoutes refactor', () => {
+    const md = renderCodemap(makeRepo(app), loadCatalog(REAL_CATALOG))
+    for (const r of ['`/`', '`/precios`', '`/blog/[slug]`']) assert.ok(md.includes(r), r)
   })
 })

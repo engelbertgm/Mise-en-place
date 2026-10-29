@@ -5,7 +5,7 @@ const DEFAULT_GLOB = '{supabase/migrations,migrations,db/migrations,prisma/migra
 const SYSTEM_SCHEMAS = new Set(['auth', 'storage', 'extensions', 'realtime', 'supabase_functions', 'graphql', 'vault'])
 const OPERATIONS = ['select', 'insert', 'update', 'delete'] as const
 
-function tableName(raw: string): string | undefined {
+export function tableName(raw: string): string | undefined {
   const parts = raw.replace(/"/g, '').toLowerCase().split('.')
   if (parts.length === 2 && SYSTEM_SCHEMAS.has(parts[0])) return undefined
   return parts.length === 2 && parts[0] === 'public' ? parts[1] : parts.join('.')
@@ -14,7 +14,7 @@ function tableName(raw: string): string | undefined {
 const NAME = '((?:"?[\\w]+"?\\.)?"?[\\w]+"?)'
 
 /** Reads every migration in order: tables created, tables with RLS on, policies per operation. */
-function scan(root: string, glob: string) {
+export function scanMigrations(root: string, glob = DEFAULT_GLOB) {
   const sql = matchFiles(root, glob)
     .map(f => (readText(root, f) ?? '').replace(/--.*$/gm, ''))
     .join('\n')
@@ -45,7 +45,7 @@ function scan(root: string, glob: string) {
 }
 
 export function checkSql(root: string, check: Extract<Check, { type: 'sql' }>): CheckResult {
-  const { files, tables, rls, policies } = scan(root, check.glob ?? DEFAULT_GLOB)
+  const { files, tables, rls, policies } = scanMigrations(root, check.glob)
   if (files === 0) return { ok: null, detail: 'sin migraciones SQL versionadas' }
   if (check.rule === 'rls_enabled') {
     const missing = [...tables].filter(t => !rls.has(t)).sort()
