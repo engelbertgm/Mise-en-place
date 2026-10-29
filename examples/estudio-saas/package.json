@@ -6,7 +6,9 @@
     "build": "node scripts/check.mjs build",
     "lint": "node scripts/check.mjs lint",
     "typecheck": "node scripts/check.mjs typecheck",
-    "test": "node scripts/check.mjs test"
+    "test": "node scripts/check.mjs test",
+    "knip": "node scripts/check.mjs knip",
+    "jscpd": "node scripts/check.mjs jscpd"
   },
   "dependencies": {
     "@supabase/ssr": "0.5.2",

@@ -1,7 +1,7 @@
 ---
 name: threshold
 description: Cambia un umbral de calidad de mep (complejidad, líneas por archivo o por función). Relajarlo pide razón y solo lo escribe el usuario.
-argument-hint: "<complexity|max_lines|max_function_lines> <valor> [razón]"
+argument-hint: "<complexity|max_lines|max_function_lines|max_params> <valor> [razón]"
 disable-model-invocation: true
 ---
 

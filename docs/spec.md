@@ -667,7 +667,7 @@ Se genera **antes** de construir páginas. Todo componente del proyecto sale de 
 - **Retícula y alineación**: todo alineado a una grid; nada "flotando"
 - **Escala de espaciado** (base 4 u 8 px): solo valores de la escala, nunca arbitrarios
 - **Escala tipográfica** definida (ej. ratio 1.25): máximo 2 familias tipográficas
-- **Largo de línea**: 60–80 caracteres en textos de lectura
+- **Largo de línea**: 45–75 caracteres en textos de lectura
 - **Espacio en blanco** como separador antes que bordes y líneas
 - **Color 60-30-10**: dominante, secundario y acento; el acento solo para acciones
 - **Gestalt**: similitud (lo que funciona igual se ve igual), continuidad, cierre, figura-fondo

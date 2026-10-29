@@ -39,7 +39,7 @@ export type Check =
   | { type: 'manual'; prompt: string }
 
 /** Checks against the deployed site (urls in the profile, or MEP_URL). */
-export type LiveRule = 'headers' | 'hsts' | 'compression' | 'cookies' | 'error_page' | 'canonical_redirect' | 'sitemap'
+export type LiveRule = 'headers' | 'hsts' | 'compression' | 'cookies' | 'error_page' | 'canonical_redirect' | 'sitemap' | 'reachable'
 
 export type HtmlRule =
   | 'meta'
@@ -151,8 +151,8 @@ export type Profile = {
   /** The domain email is sent from, for the DNS checks (defaults to the production host). */
   email_domain?: string
   email_dkim_selector?: string
-  /** Code quality thresholds (complexity, max_lines, max_function_lines). Laxer than the defaults needs a reason. */
-  quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines', number>>
+  /** Code quality thresholds (complexity, max_lines, max_function_lines, max_params). Laxer than the defaults needs a reason. */
+  quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines' | 'max_params', number>>
 }
 
 export type ItemState = 'active' | 'skipped' | 'overridden' | 'offered'

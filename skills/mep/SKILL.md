@@ -38,11 +38,12 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
 
 - `BRIEF.md` es la instrucción maestra; se regenera desde el perfil, no se edita a mano.
 - Fases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Trabaja la sub-etapa activa; las 🔴 de sub-etapas cerradas están protegidas contra regresiones.
+- Guías (`${CLAUDE_PLUGIN_ROOT}/catalog/guidelines.md`): al empezar una sub-etapa, lee solo su sección. `foundation.design`: 1 y 2. `build.ux`: 1 y 3. `launch.content`: 4, solo si `type` es landing, ecommerce, marketplace o saas. La 5 (código) aplica siempre. La sección 0 la verifica el motor; no la repitas a mano.
 - Seguridad: la implementa o la audita el agente `mep-security`. Un ítem de seguridad solo cuenta como cumplido con su reporte en `.mep/security/`.
 - Para encontrar código usa el agente `mep-locator`. Mantén los mapas al día: `codemap` regenera `CODEMAP.md` (respeta "Notas manuales") y `registry` regenera `REGISTRY.md` desde los exports; "Para qué", "No usar para", "Variantes" y `@example` se escriben en el comentario `/** */` de cada export, nunca en el registro.
 - Antes de abrir o fusionar un PR a `main`, mep exige una revisión de calidad de la rama, registrada y vigente para el código actual: `/ponytail-review branch` si Ponytail está instalado (si no, revisa duplicados, nombres, complejidad y reutilización contra `REGISTRY.md`), y regístrala con `review record --pr --must-fix <n>`. Reintentar sin revisión no pasa, y el CI la exige también.
 - Para cerrar una sub-etapa, el motor exige una revisión de calidad registrada (`review record`), sin "must fix" y sobre el código actual: `/ponytail-review` si Ponytail está instalado, si no la revisión propia. `review` dice cuál.
-- Umbrales de calidad (complexity, max_lines, max_function_lines) en `quality` del perfil; relajarlos solo con `/mep:threshold` (lo escribe el usuario) y razón.
+- Umbrales de calidad (complexity, max_lines, max_function_lines, max_params) en `quality` del perfil; relajarlos solo con `/mep:threshold` (lo escribe el usuario) y razón.
 - Features fuera del catálogo van en `custom_work` del perfil, con talla; el cotizador las marca "estimación a revisar".
 - Cotización: solo corre sola al definir el scope y en cambios de scope. No la calcules en otros momentos salvo que el usuario la pida (`/mep:quote`).
 - Ítems 🔒 (`locked`) no se desactivan nunca. 🟡 se omite solo con `/mep:skip` y razón; 🔴 se desactiva solo con `/mep:override`, con razón y confirmación del usuario.

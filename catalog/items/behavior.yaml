@@ -117,3 +117,19 @@
   how: "Guardar la zona IANA del usuario y calcular la próxima ejecución en esa zona."
   verify:
     - { type: manual, prompt: "Recordatorios y tareas programadas se calculan en la zona IANA del usuario" }
+
+# ── Agregados en 2026.10.8: guías ──
+
+- id: no-dark-patterns
+  title: "Sin patrones oscuros: escasez solo real, sin upsells premarcados, sin temporizadores falsos, sin confirmshaming, cancelar tan fácil como registrarse"
+  category: behavior
+  level: required
+  phase: launch.content
+  since: "2026.10.8"
+  when: { not: { type: internal-app } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Convierten una vez y cuestan la confianza, reseñas y multas (FTC click-to-cancel, DSA en la UE, Profeco en México)."
+  how: "Casillas de extras y suscripción desmarcadas por defecto; contadores solo con una fecha real del servidor; el botón de rechazo dice \"No, gracias\"; la baja se hace en línea, con los mismos pasos que el alta. Guía: sección 4 de catalog/guidelines.md."
+  verify:
+    - { type: grep, pattern: "<(?:Checkbox\\b|input(?=[^>]*type=[\"']checkbox[\"']))(?=[^>]*(?:newsletter|marketing|promo|upsell|add-?on|extra|insurance|warranty|subscribe))(?=[^>]*\\b(?:defaultChecked|checked)(?:=\\{true\\}|=[\"']checked[\"']|[\\s/>]))", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}", expect: absent }
+    - { type: manual, prompt: "Ningún extra premarcado, ningún temporizador o escasez falsa, ningún texto que avergüence al rechazar, y la cancelación se hace en línea con los mismos pasos que el alta" }

@@ -635,7 +635,7 @@ function main(): void {
           '  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)',
           '  phase [close <sub-etapa>]',
           '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> · resync   (override, confirm y resync: solo el usuario)',
-          '  threshold <complexity|max_lines|max_function_lines> <valor> [razón --yes]',
+          '  threshold <complexity|max_lines|max_function_lines|max_params> <valor> [razón --yes]',
           '  security [record --id --result --files --notes]',
           '  review [<sub-etapa>] · review record --must-fix <n> [--sub | --pr] [--tool ponytail|mep] [--notes]   revisión de calidad (cierre o PR)',
           '  audit [--from scope.yaml]                             evidencia del código / brecha según el scope (no escribe nada)',

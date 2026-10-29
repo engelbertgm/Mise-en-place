@@ -1,12 +1,12 @@
 import { matchFiles, readText } from './files.ts'
 import type { CheckResult, Profile } from './types.ts'
 
-export type QualityKey = 'complexity' | 'max_lines' | 'max_function_lines'
+export type QualityKey = 'complexity' | 'max_lines' | 'max_function_lines' | 'max_params'
 
 /** Spec defaults. A lower number is stricter; a higher one needs a reason (`mep threshold`). */
-export const QUALITY_DEFAULTS: Record<QualityKey, number> = { complexity: 10, max_lines: 300, max_function_lines: 50 }
+export const QUALITY_DEFAULTS: Record<QualityKey, number> = { complexity: 10, max_lines: 300, max_function_lines: 50, max_params: 4 }
 
-const ESLINT_RULE: Record<QualityKey, string> = { complexity: 'complexity', max_lines: 'max-lines', max_function_lines: 'max-lines-per-function' }
+const ESLINT_RULE: Record<QualityKey, string> = { complexity: 'complexity', max_lines: 'max-lines', max_function_lines: 'max-lines-per-function', max_params: 'max-params' }
 
 export function thresholds(profile: Profile): Record<QualityKey, number> {
   return { ...QUALITY_DEFAULTS, ...profile.quality }
@@ -29,7 +29,7 @@ export function checkThresholds(root: string, profile: Profile): CheckResult {
     const max = Number((readText(root, biome) ?? '').match(/"maxAllowedComplexity"\s*:\s*(\d+)/)?.[1])
     if (!max) return { ok: false, detail: `${biome}: falta noExcessiveCognitiveComplexity con maxAllowedComplexity` }
     if (max > wanted.complexity) return { ok: false, detail: `${biome}: complejidad ${max} > ${wanted.complexity}` }
-    return { ok: null, detail: 'Biome no tiene max-lines: revisa el largo de archivos y funciones a mano' }
+    return { ok: null, detail: 'Biome no tiene max-lines ni max-params: revisa el largo de archivos y funciones y el número de parámetros a mano' }
   }
   const text = readText(root, eslint) ?? ''
   const problems: string[] = []

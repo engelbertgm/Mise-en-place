@@ -2,6 +2,16 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.2.2
+
+Guidelines and code-quality guardrails (catalog 2026.10.8):
+
+- **`catalog/guidelines.md`.** Design, UX, marketing and code principles, cleaned and merged. The agent reads only the active sub-phase's section; the close review checks key views against it and each miss is a "must fix".
+- **New required items:** `touch-targets` (≥ 44×44 px), `no-dark-patterns`, `walking-skeleton` (Gall's law), `no-import-cycles` and `twelve-factor`.
+- **Engine:** new quality threshold `max_params` (4) and a new live rule `reachable`.
+- **Stricter checks:** one primary CTA per view; knip and jscpd actually run; line length 45–75 characters everywhere.
+- **Responsive test template** checks touch targets and the single primary CTA. Existing projects regenerate `tests/responsive.spec.ts` to get them.
+
 ## 0.2.1
 
 Panel (`/mep:panel`):

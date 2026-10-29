@@ -135,11 +135,12 @@
   level: required
   phase: build.ux
   since: "2026.10.2"
+  updated: "2026.10.8"
   effort: { size: M, hours: [2, 6] }
   why: "Son la forma más barata de que la interfaz se sienta obvia: respuesta < 400 ms, objetivos ≥ 44 px, pocas opciones por decisión, un CTA principal por vista, patrones conocidos, progreso visible, finales cuidados."
-  how: "Revisar cada vista clave contra la lista antes de cerrar build.ux."
+  how: "Revisar cada vista clave contra las secciones 1 (simplicidad) y 3 (interacción y usabilidad) de catalog/guidelines.md antes de cerrar build.ux; lo que falle cuenta como must fix en la revisión de cierre."
   verify:
-    - { type: manual, prompt: "Vistas clave revisadas contra las leyes de UX (objetivos ≥ 44 px, un CTA principal, progreso visible, finales de flujo cuidados)" }
+    - { type: manual, prompt: "Vistas clave revisadas contra las secciones 1 y 3 de catalog/guidelines.md (estado visible, control y deshacer, prevención de errores, reconocer en vez de recordar, cierre de flujos)" }
   references: ["https://lawsofux.com/"]
 
 - id: ui-principles
@@ -148,25 +149,27 @@
   level: required
   phase: build.ux
   since: "2026.10.2"
+  updated: "2026.10.8"
   effort: { size: M, hours: [2, 6] }
   why: "Se entiende qué leer primero, todo alinea, el acento marca acciones y lo clicable parece clicable."
-  how: "Revisar cada vista clave: retícula, largo de línea 60–80 caracteres, acento solo en acciones, deshacer/cancelar, prevención de errores."
+  how: "Revisar cada vista clave contra las secciones 1 (simplicidad) y 2 (diseño visual) de catalog/guidelines.md: jerarquía, retícula, largo de línea 45–75 caracteres, 60-30-10 con el acento solo en acciones."
   verify:
-    - { type: manual, prompt: "Vistas clave revisadas contra los principios de UI y las heurísticas de Nielsen" }
+    - { type: manual, prompt: "Vistas clave revisadas contra las secciones 1 y 2 de catalog/guidelines.md" }
   references: ["https://www.nngroup.com/articles/ten-usability-heuristics/"]
 
 # ── Agregados en 2026.10.5: conversión ──
 
 - id: cta-above-fold
-  title: "CTA principal visible sin hacer scroll, en móvil y escritorio"
+  title: "Un solo CTA principal por vista, visible sin hacer scroll, en móvil y escritorio"
   category: ux
   level: required
   phase: build.ux
   since: "2026.10.5"
+  updated: "2026.10.8"
   when: { type: { any: [landing, corporate, local-business, ecommerce, saas, marketplace, booking, portfolio] } }
   effort: { size: S, hours: [1, 2] }
   why: "Quien llega debe saber qué hacer en el primer vistazo; un CTA escondido bajo el pliegue pierde la mayor parte de la conversión."
-  how: "Un solo CTA principal en el primer viewport (360 y 1280 px), marcado con data-cta=\"primary\"; el test responsive comprueba que está a la vista."
+  how: "Un solo CTA principal por vista, en el primer viewport (360 y 1280 px), marcado con data-cta=\"primary\"; el test responsive comprueba que hay uno como máximo y que está a la vista."
   verify:
     - { type: grep, pattern: "data-cta=[\"']primary[\"']", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
     - { type: command, run: "pnpm run test:responsive", timeout: 600 }

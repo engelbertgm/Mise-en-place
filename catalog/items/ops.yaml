@@ -66,3 +66,17 @@
   how: "Regla de alerta para errores nuevos y picos, a Slack o email de una persona responsable; releases con source maps subidos de forma privada para leer la traza."
   verify:
     - { type: manual, prompt: "Las alertas de errores nuevos llegan a un canal con responsable, y se probó con un error de prueba" }
+
+# ── Agregados en 2026.10.8: guías ──
+
+- id: walking-skeleton
+  title: "Esqueleto desplegado en preview antes de construir features (ley de Gall)"
+  category: ops
+  level: required
+  phase: foundation.setup
+  since: "2026.10.8"
+  effort: { size: S, hours: [1, 2] }
+  why: "Un sistema complejo que funciona crece de uno simple que funcionó: desplegar el primer día saca a la luz los problemas de build, variables y dominio cuando son baratos."
+  how: "Página mínima desplegada en el hosting con su URL de preview en el perfil (urls.preview, vía /mep:add); de ahí en adelante cada cambio se despliega."
+  verify:
+    - { type: live, rule: reachable }

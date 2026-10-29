@@ -58,6 +58,7 @@ describe('live checks against the deployed site', () => {
     assert.equal(live(urls.good, 'compression').ok, true, live(urls.good, 'compression').detail)
     assert.equal(live(urls.good, 'cookies').ok, true)
     assert.equal(live(urls.good, 'error_page').ok, true)
+    assert.equal(live(urls.good, 'reachable').ok, true)
     assert.equal(live(urls.good, 'sitemap').ok, true, live(urls.good, 'sitemap').detail)
   })
 

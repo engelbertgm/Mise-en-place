@@ -2,6 +2,25 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.8
+
+Guías de diseño, UX, marketing y código (`catalog/guidelines.md`), convertidas en verificaciones donde se pueden medir:
+
+- **Guías por sub-etapa.** El agente lee solo la sección de la sub-etapa activa (diseño visual en `foundation.design`, interacción y usabilidad en `build.ux`, copy y conversión en `launch.content` para landing, ecommerce, marketplace y SaaS; simplicidad y código siempre). La revisión de cierre revisa las vistas clave contra esa sección; cada incumplimiento es un "must fix".
+- **Nuevos 🔴:**
+  - `touch-targets`: objetivos táctiles ≥ 44×44 px, comprobados por el test responsive a 360 y 768 px.
+  - `no-dark-patterns`: sin extras ni suscripciones premarcados, sin escasez o temporizadores falsos, sin confirmshaming, cancelar tan fácil como registrarse.
+  - `walking-skeleton` (ley de Gall): el sitio desplegado en preview responde antes de cerrar `foundation.setup` (nueva regla `live` `reachable`).
+  - `no-import-cycles`: import/no-cycle en el linter.
+  - `twelve-factor`: env validada al arrancar, servidor sin escritura a disco ni sesiones en memoria, logs a stdout, lockfile y versión de Node fijada.
+- **Cambios:**
+  - Nuevo umbral de calidad `max_params` (4) junto a complexity, max_lines y max_function_lines.
+  - `cta-above-fold`: un solo CTA principal por vista (el test responsive falla con más de uno).
+  - `no-duplication-dead-code`: ahora corre knip y jscpd, no solo revisa que estén instalados.
+  - `ux-laws` y `ui-principles` revisan contra las secciones de las guías; largo de línea 45–75 caracteres.
+
+Los proyectos existentes deben regenerar `tests/responsive.spec.ts` desde la plantilla para que el test compruebe los objetivos táctiles y el CTA único.
+
 ## 2026.10.7
 
 Reglas por tipo de proyecto, cobro por uso, operación y datos sensibles:

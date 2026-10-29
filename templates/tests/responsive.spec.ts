@@ -44,7 +44,23 @@ for (const path of PAGES) {
       })
       expect(overlaps, 'elementos encimados').toEqual([])
 
-      // The primary CTA (data-cta="primary") is visible without scrolling (ítem cta-above-fold).
+      // Touch targets of at least 44×44 px on touch widths (ítem touch-targets). Inline links in running text are exempt.
+      if (width <= 768) {
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll('a, button, input:not([type="hidden"]), select, textarea, [role="button"]')]
+            .filter(el => {
+              const r = el.getBoundingClientRect()
+              const inText = el.tagName === 'A' && getComputedStyle(el).display === 'inline' && el.parentElement?.closest('p, li')
+              return r.width > 0 && r.height > 0 && !inText && (r.width < 44 || r.height < 44)
+            })
+            .map(el => el.outerHTML.slice(0, 60))
+            .slice(0, 5),
+        )
+        expect(small, 'objetivos táctiles < 44×44 px').toEqual([])
+      }
+
+      // One primary CTA per view (ítem cta-above-fold), visible without scrolling.
+      expect(await page.locator('[data-cta="primary"]').count(), 'CTAs principales en la vista').toBeLessThanOrEqual(1)
       const cta = page.locator('[data-cta="primary"]').first()
       if (await cta.count()) {
         const box = await cta.boundingBox()

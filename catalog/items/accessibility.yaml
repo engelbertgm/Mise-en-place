@@ -161,3 +161,19 @@
   how: "@axe-core/playwright en los tests e2e de las páginas clave."
   verify:
     - { type: grep, pattern: "@axe-core|axe-core|pa11y|lighthouse-ci|@lhci", glob: "{package.json,.github/workflows/*.{yml,yaml}}" }
+
+# ── Agregados en 2026.10.8: guías ──
+
+- id: touch-targets
+  title: "Objetivos táctiles de al menos 44×44 px"
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.10.8"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un botón chico en móvil se falla o se toca el vecino (ley de Fitts); 44 px es el mínimo de Apple y WCAG 2.5.5."
+  how: "Botones, enlaces sueltos e inputs con min-h-11 min-w-11 (o padding que lo alcance); los enlaces dentro de un párrafo quedan exentos. El test responsive lo comprueba a 360 y 768 px."
+  verify:
+    - { type: grep, pattern: "objetivos táctiles", glob: "{tests,e2e}/responsive.spec.{ts,js}" }
+    - { type: command, run: "pnpm run test:responsive", timeout: 600 }
+  references: ["https://www.w3.org/WAI/WCAG22/Understanding/target-size-enhanced.html"]

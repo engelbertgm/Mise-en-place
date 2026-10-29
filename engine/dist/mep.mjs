@@ -8578,8 +8578,8 @@ function checkSql(root, check) {
 }
 
 // engine/src/quality.ts
-var QUALITY_DEFAULTS = { complexity: 10, max_lines: 300, max_function_lines: 50 };
-var ESLINT_RULE = { complexity: "complexity", max_lines: "max-lines", max_function_lines: "max-lines-per-function" };
+var QUALITY_DEFAULTS = { complexity: 10, max_lines: 300, max_function_lines: 50, max_params: 4 };
+var ESLINT_RULE = { complexity: "complexity", max_lines: "max-lines", max_function_lines: "max-lines-per-function", max_params: "max-params" };
 function thresholds(profile) {
   return { ...QUALITY_DEFAULTS, ...profile.quality };
 }
@@ -8597,7 +8597,7 @@ function checkThresholds(root, profile) {
     const max = Number((readText(root, biome) ?? "").match(/"maxAllowedComplexity"\s*:\s*(\d+)/)?.[1]);
     if (!max) return { ok: false, detail: `${biome}: falta noExcessiveCognitiveComplexity con maxAllowedComplexity` };
     if (max > wanted.complexity) return { ok: false, detail: `${biome}: complejidad ${max} > ${wanted.complexity}` };
-    return { ok: null, detail: "Biome no tiene max-lines: revisa el largo de archivos y funciones a mano" };
+    return { ok: null, detail: "Biome no tiene max-lines ni max-params: revisa el largo de archivos y funciones y el n\xFAmero de par\xE1metros a mano" };
   }
   const text = readText(root, eslint) ?? "";
   const problems = [];
@@ -8865,6 +8865,8 @@ function checkLive(profile, check, mode, env = process.env) {
       return checkCanonicalRedirect(base);
     case "sitemap":
       return checkSitemap(base);
+    case "reachable":
+      return home.status < 400 ? { ok: true, detail: `${base}/ responde ${home.status}` } : { ok: false, detail: `${base}/ responde ${home.status}` };
   }
 }
 function spfResult(records) {
@@ -9172,7 +9174,7 @@ function describeCheck(c) {
     case "design":
       return `${c.rule === "font_families" ? "familias tipogr\xE1ficas" : "pesos de texto"} \u2264 ${c.max}`;
     case "live":
-      return { headers: `el sitio env\xEDa ${(c.names ?? []).join(", ")}`, hsts: "el sitio env\xEDa HSTS \u2265 180 d\xEDas", compression: "el sitio sirve con Brotli/gzip y assets con cach\xE9 inmutable", cookies: "las cookies del sitio llevan Secure, SameSite y HttpOnly", error_page: "una ruta inexistente da 404 sin detalles internos", canonical_redirect: "http:// y www redirigen al dominio can\xF3nico", sitemap: "el sitemap lista solo p\xE1ginas p\xFAblicas e indexables" }[c.rule];
+      return { headers: `el sitio env\xEDa ${(c.names ?? []).join(", ")}`, hsts: "el sitio env\xEDa HSTS \u2265 180 d\xEDas", compression: "el sitio sirve con Brotli/gzip y assets con cach\xE9 inmutable", cookies: "las cookies del sitio llevan Secure, SameSite y HttpOnly", error_page: "una ruta inexistente da 404 sin detalles internos", canonical_redirect: "http:// y www redirigen al dominio can\xF3nico", sitemap: "el sitemap lista solo p\xE1ginas p\xFAblicas e indexables", reachable: "el sitio desplegado responde" }[c.rule];
     case "dns":
       return `DNS: ${c.rule.toUpperCase()}`;
     case "manual":
@@ -10911,7 +10913,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)",
           "  phase [close <sub-etapa>]",
           "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> \xB7 resync   (override, confirm y resync: solo el usuario)",
-          "  threshold <complexity|max_lines|max_function_lines> <valor> [raz\xF3n --yes]",
+          "  threshold <complexity|max_lines|max_function_lines|max_params> <valor> [raz\xF3n --yes]",
           "  security [record --id --result --files --notes]",
           "  review [<sub-etapa>] \xB7 review record --must-fix <n> [--sub | --pr] [--tool ponytail|mep] [--notes]   revisi\xF3n de calidad (cierre o PR)",
           "  audit [--from scope.yaml]                             evidencia del c\xF3digo / brecha seg\xFAn el scope (no escribe nada)",

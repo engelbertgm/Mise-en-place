@@ -175,6 +175,8 @@ export function checkLive(profile: Profile, check: LiveCheck, mode: Mode, env = 
       return checkCanonicalRedirect(base)
     case 'sitemap':
       return checkSitemap(base)
+    case 'reachable':
+      return home.status < 400 ? { ok: true, detail: `${base}/ responde ${home.status}` } : { ok: false, detail: `${base}/ responde ${home.status}` }
   }
 }
 

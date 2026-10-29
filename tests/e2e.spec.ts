@@ -78,6 +78,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     assert.equal(mep(['confirm', 'git-protected-main', '--human']).code, 0)
     // pnpm audit needs the network: the test turns it off the way a person would, with a reason.
     assert.equal(mep(['override', 'no-critical-vulnerabilities', 'el e2e corre sin red; el CI del proyecto lo cubre', '--yes', '--human']).code, 0)
+    assert.equal(mep(['override', 'walking-skeleton', 'el e2e corre sin sitio desplegado', '--yes', '--human']).code, 0)
     const security = JSON.parse(mep(['check', '--json', '--fast']).out).results.filter(
       (r: { phase: string; level: string; state: string; id: string }) => r.phase === 'foundation.setup' && r.level === 'required' && r.state === 'active',
     )

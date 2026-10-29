@@ -53,7 +53,7 @@
     - { type: grep, pattern: "\\b(min-)?h-screen\\b|100vh", glob: "**/*.{tsx,jsx,astro,vue,svelte,css,scss}", expect: absent }
 
 - id: line-length
-  title: "Largo de línea 60–80 caracteres, también en ultra wide"
+  title: "Largo de línea 45–75 caracteres, también en ultra wide"
   category: responsive
   level: required
   phase: build.ux

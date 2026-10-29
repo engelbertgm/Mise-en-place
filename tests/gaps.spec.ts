@@ -40,7 +40,7 @@ describe('1. markets bring their languages', () => {
 })
 
 describe('2. quality thresholds from the profile', () => {
-  const eslint = (c: number, l: number, f: number) => `export default [{ rules: { complexity: ['error', ${c}], 'max-lines': ['error', { max: ${l} }], 'max-lines-per-function': ['error', ${f}] } }]`
+  const eslint = (c: number, l: number, f: number, p = 4) => `export default [{ rules: { complexity: ['error', ${c}], 'max-lines': ['error', { max: ${l} }], 'max-lines-per-function': ['error', ${f}], 'max-params': ['error', ${p}] } }]`
 
   test('the linter must enforce the profile thresholds or stricter ones', () => {
     assert.equal(checkThresholds(makeRepo({ 'eslint.config.mjs': eslint(10, 300, 50) }), profile(real)).ok, true)
@@ -50,6 +50,7 @@ describe('2. quality thresholds from the profile', () => {
     assert.match(lax.detail, /complexity 15 > 10/)
     assert.equal(checkThresholds(makeRepo({ 'eslint.config.mjs': eslint(15, 300, 50) }), profile(real, { quality: { complexity: 15 } })).ok, true)
     assert.match(checkThresholds(makeRepo({ 'eslint.config.mjs': 'export default []' }), profile(real)).detail, /falta complexity/)
+    assert.match(checkThresholds(makeRepo({ 'eslint.config.mjs': eslint(10, 300, 50, 6) }), profile(real)).detail, /max-params 6 > 4/)
   })
 
   test('relaxing a threshold needs a reason and confirmation, and shows in the brief', () => {

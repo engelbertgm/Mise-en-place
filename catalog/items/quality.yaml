@@ -69,11 +69,14 @@
   level: required
   phase: foundation.setup
   since: "2026.10.2"
+  updated: "2026.10.8"
   effort: { size: S, hours: [1, 2] }
-  why: "El duplicado se desincroniza; el código muerto confunde y pesa."
-  how: "jscpd con umbral 3% y knip en CI."
+  why: "El duplicado se desincroniza (DRY); el código, los exports y las dependencias sin uso confunden y pesan (YAGNI)."
+  how: "Scripts knip (archivos, exports y dependencias sin uso o sin declarar) y jscpd (\"jscpd --threshold 3 --gitignore .\") en package.json, corridos en CI."
   verify:
     - { type: grep, pattern: "\"jscpd\"|\"knip\"", glob: package.json }
+    - { type: command, run: "pnpm -s knip", timeout: 300 }
+    - { type: command, run: "pnpm -s jscpd", timeout: 300 }
 
 - id: no-debug-leftovers
   title: "Sin console.log, código comentado ni TODO sin referencia (shortcut: de Ponytail permitido)"
@@ -398,3 +401,35 @@
   verify:
     - { type: grep, pattern: "pageerror|console\\.error|msg\\.type\\(\\)\\s*===\\s*[\"']error", glob: "{tests,e2e}/**/*.{ts,js}" }
     - { type: command, run: "pnpm run test:responsive", timeout: 600 }
+
+# ── Agregados en 2026.10.8: guías ──
+
+- id: no-import-cycles
+  title: "Sin dependencias circulares entre módulos"
+  category: quality
+  level: required
+  phase: foundation.setup
+  since: "2026.10.8"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un ciclo de imports amarra módulos que deberían poder cambiar solos (SOLID) y produce valores undefined al cargar."
+  how: "Regla import/no-cycle (eslint-plugin-import o import-x) en error; junto con max-params ≤ 4 de los umbrales, mantiene módulos de una responsabilidad e interfaces pequeñas."
+  verify:
+    - { type: grep, pattern: "no-cycle", glob: "{eslint.config.{js,mjs,cjs,ts},.eslintrc,.eslintrc.{json,js,cjs,yml,yaml}}" }
+    - { type: command, run: "pnpm -s lint", timeout: 300 }
+
+- id: twelve-factor
+  title: "Twelve-Factor: config validada desde env, servidor sin estado, logs a stdout, misma versión en dev y prod"
+  category: quality
+  level: required
+  phase: build.features
+  since: "2026.10.8"
+  when: { signals: { has_db: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Config en el código, archivos locales o sesiones en memoria funcionan en tu máquina y se rompen al escalar o al redeployar; dev distinto de prod esconde errores hasta producción."
+  how: "Variables validadas al arrancar (t3-env, envalid o zod sobre process.env), incluidas las URLs de DB, correo y storage; nada de escribir archivos ni guardar sesiones en memoria en el servidor (storage y DB); logs a stdout o un logger estructurado; lockfile y versión de Node fijada (.nvmrc); el mismo motor de base de datos en dev y prod. Guía: sección 5 de catalog/guidelines.md."
+  verify:
+    - { type: grep, pattern: "createEnv\\(|@t3-oss/env|envalid|(?:safeParse|parse)\\(\\s*process\\.env\\b", glob: "**/*.{ts,js,mjs}" }
+    - { type: grep, pattern: "\\b(?:writeFileSync|appendFileSync)\\(|\\bfs\\.(?:promises\\.)?(?:writeFile|appendFile)\\(|MemoryStore", glob: "{app,src,server,lib,pages/api}/**/*.{ts,js,mjs}", exclude: "**/*.{test,spec}.*", expect: absent }
+    - { type: grep, pattern: "transports\\.File\\b|pino\\.destination\\(\\s*[\"'][^\"']+\\.log|appendFile(?:Sync)?\\([^)]*\\.log", glob: "**/*.{ts,js,mjs}", expect: absent }
+    - { type: file_exists, path: ["pnpm-lock.yaml", "package-lock.json", "yarn.lock", "bun.lockb", "bun.lock"] }
+    - { type: file_exists, path: [".nvmrc", ".node-version", ".tool-versions"] }
