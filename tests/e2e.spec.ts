@@ -50,7 +50,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     assert.equal(r.code, 0, r.err)
     assert.match(r.out, /Cotización: .* MXN/)
     const brief = readFileSync(join(root, 'BRIEF.md'), 'utf8')
-    for (const id of ['rls-all-tables', 'hosted-checkout', 'mx-privacy-notice', 'gpc-signal', 'eu-de-impressum', 'eu-withdrawal-right', 'i18n-hreflang']) {
+    for (const id of ['plan-prd', 'plan-trd', 'plan-implementation', 'rls-all-tables', 'hosted-checkout', 'mx-privacy-notice', 'gpc-signal', 'eu-de-impressum', 'eu-withdrawal-right', 'i18n-hreflang']) {
       assert.match(brief, new RegExp('`' + id + '`'), id)
     }
     assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /Mantra de código/)

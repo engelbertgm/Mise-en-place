@@ -1,11 +1,13 @@
 // 0.3.0 / catalog 2026.10.9: planning documents in docs/plan/, checked by the engine.
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, test } from 'node:test'
-import { checkPlan } from '../engine/src/plan.ts'
+import { PLAN_FILES, checkPlan } from '../engine/src/plan.ts'
 import type { Check, Profile } from '../engine/src/types.ts'
 import { loadCatalog } from '../engine/src/catalog.ts'
 import { renderCodemap } from '../engine/src/maps.ts'
-import { REAL_CATALOG, makeRepo, profile, testCatalog } from './helpers.ts'
+import { REAL_CATALOG, REPO, makeRepo, profile, testCatalog } from './helpers.ts'
 
 type PlanCheck = Extract<Check, { type: 'plan' }>
 const catalog = testCatalog([])
@@ -105,5 +107,24 @@ describe('plan drift against the code', () => {
   test('codemap lists the same pages after the pageRoutes refactor', () => {
     const md = renderCodemap(makeRepo(app), loadCatalog(REAL_CATALOG))
     for (const r of ['`/`', '`/precios`', '`/blog/[slug]`']) assert.ok(md.includes(r), r)
+  })
+})
+
+describe('plan catalog and templates', () => {
+  const real = loadCatalog(REAL_CATALOG)
+  const planChecks = real.items.flatMap(i => i.verify.filter((c): c is PlanCheck => c.type === 'plan'))
+
+  test('every template has every marker the catalog requires', () => {
+    assert.ok(planChecks.some(c => c.rule === 'sections'))
+    for (const c of planChecks.filter(c => c.sections)) {
+      const template = readFileSync(join(REPO, 'templates', PLAN_FILES[c.doc].replace('docs/', '')), 'utf8')
+      for (const key of c.sections!) assert.ok(template.includes(`<!-- mep:${key} -->`), `${c.doc}: ${key}`)
+    }
+  })
+
+  test('phases lists in plan.yaml are a subset of dimensions.phases', () => {
+    const phases = planChecks.filter(c => c.rule === 'phases')
+    assert.ok(phases.length > 0)
+    for (const c of phases) for (const p of c.phases ?? []) assert.ok(real.dimensions.phases.includes(p), p)
   })
 })

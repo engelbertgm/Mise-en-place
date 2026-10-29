@@ -2,6 +2,18 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.10.9
+
+Documentos de planeación en `docs/plan/`, escritos por Claude desde `templates/plan/` y verificados por el motor:
+
+- **Nuevos 🔴 (categoría `plan`):**
+  - `plan-prd`, `plan-trd` y `plan-implementation` en `foundation.setup` (los escribe `/mep:scope`).
+  - `plan-flows` en `foundation.design` y `plan-schema` en `build.data` (solo con base de datos): se escriben al empezar su sub-etapa.
+- **Nueva verificación `plan`:** encuentra cada sección por su marcador (`<!-- mep:clave -->`), así los títulos pueden estar en cualquier idioma. Comprueba las secciones obligatorias, que el PRD mencione el trabajo a la medida, que el TRD mencione el stack, una fase por sub-etapa, los diagramas obligatorios (por nombre de archivo, hechos con diagram-design) y que cada imagen enlazada exista.
+- **Los documentos no se pudren:** `FLOWS.md` debe listar cada ruta de página del código y `SCHEMA.md` las mismas tablas que las migraciones; si el código cambia y el documento no, el ítem vuelve a pendiente.
+
+Los proyectos existentes reciben estos ítems con `/mep:update`, con el periodo de gracia normal.
+
 ## 2026.10.8
 
 Guías de diseño, UX, marketing y código (`catalog/guidelines.md`), convertidas en verificaciones donde se pueden medir:
