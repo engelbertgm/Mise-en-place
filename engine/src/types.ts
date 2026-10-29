@@ -37,6 +37,7 @@ export type Check =
   | { type: 'live'; rule: LiveRule; names?: string[]; paths?: string[] }
   | { type: 'dns'; rule: 'spf' | 'dmarc' | 'dkim'; selectors?: string[] }
   | { type: 'manual'; prompt: string }
+  | { type: 'plan'; doc: 'prd' | 'trd' | 'flows' | 'schema' | 'implementation'; rule: 'sections' | 'custom_work' | 'stack' | 'phases' | 'diagrams' | 'routes' | 'tables'; sections?: string[]; phases?: string[]; required?: string[]; if_capabilities?: string[] }
 
 /** Checks against the deployed site (urls in the profile, or MEP_URL). */
 export type LiveRule = 'headers' | 'hsts' | 'compression' | 'cookies' | 'error_page' | 'canonical_redirect' | 'sitemap' | 'reachable'

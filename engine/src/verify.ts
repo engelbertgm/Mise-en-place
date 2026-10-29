@@ -3,6 +3,7 @@ import { parseJsonc, exists, matchFiles, readText } from './files.ts'
 import { routeExists } from './framework.ts'
 import { checkHtml } from './html.ts'
 import { checkCodemap, checkRegistry } from './maps.ts'
+import { checkPlan } from './plan.ts'
 import { checkSql } from './sql.ts'
 import { checkThresholds } from './quality.ts'
 import { checkDesign } from './design.ts'
@@ -98,6 +99,8 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkLive(profile, check, mode)
     case 'dns':
       return checkDns(profile, check, mode)
+    case 'plan':
+      return checkPlan(root, check, profile)
     case 'manual': {
       const confirmed = profile.selections.manual_confirmed.find(c => c.id === itemId)
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` }
