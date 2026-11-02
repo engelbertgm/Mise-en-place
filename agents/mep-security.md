@@ -20,7 +20,7 @@ Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"` (desde la raíz del pr
    - Análisis estático: `semgrep --config auto` si está instalado.
    - Supabase: advisors de seguridad (MCP de Supabase `get_advisors`) cuando aplique.
 4. Decide por ítem: `pass` (cumple), `fail` (no cumple) o `risk` (cumple con un riesgo que el usuario debe aceptar). Si un ítem no aplica al código real (ej. no hay fetch de URLs del usuario para SSRF), es `pass` con esa nota.
-5. Registra cada resultado, listando **los archivos que revisaste** (el reporte vence si cambian):
+5. Registra cada resultado, listando **los archivos que revisaste** (el reporte vence si cambian). El motor agrega siempre los archivos de los grupos sensibles del ítem (`sensitive` en el catálogo): `--files` suma, nunca quita.
    `security record --id <id> --result pass|fail|risk --files a.ts,b.sql --notes "qué revisaste y por qué cumple o no"`
 
 ## Cómo implementar

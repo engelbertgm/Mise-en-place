@@ -39,13 +39,21 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
 
 - `BRIEF.md` es la instrucción maestra; se regenera desde el perfil, no se edita a mano.
 - Fases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Trabaja la sub-etapa activa; las 🔴 de sub-etapas cerradas están protegidas contra regresiones.
+- Documentos de planeación (`docs/plan/`): son el plan contra el que se construye.
+  - Al empezar `foundation.design`, si falta `FLOWS.md`, escríbelo antes que nada; al empezar `build.data` con `has_db`, lo mismo con `SCHEMA.md`, antes de escribir migraciones. Plantillas en `${CLAUDE_PLUGIN_ROOT}/templates/plan/`.
+  - Lee `SCHEMA.md` antes de tocar la base de datos y `FLOWS.md` antes de construir una pantalla.
+  - Mantenlos al día: una ruta nueva va al inventario de `FLOWS.md` y una tabla nueva a `SCHEMA.md` en el mismo cambio. Los ítems `plan-*` fallan cuando se desvían del código.
+  - Diagramas: genera cada uno con la skill `diagram-design:diagram-design` y expórtalo a PNG con `diagram-design:export-diagram` (correr esta skill de mep es la petición del usuario para esas exportaciones). Guarda el HTML y el PNG en `docs/plan/diagrams/<doc>-<tipo>[-<nombre>]` (`<tipo>` es el nombre del tipo en diagram-design: `journey`, `architecture`, `gantt`…) y muéstralo con `![descripción](diagrams/<archivo>.png)`. Antes de cerrar `foundation.design` usan el estilo por defecto de diagram-design; después, los tokens del proyecto.
+- Guías (`${CLAUDE_PLUGIN_ROOT}/catalog/guidelines.md`): al empezar una sub-etapa, lee solo su sección. `foundation.design`: 1 y 2. `build.ux`: 1 y 3. `launch.content`: 4, solo si `type` es landing, ecommerce, marketplace o saas. La 5 (código) aplica siempre. La sección 0 la verifica el motor; no la repitas a mano.
 - Seguridad: la implementa o la audita el agente `mep-security`. Un ítem de seguridad solo cuenta como cumplido con su reporte en `.mep/security/`.
 - Para encontrar código usa el agente `mep-locator`. Mantén los mapas al día: `codemap` regenera `CODEMAP.md` (respeta "Notas manuales") y `registry` regenera `REGISTRY.md` desde los exports; "Para qué", "No usar para", "Variantes" y `@example` se escriben en el comentario `/** */` de cada export, nunca en el registro.
-- Antes de abrir o fusionar un PR a `main`, mep pide una revisión de calidad (una vez por commit): `/ponytail-review branch` si Ponytail está instalado; si no, revisa duplicados, nombres, complejidad y reutilización contra `REGISTRY.md`. Luego reintenta el comando.
+- Antes de abrir o fusionar un PR a `main`, mep exige una revisión de calidad de la rama, registrada y vigente para el código actual: `/ponytail-review branch` si Ponytail está instalado (si no, revisa duplicados, nombres, complejidad y reutilización contra `REGISTRY.md`), y regístrala con `review record --pr --must-fix <n>`. Reintentar sin revisión no pasa, y el CI la exige también.
 - Para cerrar una sub-etapa, el motor exige una revisión de calidad registrada (`review record`), sin "must fix" y sobre el código actual: `/ponytail-review` si Ponytail está instalado, si no la revisión propia. `review` dice cuál.
-- Umbrales de calidad (complexity, max_lines, max_function_lines) en `quality` del perfil; relajarlos solo con `threshold … --yes` y razón del usuario.
+- Umbrales de calidad (complexity, max_lines, max_function_lines, max_params) en `quality` del perfil; relajarlos solo con `/mep:threshold` (lo escribe el usuario) y razón.
 - Features fuera del catálogo van en `custom_work` del perfil, con talla; el cotizador las marca "estimación a revisar".
 - Cotización: solo corre sola al definir el scope y en cambios de scope. No la calcules en otros momentos salvo que el usuario la pida (`/mep:quote`).
 - Ítems 🔒 (`locked`) no se desactivan nunca. 🟡 se omite solo con `/mep:skip` y razón; 🔴 se desactiva solo con `/mep:override`, con razón y confirmación del usuario.
-- `MEP_BYPASS=1` es un escape de emergencia del usuario, no tuyo. No aplica a ítems locked.
+- `MEP_BYPASS=1` es un escape de emergencia del usuario, no tuyo: la guardia niega comandos que lo mencionen. No aplica a ítems locked ni a un estado modificado fuera de la CLI.
+- El estado de mep (`.mep/profile.yaml`, `log`, `security/`, `reviews/`) solo cambia con la CLI y queda sellado; nunca lo edites a mano ni por script. Si `verify` dice "modificado fuera de la CLI", explica el cambio al usuario: re-sellarlo es suyo (`/mep:resync`).
+- Acciones del usuario, nunca tuyas: `/mep:confirm`, `/mep:override`, `/mep:threshold` (relajar) y `/mep:resync`. Cada una queda en `.mep/log` y en el resumen del PR.
 - "Checklist orientativo, no sustituye asesoría legal."

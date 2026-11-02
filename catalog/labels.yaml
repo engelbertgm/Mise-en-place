@@ -34,10 +34,10 @@ capabilities:
   cms: "Gestor de contenido para editar sin código"
   media: "Video y audio"
   site-migration: "Migración de un sitio anterior"
+  usage-billing: "Cobro por uso o por resultado (medido, por tramos)"
 audience:
   b2b: "Empresas"
   b2c: "Consumidores"
-  minors: "Incluye menores de edad"
   sensitive-data-health: "Datos de salud"
   sensitive-data-finance: "Datos financieros"
 context:

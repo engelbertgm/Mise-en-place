@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.11.1, 382 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.11.1). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -47,7 +47,7 @@ mep/
 ├── hooks/
 │   └── hooks.json        # declara el módulo de mods y los hooks de respaldo
 ├── mods/                 # código TypeScript que corre dentro de Claude Code
-│   └── register.ts       # gate + commands + status en un solo módulo (Claude Code sigue `$` solo dentro de un archivo)
+│   └── register.tsx      # gate + commands + status en un solo módulo (Claude Code sigue `$` solo dentro de un archivo)
 ├── engine/               # evaluador determinista en TypeScript/Node, sin LLM; se publica como paquete npm `@engelbertgm/mep`
 │   ├── src/evaluate.ts   # perfil + catálogo → ítems aplicables, diff, stack
 │   ├── src/verify.ts     # ejecuta las verificaciones de cada ítem
@@ -81,7 +81,7 @@ Definidas en `catalog/dimensions.yaml`. Solo se aceptan valores de ahí.
 | `type` | landing, corporate, local-business, blog, portfolio, ecommerce, saas, marketplace, internal-app, directory, booking |
 | `capabilities` | auth, payments (checkout integrado), payment-links (enlaces del proveedor, sin backend), subscriptions, ugc, uploads, email, i18n, search, notifications, realtime, admin-panel, api-public, analytics, maps, ai-features, pwa, offline, newsletter, cms, media, site-migration |
 | `markets` | MX, USA, CA, EU, UK, BR, IN (CN: reservado para fase futura) |
-| `audience` | b2b, b2c, minors, sensitive-data-health, sensitive-data-finance |
+| `audience` | b2b, b2c, sensitive-data-health, sensitive-data-finance (mep no cubre proyectos para menores ni con verificación de edad: `/mep:scope` los rechaza) |
 | `context` | client-project, own-product |
 
 ### Sub-niveles de mercado
@@ -668,7 +668,7 @@ Se genera **antes** de construir páginas. Todo componente del proyecto sale de 
 - **Retícula y alineación**: todo alineado a una grid; nada "flotando"
 - **Escala de espaciado** (base 4 u 8 px): solo valores de la escala, nunca arbitrarios
 - **Escala tipográfica** definida (ej. ratio 1.25): máximo 2 familias tipográficas
-- **Largo de línea**: 60–80 caracteres en textos de lectura
+- **Largo de línea**: 45–75 caracteres en textos de lectura
 - **Espacio en blanco** como separador antes que bordes y líneas
 - **Color 60-30-10**: dominante, secundario y acento; el acento solo para acciones
 - **Gestalt**: similitud (lo que funciona igual se ve igual), continuidad, cierre, figura-fondo
@@ -985,22 +985,21 @@ Los umbrales son configurables por proyecto en `profile.yaml`; bajarlos requiere
 
 🟡 Manual de uso para el cliente · acceso del cliente a analytics
 
-**Agregados en 2026.11.1** (37 reglas, todas según el scope)
+**Agregados en 2026.11.1** (33 reglas, todas según el scope; no repiten `touch-targets`, `no-dark-patterns`, `ecommerce-all-in-price`, `uptime-monitor`, `health-endpoint` ni `twelve-factor`)
 
 Patrones de interacción y pulido
 - `ux`: 🟡 menú de comandos ⌘K y atajos visibles (saas, internal-app, admin-panel, tablas) · 🟡 stale-while-revalidate (con DB) · 🟡 hojas inferiores con swipe (ecommerce, saas, marketplace, booking, directory) · 🟡 animaciones interrumpibles · ⚪ View Transitions (🟡 en portfolio y ecommerce) · ⚪ zona segura en menús con submenú
-- `accessibility`: 🔴 objetivos táctiles ≥ 24 px (WCAG 2.5.8), verificado por el test responsive; 44 px recomendado
 - `design`: 🟡 números tabulares (tablas, precios) · 🟡 títulos equilibrados y párrafos sin viudas · ⚪ esquinas continuas
 - `performance`: 🟡 placeholders de imagen (blurhash/blurDataURL) · pre-renderizado y prefetch (🟡; 🔴 en landing, blog, corporate, portfolio y local-business)
 - `forms`: 🟡 código de un solo uso con `autocomplete="one-time-code"` (auth) · `pwa`: 🟡 gesto atrás predictivo
 
 Privacidad, legal y consumidor
 - 🔴 aviso de uso de datos junto a cada formulario con datos personales · 🔴 minimización (inventario de datos con finalidad) · 🔴 auditoría de SDKs de terceros (cookies no esenciales, embeds o analytics) · 🔴 datos del negocio visibles (razón social, domicilio, identificación fiscal)
-- Categoría `consumer`, 🔴: sin patrones oscuros · precio final claro y sin cobros ocultos · reseñas y testimonios reales · afirmaciones con respaldo
+- Categoría `consumer`, 🔴: reseñas y testimonios reales · afirmaciones con respaldo
 - `asset-licenses` suma autorizaciones de fotos de personas e imágenes generadas con IA
 
 Diseño de sistemas (categoría `architecture`)
-- Según lo que hace el proyecto: 🟡/🔴 `Idempotency-Key` (payments, subscriptions, api-public; 🔴 con cobros) · 🟡 cola de mensajes · 🟡 `429` con `Retry-After` y almacén compartido · 🟡 llamadas a terceros con timeout, backoff y circuit breaker · 🟡 logs estructurados · 🟡 monitor de disponibilidad (🔴 en saas, ecommerce, booking, marketplace) · 🟡 métricas y trazas · 🟡 caché en capas (con DB) · 🟡 CDN
+- Según lo que hace el proyecto: 🟡/🔴 `Idempotency-Key` (payments, subscriptions, api-public; 🔴 con cobros) · 🟡 cola de mensajes · 🟡 `429` con `Retry-After` y almacén compartido · 🟡 llamadas a terceros con timeout, backoff y circuit breaker · 🟡 logs estructurados · 🟡 métricas y trazas · 🟡 caché en capas (con DB) · 🟡 CDN
 - Solo con `high_traffic`: 🟡 balanceo de carga con health check · 🟡 réplicas y recuperación (con DB) · 🟡 modelo de consistencia / CAP · ⚪ sharding · ⚪ hashing consistente; y caché, CDN, colas, resiliencia y métricas pasan a 🔴
 
 ### Mercados (`catalog/markets/`)
@@ -1244,4 +1243,4 @@ Reglas de convivencia:
 
 Notas de implementación:
 - Verificar en la documentación actual de Claude Code cómo se declaran modelo y esfuerzo en el frontmatter de los agentes.
-- Si el proyecto usa otro plugin de ruteo de modelos (ej. Batuta), estos dos agentes son excepciones fijas: el ruteo general lo decide ese plugin; localizar y seguridad siempre van a estos agentes.
+- Estos dos agentes tienen modelo fijo: localizar código siempre va a `mep-locator` (Haiku) y seguridad siempre a `mep-security` (Opus), elija quien elija el modelo de la sesión. Baladero (HUD) muestra lo que cuesta cada uno.

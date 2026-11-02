@@ -1,15 +1,22 @@
 # Rutas sensibles: editarlas pide una auditoría de mep-security (hook PostToolUse y mod gate).
-paths:
-  - "**/auth/**"
-  - "**/*auth*.{ts,tsx,js,jsx}"
-  - "**/{payments,billing,checkout,stripe}/**"
-  - "**/webhooks/**"
-  - "**/middleware.{ts,js}"
-  - "supabase/migrations/**"
-  - "**/migrations/**"
-  - "**/*.sql"
-  - "**/{policies,rls}/**"
-  - ".env.example"
-  - "next.config.{js,mjs,ts}"
-  - "vercel.json"
-  - "**/{security,secrets}*.{ts,js}"
+# Agrupadas por tema: cada ítem de seguridad declara `sensitive: [<grupo>]`, y su reporte de mep-security
+# cubre siempre los archivos del repo de esos grupos (quien lo registra puede agregar más, nunca quitar).
+groups:
+  auth:
+    - "**/auth/**"
+    - "**/*auth*.{ts,tsx,js,jsx}"
+    - "**/middleware.{ts,js}"
+  payments:
+    - "**/{payments,billing,checkout,stripe}/**"
+    - "**/webhooks/**"
+  db:
+    - "supabase/migrations/**"
+    - "**/migrations/**"
+    - "**/*.sql"
+    - "**/{policies,rls}/**"
+  config:
+    - ".env.example"
+    - "next.config.{js,mjs,ts}"
+    - "vercel.json"
+    - "**/middleware.{ts,js}"
+    - "**/{security,secrets}*.{ts,js}"

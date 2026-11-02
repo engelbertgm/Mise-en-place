@@ -1,0 +1,85 @@
+# Datos de salud y financieros: lo que cambia cuando el proyecto los maneja, en general y por mercado.
+
+- id: sensitive-data-encryption
+  title: "Datos de salud o financieros cifrados a nivel de campo, con llaves fuera de la base de datos"
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.10.7"
+  sensitive: [db]
+  when: { audience: { any: [sensitive-data-health, sensitive-data-finance] } }
+  effort: { size: M, hours: [4, 8] }
+  why: "El cifrado del disco no protege de una consulta, un respaldo filtrado o un empleado curioso; el cifrado por campo sí."
+  how: "Columnas sensibles cifradas (pgsodium/Supabase Vault, pgcrypto o cifrado en la app) con la llave en un gestor (KMS, Vault); solo el servidor descifra."
+  verify:
+    - { type: grep, pattern: "pgsodium|vault\\.|pgp_sym_encrypt|encrypt\\(|kms|createCipheriv", glob: "**/*.{ts,sql}", flags: i }
+
+- id: sensitive-data-access-log
+  title: "Registro de cada acceso a datos de salud o financieros: quién, cuándo y qué registro"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  sensitive: [db, auth]
+  when: { audience: { any: [sensitive-data-health, sensitive-data-finance] } }
+  effort: { size: M, hours: [3, 6] }
+  why: "Las leyes de datos de salud y financieros piden poder responder quién vio un expediente; sin registro no hay respuesta ante una queja o una auditoría."
+  how: "Tabla append-only escrita en el servidor en cada lectura y cambio de un registro sensible; retención definida; solo lectura para quien audita."
+  verify:
+    - { type: grep, pattern: "access_log|audit_log|audit_events|phi_access", glob: "**/*.{ts,sql}", flags: i }
+
+- id: health-no-tracking
+  title: "Sin píxeles de seguimiento de terceros en páginas con información de salud"
+  category: privacy
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { audience: [sensitive-data-health] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Enviar a Meta o Google que alguien visitó una página de un padecimiento es divulgar datos de salud; la FTC y HHS han multado justo eso."
+  how: "Nada de Meta Pixel, Google Ads ni TikTok Pixel en el sitio o la app; analítica sin cookies y sin datos de salud en eventos o URLs."
+  verify:
+    - { type: grep, pattern: "fbq\\(|connect\\.facebook\\.net|googleadservices|gtag\\([\"']config[\"'],\\s*[\"']AW-|analytics\\.tiktok\\.com|snap\\.licdn", glob: "**/*.{ts,tsx,js,jsx,html,astro}", expect: absent }
+
+- id: usa-hipaa
+  title: "HIPAA: contrato BAA firmado con cada proveedor que toca información de salud (PHI)"
+  category: legal
+  level: required
+  phase: foundation.design
+  since: "2026.10.7"
+  when: { all: [ { markets: { any: [USA] } }, { audience: [sensitive-data-health] } ] }
+  effort: { size: M, hours: [2, 6] }
+  why: "Si el cliente es un proveedor de salud (o trabaja para uno), cada servicio que guarda o procesa PHI sin BAA es una violación de HIPAA, con multas por registro."
+  how: "Hosting, base de datos, email, almacenamiento, monitoreo y soporte en planes con BAA firmado; los que no lo ofrecen no reciben PHI (ni en logs, errores o emails)."
+  verify:
+    - { type: manual, prompt: "BAA firmado con cada proveedor que recibe PHI, y los demás verificados para no recibirla (logs, errores, emails, analítica)" }
+  references: ["https://www.hhs.gov/hipaa/for-professionals/covered-entities/sample-business-associate-agreement-provisions/index.html"]
+
+- id: eu-health-explicit-consent
+  title: "RGPD art. 9: consentimiento explícito para datos de salud y evaluación de impacto (DPIA)"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { all: [ { markets: { any: [EU, UK] } }, { audience: [sensitive-data-health] } ] }
+  effort: { size: M, hours: [3, 6] }
+  why: "Los datos de salud son categoría especial: sin consentimiento explícito u otra base del art. 9, y sin DPIA, el tratamiento es ilícito."
+  how: "Consentimiento explícito y separado (casilla propia, no premarcada), registro de cuándo y de qué versión; DPIA documentada antes del lanzamiento."
+  verify:
+    - { type: grep, pattern: "explicit.?consent|consentimiento expl[ií]cito|health.?consent|consentimiento.*salud", glob: "**/*.{ts,tsx,sql}", flags: i }
+    - { type: manual, prompt: "DPIA (evaluación de impacto) hecha y guardada" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj"]
+
+- id: mx-sensitive-consent
+  title: "LFPDPPP: consentimiento expreso y por escrito para datos sensibles (salud, financieros)"
+  category: legal
+  level: required
+  phase: build.features
+  since: "2026.10.7"
+  when: { all: [ { markets: { any: [MX] } }, { audience: { any: [sensitive-data-health, sensitive-data-finance] } } ] }
+  effort: { size: S, hours: [2, 4] }
+  why: "La ley mexicana exige consentimiento expreso y por escrito (puede ser firma electrónica o casilla explícita) para datos sensibles, y el aviso de privacidad debe señalarlos."
+  how: "Casilla explícita no premarcada que remite al aviso de privacidad, guardada con fecha y versión; el aviso identifica los datos sensibles y su finalidad."
+  verify:
+    - { type: grep, pattern: "datos (personales )?sensibles|consentimiento expreso", glob: "**/*.{ts,tsx,md,mdx,json}", flags: i }
+  references: ["https://www.diputados.gob.mx/LeyesBiblio/pdf/LFPDPPP.pdf"]

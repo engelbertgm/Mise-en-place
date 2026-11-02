@@ -8,6 +8,7 @@ import { loadCatalog } from '../engine/src/catalog.ts'
 import { prToMain } from '../engine/src/deploy.ts'
 import { checkDesign, fontFamilies, fontWeights } from '../engine/src/design.ts'
 import { prReviewGate } from '../engine/src/gate.ts'
+import { PR_REVIEW, recordReview } from '../engine/src/review.ts'
 import { evaluate, stack } from '../engine/src/evaluate.ts'
 import { compareScopeAndCode, inferProfile } from '../engine/src/audit.ts'
 import { checkBuild, checkRobots } from '../engine/src/build.ts'
@@ -39,7 +40,7 @@ describe('1. markets bring their languages', () => {
 })
 
 describe('2. quality thresholds from the profile', () => {
-  const eslint = (c: number, l: number, f: number) => `export default [{ rules: { complexity: ['error', ${c}], 'max-lines': ['error', { max: ${l} }], 'max-lines-per-function': ['error', ${f}] } }]`
+  const eslint = (c: number, l: number, f: number, p = 4) => `export default [{ rules: { complexity: ['error', ${c}], 'max-lines': ['error', { max: ${l} }], 'max-lines-per-function': ['error', ${f}], 'max-params': ['error', ${p}] } }]`
 
   test('the linter must enforce the profile thresholds or stricter ones', () => {
     assert.equal(checkThresholds(makeRepo({ 'eslint.config.mjs': eslint(10, 300, 50) }), profile(real)).ok, true)
@@ -49,6 +50,7 @@ describe('2. quality thresholds from the profile', () => {
     assert.match(lax.detail, /complexity 15 > 10/)
     assert.equal(checkThresholds(makeRepo({ 'eslint.config.mjs': eslint(15, 300, 50) }), profile(real, { quality: { complexity: 15 } })).ok, true)
     assert.match(checkThresholds(makeRepo({ 'eslint.config.mjs': 'export default []' }), profile(real)).detail, /falta complexity/)
+    assert.match(checkThresholds(makeRepo({ 'eslint.config.mjs': eslint(10, 300, 50, 6) }), profile(real)).detail, /max-params 6 > 4/)
   })
 
   test('relaxing a threshold needs a reason and confirmation, and shows in the brief', () => {
@@ -57,7 +59,8 @@ describe('2. quality thresholds from the profile', () => {
     run(['init', '--from', 'p.yaml'])
     assert.match(run(['threshold', 'complexity', '15']).stderr, /requiere una razón/)
     assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado']).status, 2)
-    assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado', '--yes']).status, 0)
+    assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado', '--yes']).status, 3)
+    assert.equal(run(['threshold', 'complexity', '15', 'código', 'legado', '--yes', '--human']).status, 0)
     assert.match(readFileSync(join(root, 'BRIEF.md'), 'utf8'), /⚠️ umbral `complexity` — complexity = 15 \(por defecto 10\): código legado/)
     assert.match(readFileSync(join(root, '.mep/log'), 'utf8'), /threshold complexity=15/)
     assert.equal(run(['threshold', 'max_lines', '200']).status, 0)
@@ -136,23 +139,30 @@ describe('7. review before a PR into main', () => {
     assert.equal(prToMain('gh pr view 12'), false)
   })
 
-  test('held once per commit with the instructions, then let through', () => {
-    const root = makeRepo()
-    spawnSync('git', ['init', '-q'], { cwd: root })
-    spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'a'], { cwd: root })
+  test('held until a current branch review is recorded; a second attempt alone never goes through', () => {
+    const root = makeRepo({ 'app.ts': 'export const a = 1\n' })
+    const git = (...args: string[]) => spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', ...args], { cwd: root })
+    git('init', '-q')
+    git('add', '.')
+    git('commit', '-q', '-m', 'a')
     assert.equal(prReviewGate(root).block, false)
     withProfile(root, real)
-    const first = prReviewGate(root, { MEP_PONYTAIL: '1' })
+    const env = { MEP_PONYTAIL: '1' }
+    const first = prReviewGate(root, env)
     assert.equal(first.block, true)
     assert.match(first.message, /ponytail-review branch/)
-    assert.equal(prReviewGate(root).block, false)
-    spawnSync('git', ['-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'b'], { cwd: root })
-    const second = prReviewGate(root, { MEP_PONYTAIL: '0' })
-    assert.equal(second.block, true)
-    assert.match(second.message, /Ponytail no está instalado: revisa duplicados/)
-    const hook = spawnSync('node', [CLI, 'hook', 'pre-bash'], { cwd: root, encoding: 'utf8', input: JSON.stringify({ cwd: root, tool_input: { command: 'gh pr create --fill' } }) })
-    assert.equal(hook.stdout, '')
-    assert.ok(existsSync(join(root, '.mep/.gitignore')))
+    assert.equal(prReviewGate(root, env).block, true)
+    const hook = (command: string) => spawnSync('node', [CLI, 'hook', 'pre-bash'], { cwd: root, encoding: 'utf8', env: { ...process.env, ...env }, input: JSON.stringify({ cwd: root, tool_input: { command } }) })
+    assert.match(hook('gh pr create --fill').stdout, /"deny"/)
+    recordReview(root, { sub: PR_REVIEW, tool: 'ponytail', must_fix: 0, notes: '' })
+    assert.equal(prReviewGate(root, env).block, false)
+    // Committing the review does not expire it: it is tied to the code, not to the commit.
+    git('add', '.')
+    git('commit', '-q', '-m', 'review')
+    assert.equal(hook('gh pr create --fill').stdout, '')
+    // Changing the code does.
+    writeFileSync(join(root, 'app.ts'), 'export const a = 2\n')
+    assert.match(prReviewGate(root, env).message, /revisión vencida/)
   })
 })
 
@@ -353,10 +363,10 @@ describe('14. systems design and honesty rules follow the scope', () => {
     assert.equal(busy.get('sharding-strategy'), 'optional')
   })
 
-  test('a static landing gets no queue, cache or idempotency rules, but does get honesty and touch rules', () => {
+  test('a static landing gets no queue, cache or idempotency rules, but does get honesty rules', () => {
     const landing = levels(profile(real, { type: 'landing' }))
     for (const id of ['message-queue', 'server-caching', 'idempotency-keys', 'load-balancing']) assert.ok(!landing.has(id), id)
-    for (const id of ['hit-slop', 'no-dark-patterns', 'no-fake-reviews', 'substantiated-claims', 'text-balance']) assert.ok(landing.has(id), id)
+    for (const id of ['no-dark-patterns', 'no-fake-reviews', 'substantiated-claims', 'text-balance']) assert.ok(landing.has(id), id)
     assert.equal(landing.get('prerender-public-pages'), 'required')
     assert.ok(!levels(profile(real, { type: 'internal-app' })).has('no-dark-patterns'))
   })
@@ -364,16 +374,11 @@ describe('14. systems design and honesty rules follow the scope', () => {
   test('idempotency keys: required with payments, recommended with only a public API', () => {
     assert.equal(levels(profile(real, { type: 'ecommerce', capabilities: ['payments'] })).get('idempotency-keys'), 'required')
     assert.equal(levels(profile(real, { type: 'saas', capabilities: ['api-public'] })).get('idempotency-keys'), 'recommended')
-    assert.equal(levels(profile(real, { type: 'landing', capabilities: ['payment-links'] })).get('price-transparency'), 'required')
   })
 
   test('the audit never reports high_traffic as missing from the code', () => {
     const scope = profile(real, { type: 'saas', signals: { high_traffic: true } })
     const code = profile(real, { type: 'saas' })
     assert.ok(!compareScopeAndCode(scope, code).scopeOnly.includes('señal high_traffic'))
-  })
-
-  test('the responsive test also measures touch targets', () => {
-    assert.match(readFileSync(join(import.meta.dirname, '..', 'templates/tests/responsive.spec.ts'), 'utf8'), /24×24 px/)
   })
 })

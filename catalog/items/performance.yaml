@@ -55,11 +55,12 @@
   level: required
   phase: launch.ops
   since: "2026.10.2"
+  updated: "2026.10.7"
   effort: { size: XS, hours: [0.5, 1] }
   why: "Sin compresión ni caché, cada visita descarga todo otra vez."
   how: "Vercel lo hace por defecto para assets con hash; en otro hosting, Cache-Control: public, max-age=31536000, immutable."
   verify:
-    - { type: manual, prompt: "Assets con hash servidos con Brotli/gzip y Cache-Control immutable de un año" }
+    - { type: live, rule: compression }
 
 - id: core-web-vitals-budget
   title: "Presupuesto Core Web Vitals: LCP < 2.5 s · INP < 200 ms · CLS < 0.1"

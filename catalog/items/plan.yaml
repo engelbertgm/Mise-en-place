@@ -1,0 +1,73 @@
+# Documentos de planeación en docs/plan/: Claude los escribe desde templates/plan/; el motor verifica que existan, que tengan sus secciones y que sigan al día con el código.
+
+- id: plan-prd
+  title: "PRD en docs/plan/PRD.md: qué se construye, para quién y cómo se mide"
+  category: plan
+  level: required
+  phase: foundation.setup
+  since: "2026.10.9"
+  effort: { size: S, hours: [1, 3] }
+  why: "Sin un PRD escrito, cada sesión reconstruye el producto de memoria y el cliente no tiene qué aprobar."
+  how: "/mep:scope lo escribe desde templates/plan/PRD.md, con su diagrama journey o story-map hecho con diagram-design; cada trabajo a la medida del perfil aparece con su título."
+  verify:
+    - { type: plan, doc: prd, rule: sections, sections: [resumen, usuarios, metas, alcance, fuera-de-alcance, historias] }
+    - { type: plan, doc: prd, rule: custom_work }
+    - { type: plan, doc: prd, rule: diagrams, required: ["journey|story-map"] }
+
+- id: plan-trd
+  title: "TRD en docs/plan/TRD.md: stack, arquitectura, entornos y requisitos no funcionales"
+  category: plan
+  level: required
+  phase: foundation.setup
+  since: "2026.10.9"
+  effort: { size: S, hours: [1, 3] }
+  why: "La arquitectura escrita evita que cada sesión decida de nuevo cómo se conectan las piezas."
+  how: "/mep:scope lo escribe desde templates/plan/TRD.md, con su diagrama architecture; menciona cada decisión de stack del perfil y enlaza su ADR."
+  verify:
+    - { type: plan, doc: trd, rule: sections, sections: [stack, arquitectura, entornos, no-funcionales] }
+    - { type: plan, doc: trd, rule: stack }
+    - { type: plan, doc: trd, rule: diagrams, required: [architecture] }
+
+- id: plan-implementation
+  title: "Plan de implementación en docs/plan/IMPLEMENTATION.md: fases, hitos y calendario"
+  category: plan
+  level: required
+  phase: foundation.setup
+  since: "2026.10.9"
+  effort: { size: S, hours: [1, 2] }
+  why: "El cliente y Claude necesitan el mismo orden de construcción y saber qué se entrega al final de cada fase."
+  how: "/mep:scope lo escribe desde templates/plan/IMPLEMENTATION.md, con una sección por sub-etapa que aplica y su diagrama gantt."
+  verify:
+    - { type: plan, doc: implementation, rule: sections, sections: [fases, hitos, calendario] }
+    - { type: plan, doc: implementation, rule: phases, phases: [foundation.setup, foundation.design, build.data, build.features, build.ux, launch.content, launch.seo, launch.ops] }
+    - { type: plan, doc: implementation, rule: diagrams, required: [gantt] }
+
+- id: plan-flows
+  title: "Flujos en docs/plan/FLOWS.md: cada pantalla y cada tarea principal del usuario"
+  category: plan
+  level: required
+  phase: foundation.design
+  since: "2026.10.9"
+  effort: { size: M, hours: [2, 4], scales_with: pages }
+  why: "Las pantallas se diseñan para un recorrido; sin el recorrido escrito, faltan estados, salidas y pantallas enteras."
+  how: "Se escribe al empezar foundation.design desde templates/plan/FLOWS.md, con un flowchart por flujo principal y un sequence de auth y pagos; cada ruta de página nueva se agrega al inventario."
+  verify:
+    - { type: plan, doc: flows, rule: sections, sections: [pantallas, flujos] }
+    - { type: plan, doc: flows, rule: routes }
+    - { type: plan, doc: flows, rule: diagrams, required: [flowchart] }
+    - { type: plan, doc: flows, rule: diagrams, required: [sequence], if_capabilities: [auth, payments] }
+
+- id: plan-schema
+  title: "Esquema de datos en docs/plan/SCHEMA.md: tablas, relaciones, autenticación y RLS"
+  category: plan
+  level: required
+  phase: build.data
+  since: "2026.10.9"
+  when: { signals: { has_db: true } }
+  effort: { size: M, hours: [2, 4], scales_with: entities }
+  why: "Decidir tablas, relaciones y permisos antes de escribir migraciones evita rehacerlas; el documento es lo que Claude lee antes de tocar la base de datos."
+  how: "Se escribe al empezar build.data desde templates/plan/SCHEMA.md, con su diagrama db-schema; cada migración que crea o borra una tabla actualiza el documento."
+  verify:
+    - { type: plan, doc: schema, rule: sections, sections: [tablas, relaciones, rls] }
+    - { type: plan, doc: schema, rule: tables }
+    - { type: plan, doc: schema, rule: diagrams, required: [db-schema] }

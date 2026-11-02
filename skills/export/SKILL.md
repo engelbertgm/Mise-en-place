@@ -22,4 +22,9 @@ Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
    - Si `changes` existe, agrega "Cambios respecto a la versión anterior".
    - Incluye la nota legal de `legal_note`.
 4. Corre `export --in docs/client/brief-v<version>.md --format <formato> --lang <idioma>`.
-5. Entrega las rutas del .docx y del .pdf.
+5. Documentos de planeación para el cliente: solo si el perfil dice `context: client-project`. Para `PRD`, `FLOWS` e `IMPLEMENTATION` que existan en `docs/plan/`:
+   - Lee `${CLAUDE_PLUGIN_ROOT}/templates/client-plan/<DOC>.<idioma>.md` (si no existe para ese idioma, usa `.en.md` y tradúcela).
+   - Escribe `docs/client/<doc>-v<version>.md` (`prd`, `flows`, `implementation`, con la misma versión del brief) desde el documento interno, con las mismas reglas del brief: lenguaje no técnico, idioma del cliente, sin tarifas ni márgenes. `FLOWS` solo con pantallas y recorridos del usuario final.
+   - Diagramas: reusa solo los PNG seguros para el cliente, con enlaces relativos a `../plan/diagrams/`: `prd-journey`, `prd-story-map`, `prd-service-blueprint`, `implementation-gantt`, `implementation-timeline` y los `flows-flowchart-*` de recorridos del usuario final. Nunca `state`, `swimlane`, `heatmap`, `sequence` ni nada de `trd-` o `schema-`. No generes diagramas nuevos.
+   - Corre `export --in docs/client/<doc>-v<version>.md --format <formato> --lang <idioma>` por cada uno. Si falla por una imagen, el mensaje dice cuál falta.
+6. Entrega las rutas de todos los .docx y .pdf.

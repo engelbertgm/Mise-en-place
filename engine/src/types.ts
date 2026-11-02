@@ -30,11 +30,17 @@ export type Check =
   | { type: 'html'; rule: HtmlRule; name?: string; property?: string; rel?: string }
   | { type: 'sql'; rule: 'rls_enabled' | 'policies_per_operation'; glob?: string }
   | { type: 'maps'; rule: 'registry' | 'codemap' }
-  | { type: 'quality'; rule: 'thresholds' }
+  | { type: 'quality'; rule: 'thresholds' | 'python' }
   | { type: 'design'; rule: 'font_families' | 'font_weights'; max: number }
   | { type: 'build'; rule: 'max_js_chunk' | 'no_source_maps' | 'server_rendered'; max_kb?: number }
   | { type: 'robots'; rule: 'allows_ai' }
+  | { type: 'live'; rule: LiveRule; names?: string[]; paths?: string[] }
+  | { type: 'dns'; rule: 'spf' | 'dmarc' | 'dkim'; selectors?: string[] }
   | { type: 'manual'; prompt: string }
+  | { type: 'plan'; doc: 'prd' | 'trd' | 'flows' | 'schema' | 'implementation'; rule: 'sections' | 'custom_work' | 'stack' | 'phases' | 'diagrams' | 'routes' | 'tables'; sections?: string[]; phases?: string[]; required?: string[]; if_capabilities?: string[] }
+
+/** Checks against the deployed site (urls in the profile, or MEP_URL). */
+export type LiveRule = 'headers' | 'hsts' | 'compression' | 'cookies' | 'error_page' | 'canonical_redirect' | 'sitemap' | 'reachable'
 
 export type HtmlRule =
   | 'meta'
@@ -53,6 +59,7 @@ export type HtmlRule =
   | 'iframe_title'
   | 'skip_link'
   | 'has_text'
+  | 'clean_links'
 
 export type Size = 'XS' | 'S' | 'M' | 'L' | 'XL'
 export type ScaleDim = 'pages' | 'entities' | 'languages' | 'markets' | 'integrations'
@@ -76,6 +83,8 @@ export type Item = {
   how: string
   verify: Check[]
   references?: string[]
+  /** Groups of catalog/sensitive.yaml a security report must always cover. */
+  sensitive?: string[]
 }
 
 export type StackRule = {
@@ -93,6 +102,8 @@ export type Dimensions = {
   market_sublevels: Record<string, string[]>
   market_languages: Record<string, string[]>
   audience: string[]
+  /** Audiences mep refuses to scope: projects for minors, or that verify age. */
+  excluded_audience?: string[]
   context: string[]
   signals: Record<string, { values: (string | boolean)[]; default: string | boolean }>
   phases: string[]
@@ -106,6 +117,7 @@ export type Catalog = {
   items: Item[]
   stackRules: StackRule[]
   presets: Record<string, Partial<Profile>>
+  sensitiveGroups: Record<string, string[]>
   sensitivePaths: string[]
 }
 
@@ -135,8 +147,13 @@ export type Profile = {
   custom_work?: { title: string; size: Size; phase?: string }[]
   /** One paragraph, in the person's words: what the project is, for whom and what it must achieve. Shown at the top of SCOPE.md. */
   summary?: string
-  /** Code quality thresholds (complexity, max_lines, max_function_lines). Laxer than the defaults needs a reason. */
-  quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines', number>>
+  /** The deployed site, for the live checks (MEP_URL overrides). */
+  urls?: { production?: string; preview?: string }
+  /** The domain email is sent from, for the DNS checks (defaults to the production host). */
+  email_domain?: string
+  email_dkim_selector?: string
+  /** Code quality thresholds (complexity, max_lines, max_function_lines, max_params). Laxer than the defaults needs a reason. */
+  quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines' | 'max_params', number>>
 }
 
 export type ItemState = 'active' | 'skipped' | 'overridden' | 'offered'
@@ -148,7 +165,11 @@ export type Evaluated = {
   reason?: string
 }
 
-export type CheckResult = { ok: boolean | null; detail: string; violation?: boolean }
+/**
+ * `all`: every finding when `detail` names only the first few (the panel shows the whole list).
+ * `skip`: the check could not run here (no deployed site to check, quick mode): it neither passes nor fails the item.
+ */
+export type CheckResult = { ok: boolean | null; detail: string; violation?: boolean; all?: string[]; skip?: boolean }
 
 export type ItemStatus = 'pass' | 'fail' | 'unknown'
 

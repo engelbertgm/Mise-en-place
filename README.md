@@ -6,11 +6,11 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.1.7-informational.svg)](.claude-plugin/plugin.json)
-[![Catalog](https://img.shields.io/badge/catalog-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.3.2-informational.svg)](.claude-plugin/plugin.json)
+[![Catalog](https://img.shields.io/badge/catalog-2026.11.1-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
-[![Works with batuta](https://img.shields.io/badge/works_with-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
+[![Works with baladero](https://img.shields.io/badge/works_with-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
 **English** · [Español](README.es.md)
@@ -54,22 +54,64 @@ Sub-phases run in order: `foundation.setup → foundation.design → build.data 
 | `mep-security` | Opus | high | Implements and audits security items. Its reports in `.mep/security/` are the only thing that marks a security item as done |
 
 > [!NOTE]
-> A security item passes only when its automatic checks pass **and** `mep-security` left a current report. The report stores a hash of the files it reviewed; when any of them changes, the report expires and the item is pending again.
+> A security item passes only when its automatic checks pass **and** `mep-security` left a current report. The report stores a hash of the files it reviewed, always including the sensitive files of that item's group (auth, payments, database, config); when any of them changes, the report expires and the item is pending again.
+
+### What the agent cannot do
+
+mep's blocks hold against the agent's own shortcuts, not just honest mistakes:
+
+- **State changes only through the CLI.** `.mep/profile.yaml`, the log, reports and reviews are sealed with a hash after every write. An edit from outside the CLI blocks `mep verify` (locally and in CI, `MEP_BYPASS` included) until you run `/mep:resync`.
+- **Your actions stay yours.** `/mep:confirm`, `/mep:override`, `/mep:threshold` (relaxing) and `/mep:resync` run only when you type them or press them in the panel; from the agent's Bash they are denied. Confirmations record your git user.
+- **PRs need a real review.** The branch review is recorded (`mep review record --pr`) and tied to the code; retrying without it does not get through, and CI asks for it too.
+- **Nothing is silent.** CI writes every state change of the PR (overrides, confirmations, phase closes, bypasses, re-seals) to the job summary, so you see it before merging.
+
+On the same machine nothing is tamper-proof; a deliberate workaround is still visible in that summary.
+
+### Planning documents
+
+mep keeps a written plan in `docs/plan/`, so every session builds against the same plan instead of memory:
+
+| Document | What it answers | Written |
+| --- | --- | --- |
+| `PRD.md` | What is built, for whom, and how success is measured | `/mep:scope` |
+| `TRD.md` | Stack, architecture, environments, non-functional requirements | `/mep:scope` |
+| `IMPLEMENTATION.md` | Phases, milestones and schedule | `/mep:scope` |
+| `FLOWS.md` | Every screen and every main user journey | start of `foundation.design` |
+| `SCHEMA.md` | Tables, relationships, auth and row-level security | start of `build.data` (only with a database) |
+
+Each one has fixed sections and diagrams made with [diagram-design](https://github.com/cathrynlavery/diagram-design). The engine checks that they exist and that they match the code: a page route missing from `FLOWS.md`, or a migration table missing from `SCHEMA.md`, puts the item back to pending. For client projects, `/mep:export` also produces non-technical versions of PRD, FLOWS and IMPLEMENTATION, with the client-safe diagrams. Any of them converts to .docx and .pdf with `mep export --in docs/plan/<DOC>.md`.
+
+There is no separate command for them: `/mep:scope` writes the first three, the `mep` skill writes FLOWS and SCHEMA when their sub-phase starts, `/mep:add` updates them when the scope changes, `/mep:update` writes the missing ones in projects already underway, and the `plan-*` items in the checklist say which are missing or out of date.
+
+### Guidelines and quality gates
+
+[`catalog/guidelines.md`](catalog/guidelines.md) holds the design, UX, copy and code principles mep works by: Nielsen, Norman, Shneiderman, the laws of UX, Maeda and Rams, Cialdini and positioning, KISS, YAGNI, DRY, SOLID, Gall, Conway and Twelve-Factor. Claude reads only the section of the active sub-phase (visual design in `foundation.design`, interaction and usability in `build.ux`, copy and conversion in `launch.content` for landing, ecommerce, marketplace and SaaS), and the close review checks key screens against it.
+
+What can be measured is a check, not a principle:
+
+| Area | Checks |
+| --- | --- |
+| Interface | touch targets ≥ 44×44 px and one primary CTA per view (responsive test), contrast, focus, spacing scale, 2 font families, 45–75 characters per line, every async state, no dark patterns |
+| Code (JS/TS) | complexity ≤ 10, files ≤ 300 lines, functions ≤ 50 lines, ≤ 4 parameters, no import cycles, strict types, no duplicated or dead code (jscpd and knip actually run) |
+| Code (Python) | Ruff with the same limits plus its security rules, mypy --strict, pytest, a lockfile with pip-audit, vulture; only in projects with `pyproject.toml`, `requirements*.txt` or `uv.lock` |
+| Architecture | Twelve-Factor (config validated from env, stateless server, logs to stdout, pinned runtime) and a walking skeleton deployed before features (Gall's law) |
 
 ## Works with
 
 | Plugin | How they fit |
 | --- | --- |
 | [ponytail](https://github.com/DietrichGebert/ponytail) | Applies the code mantra on every change. `/ponytail-review` replaces mep's quality review when closing a sub-phase. The engine detects Ponytail and requires the review recorded (`mep review record`), with no "must fix" and on the current code, before the close |
-| [batuta](https://github.com/engelbertgm/Batuta) | Routes each task to the right model (Opus decides, Sonnet executes, Haiku reads). mep's two agents are fixed exceptions: finding code always goes to `mep-locator` and security always to `mep-security` |
+| [diagram-design](https://github.com/cathrynlavery/diagram-design) | Draws the diagrams of the planning documents (journey, architecture, flowcharts, sequence, database schema, Gantt). Required to write them; its PNG export needs Python and Playwright |
+| [baladero](https://github.com/engelbertgm/Baladero) | Live HUD for Claude Code: model, git, context and usage bars, tools, todos, and the cost of each task. mep's status line and panel show the checklist; Baladero shows what the session spends doing it |
 
-Both are optional. mep works on its own.
+ponytail and baladero are optional. diagram-design is required for the planning documents.
 
 ## Requirements
 
 - Claude Code (mods need 2.1.287 or later; older versions use the bundled hooks)
 - Node.js 20 or later
 - Projects in a git repository
+- The [diagram-design](https://github.com/cathrynlavery/diagram-design) plugin (2.6.136 or later), with Python and Playwright for its PNG export, to write the planning documents
 - Recommended: the [ponytail](https://github.com/DietrichGebert/ponytail) plugin. mep works without it and uses its own quality review instead
 
 ## Install
@@ -92,23 +134,29 @@ Then, in a new or existing project folder:
 
 | Command | What it does |
 | --- | --- |
-| `/mep:scope [--preset <name>] <description>` | Asks only what changes 🔴 items, then writes `.mep/profile.yaml`, `SCOPE.md` (the scope in plain words: what is in, what is out), `BRIEF.md`, stack ADRs, the `CLAUDE.md` block and the CI workflow |
-| `/mep:add <change>` | Updates the scope and shows **only the diff**: new items, items that move up a level, items that no longer apply |
+| `/mep:scope [--preset <name>] <description>` | Asks only what changes 🔴 items, then writes `.mep/profile.yaml`, `SCOPE.md` (the scope in plain words: what is in, what is out), `BRIEF.md`, stack ADRs, the `CLAUDE.md` block, the CI workflow, and the PRD, TRD and implementation plan with their diagrams |
+| `/mep:add <change>` | Updates the scope and shows **only the diff**: new items, items that move up a level, items that no longer apply. Updates the planning documents it affects |
 | `/mep:check` | Status by sub-phase: ✅ done · ❌ pending · ⏭️ skipped · ⚠️ overridden. Warns about signals in the code the profile does not have |
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` runs the security audit and quality review, then closes it |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |
-| `/mep:override <id> <reason>` | Turns off a 🔴 item after confirmation; rejects 🔒 items |
+| `/mep:override <id> <reason>` | Turns off a 🔴 item; rejects 🔒 items. Only you type it: the agent cannot |
+| `/mep:panel` | Panel beside the chat: pending items by sub-phase; press one to see what it asks, why and everything that fails, and to confirm, skip or turn it off |
+| `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Your actions, never the agent's: confirm a manual item (recorded with your git user), relax a quality threshold, re-seal state changed outside the CLI |
 | `/mep:audit [scope]` | For an existing repo: starts from the project's scope, compares it with what the code shows (code-only vs scope-only), and reports the gap with only the rules that scope activates. Changes nothing until you adopt the brief |
-| `/mep:update` | Brings new catalog items that apply to your profile. Items that land in a closed sub-phase get a grace period |
+| `/mep:update` | Brings new catalog items that apply to your profile, marked ＋ new or ✎ changed. Items that land in a closed sub-phase get a grace period. Writes planning documents the project is missing |
 | `/mep:quote [--client]` | Quote from the brief. Internal view (hours, rate, margins) or client view (price and estimated weeks per phase, extras, recurring costs, maintenance plans) |
-| `/mep:export [--lang es]` | Client brief as .docx and .pdf, in the client's language, versioned, with what changed since the last version |
+| `/mep:export [--lang es]` | Client brief as .docx and .pdf, in the client's language, versioned, with what changed since the last version; for client projects, also the PRD, flows and implementation plan, with their diagrams |
 | `/mep:log-time <id> <hours>` | Logs real hours per item outside the repo; with enough data, mep suggests new ranges |
 
-Code quality thresholds (complexity 10, 300 lines per file, 50 per function) live in the profile; relaxing one needs a reason: `mep threshold complexity 15 "<reason>" --yes`, marked ⚠️ in the brief.
+Code quality thresholds (complexity 10, 300 lines per file, 50 per function, 4 parameters) live in the profile and apply to JS/TS and Python alike; relaxing one needs a reason: `mep threshold complexity 15 "<reason>" --yes`, marked ⚠️ in the brief.
 
 The quote runs by itself only when the scope is defined (`/mep:scope`) or changes (`/mep:add`, which shows the impact in hours and price before you accept). Rates, real hours and internal quotes live in `~/.config/mep-check/`, never in the repo.
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
+
+Checks run on the code, on the build output and, when the profile has `urls.preview`/`urls.production` (or `MEP_URL` is set), on the deployed site and its DNS: the headers it really sends, cookies, compression and caching, a real 404, canonical redirects, the sitemap, and SPF/DMARC/DKIM.
+
+Out of scope by design: projects for minors, or that need age verification (adult content, gambling, alcohol…). `/mep:scope` stops, and a profile with that audience is invalid.
 
 Every rule is activated by the project's scope (type, capabilities, markets, audience, context, signals), never by default: a landing without accounts gets no RLS rules, a site without cookies gets no consent banner. `mep explain <id>` shows the rule's condition with ✓/✗ and why it applies or not.
 
@@ -205,8 +253,8 @@ Mise-en-place/
 │   └── marketplace.json       # makes the repo installable with /plugin
 ├── skills/                    # each folder is a /mep:<name> command
 │   ├── mep/                   # guide: read a scope, use the catalog, respect the brief
-│   ├── scope/  add/  check/  phase/  skip/  override/
-│   ├── audit/  update/
+│   ├── scope/  add/  check/  phase/  skip/  panel/  audit/  update/
+│   ├── override/  confirm/  threshold/  resync/   # yours only (disable-model-invocation)
 │   └── quote/  export/  log-time/
 ├── agents/
 │   ├── mep-locator.md         # Haiku, read-only: finds code through the maps
@@ -214,23 +262,30 @@ Mise-en-place/
 ├── hooks/
 │   └── hooks.json             # mods module + fallback hooks (SessionStart, Stop, PreToolUse, PostToolUse)
 ├── mods/
-│   ├── register.ts            # gate, instant commands and status line, inside Claude Code
+│   ├── register.tsx           # gate, guard, panel, instant commands and status line
 │   └── register.test.ts       # mod tests (claude plugin test .)
+├── types/index.d.ts           # the mod's state contract (panel)
 ├── engine/
 │   ├── src/                   # deterministic engine in TypeScript, no LLM
 │   │   ├── evaluate.ts        # profile + catalog → items that apply, diff, stack
 │   │   ├── verify.ts          # runs each item's checks (html.ts, sql.ts, maps.ts)
 │   │   ├── gate.ts            # blocking rules and phase close
+│   │   ├── seal.ts guard.ts   # state sealed after every write; what the agent may not touch
+│   │   ├── human.ts           # actions only the person takes
+│   │   ├── live.ts            # checks against the deployed site and its DNS
 │   │   ├── render.ts          # BRIEF.md, ADRs, CLAUDE.md block
 │   │   ├── scope.ts           # SCOPE.md: the scope in plain words
 │   │   ├── audit.ts           # infers a profile from an existing repo
 │   │   ├── update.ts          # new catalog items, grace period
 │   │   ├── quote.ts           # quote, log-time, calibration
-│   │   ├── export.ts docs.ts  # client brief → .docx and .pdf
+│   │   ├── plan.ts            # planning documents: sections, diagrams, drift against routes and migrations
+│   │   ├── quality.ts         # code-quality limits in ESLint/Biome and Ruff
+│   │   ├── export.ts docs.ts  # client documents → .docx and .pdf, with PNG images
 │   │   └── cli.ts             # the `mep` command that skills, mods, hooks and CI call
 │   └── dist/mep.mjs           # bundle with no runtime dependencies (committed)
 ├── catalog/
 │   ├── dimensions.yaml        # valid values: types, capabilities, markets, signals, phases
+│   ├── guidelines.md          # design, UX, copy and code principles, read per sub-phase
 │   ├── items/                 # one file per category (base, seo, security, ux, legal…)
 │   ├── markets/               # one file per market (mx, usa, ca, eu, uk, br, in)
 │   ├── presets/               # landing, corporate, ecommerce, saas, marketplace
@@ -243,7 +298,9 @@ Mise-en-place/
 │   ├── claude-md.md           # block added to the project's CLAUDE.md
 │   ├── ci/mep.yml             # CI workflow installed in each project
 │   ├── tests/responsive.spec.ts  # Playwright responsive test installed in each project
-│   └── client-brief/          # client brief template (es, en)
+│   ├── client-brief/          # client brief template (es, en)
+│   ├── plan/                  # PRD, TRD, FLOWS, SCHEMA, IMPLEMENTATION templates
+│   └── client-plan/           # client versions of PRD, FLOWS, IMPLEMENTATION (es, en)
 ├── examples/estudio-saas/     # test project used by tests/e2e.spec.ts
 ├── tests/                     # engine, CLI and end-to-end tests (node:test)
 └── docs/spec.md               # full specification (Spanish)
@@ -255,8 +312,9 @@ Mise-en-place/
 your-project/
 ├── .mep/
 │   ├── profile.yaml           # source of truth: type, capabilities, markets, signals, phase
-│   ├── log                    # overrides, bypasses, phase changes
+│   ├── log                    # overrides, bypasses, phase changes, confirmations; sealed
 │   ├── security/<id>.json     # mep-security audit reports
+│   ├── reviews/<sub|pr>.json  # quality reviews (phase close, PR)
 │   └── exports.yaml           # client brief versions
 ├── SCOPE.md                   # generated: what the project is and is not, in plain words
 ├── BRIEF.md                   # generated brief: profile, stack, checklist by sub-phase
@@ -265,7 +323,8 @@ your-project/
 ├── REGISTRY.md                # reusable pieces
 ├── docs/
 │   ├── decisions/             # ADRs, starting with the stack decisions
-│   └── client/brief-vN.*      # client brief (.md, .docx, .pdf)
+│   ├── plan/                  # PRD, TRD, FLOWS, SCHEMA, IMPLEMENTATION + diagrams/
+│   └── client/                # client brief and plan documents (.md, .docx, .pdf)
 ├── tests/responsive.spec.ts   # 360–2560 px, no horizontal scroll, no overlaps (Playwright)
 └── .github/workflows/mep.yml  # mep verify --prod as a required check
 
@@ -278,12 +337,12 @@ your-project/
 ## Under the hood
 
 - **Engine** ([`engine/src`](engine/src)): TypeScript, no LLM. Same profile, same items, same result. Bundled to [`engine/dist/mep.mjs`](engine/dist/mep.mjs) with no runtime dependencies, and published as `@engelbertgm/mep` for CI.
-- **Mods** ([`mods/register.ts`](mods/register.ts)): run inside Claude Code. `/mep:check` and `/mep:phase` answer instantly, without a Claude turn; deploys wait for the engine's gate; the status line shows the active sub-phase and pending 🔴/🟡.
-- **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse and PostToolUse, as the fallback where mods are not available.
-- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): installed by `/mep:scope`. Runs gitleaks, `pnpm audit`, the build and `mep verify --prod`.
+- **Mods** ([`mods/register.tsx`](mods/register.tsx)): run inside Claude Code. The chat only hears from mep when something blocks; the status line shows the active sub-phase and pending 🔴/🟡; the panel (`/mep:panel`) shows each item's why, how and every finding, with your actions (confirm, skip, turn off through a dialog). `/mep:check` and `/mep:phase` answer instantly; deploys (Vercel, Netlify, Cloudflare, Fly, Railway, Firebase, Supabase, `git push` to main) wait for the engine's gate; edits to mep's state and secrets in versioned files are denied.
+- **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse (gate and guard) and PostToolUse, as the fallback where mods are not available.
+- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): installed by `/mep:scope`. Runs gitleaks, `pnpm audit`, the build and `mep verify --prod` (with `--pr` on pull requests, and against `MEP_URL` for the live checks), and writes the PR's state changes to the job summary.
 - **Maps**: `mep codemap` and `mep registry` generate `CODEMAP.md` and `REGISTRY.md` from the code. "What for" and "Do not use for" are written in each export's doc comment; an export without an entry blocks once its sub-phase is closed.
-- **Export**: a small Markdown subset becomes .docx and .pdf with no dependencies, so it works on any machine.
-- **Catalog** ([`catalog/`](catalog)): 345 items across accessibility, design system, UX, content, forms, data, responsive, security, privacy, legal, performance, i18n, code quality, deploy, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source.
+- **Export**: a small Markdown subset, PNG images included, becomes .docx and .pdf with no dependencies, so it works on any machine.
+- **Catalog** ([`catalog/`](catalog)): 415 items across accessibility, design system, UX, content, forms, data, responsive, security, privacy, legal, performance, i18n, code quality (JS/TS and Python), planning documents, deploy and operations; rules per project type (SaaS, ecommerce, marketplace, booking, blog, directory, portfolio, internal app), usage-based billing, health and finance data, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source or a confirmation from you.
 
 ### Test project
 
@@ -296,7 +355,11 @@ your-project/
 
 - The CI check only blocks merges once you mark it as **required** in the repo's branch protection settings.
 - HTML checks need a build output (`out/`, `.next/server/app`, `dist/`). Without one, those items stay pending instead of passing.
-- Many UX, legal and design items are `manual`: the engine tracks them, but a person (or `mep-security`, for security) confirms them.
+- Many UX, legal and design items are `manual`: the engine tracks them, but you (or `mep-security`, for security) confirm them.
+- Live and DNS checks need the deployed site (`urls` in the profile, or `MEP_URL`); without it they are skipped, and items that depend only on them stay pending.
+- The guard and the seal stop the obvious shortcuts; a deliberate workaround on the same machine is not prevented, only shown in the PR summary.
+- Planning documents need diagram-design with Python and Playwright for the PNG export; `/mep:scope` stops and says what to install when they are missing.
+- Python checks run through `uv run`, so Python projects are expected to use uv.
 - Prices in `catalog/costs.yaml` and effort ranges are estimates; check current prices and calibrate with `/mep:log-time`.
 
 The full design is in [docs/spec.md](docs/spec.md) (Spanish).

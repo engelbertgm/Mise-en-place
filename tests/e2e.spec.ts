@@ -6,6 +6,7 @@ import { cpSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs
 import { join } from 'node:path'
 import { before, describe, test } from 'node:test'
 import { parse } from 'yaml'
+import { seal } from '../engine/src/seal.ts'
 import { CLI, REPO, tempDir } from './helpers.ts'
 
 const root = tempDir('mep-e2e-')
@@ -49,7 +50,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     assert.equal(r.code, 0, r.err)
     assert.match(r.out, /Cotización: .* MXN/)
     const brief = readFileSync(join(root, 'BRIEF.md'), 'utf8')
-    for (const id of ['rls-all-tables', 'hosted-checkout', 'mx-privacy-notice', 'gpc-signal', 'eu-de-impressum', 'eu-withdrawal-right', 'i18n-hreflang']) {
+    for (const id of ['plan-prd', 'plan-trd', 'plan-implementation', 'rls-all-tables', 'hosted-checkout', 'mx-privacy-notice', 'gpc-signal', 'eu-de-impressum', 'eu-withdrawal-right', 'i18n-hreflang']) {
       assert.match(brief, new RegExp('`' + id + '`'), id)
     }
     assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /Mantra de código/)
@@ -61,8 +62,9 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
 
   test('3. nothing blocks Stop while foundation.setup is the active sub-phase', () => {
     const out = hook('stop')
+    // Nothing blocks, so the chat hears nothing: pending items live in the status line and the panel.
     assert.equal(out.decision, undefined)
-    assert.match(out.systemMessage ?? '', /Pendientes de foundation\.setup/)
+    assert.equal(out.systemMessage, undefined)
   })
 
   test('4. closing foundation.setup needs the mep-security audit and the manual confirmations', () => {
@@ -72,9 +74,11 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     assert.match(fail.out, /git-protected-main/)
 
     // The person confirms what only they can know; mep-security audits each security item.
-    assert.equal(mep(['confirm', 'git-protected-main', '--by', 'Engel']).code, 0)
+    assert.equal(mep(['confirm', 'git-protected-main']).code, 3)
+    assert.equal(mep(['confirm', 'git-protected-main', '--human']).code, 0)
     // pnpm audit needs the network: the test turns it off the way a person would, with a reason.
-    assert.equal(mep(['override', 'no-critical-vulnerabilities', 'el e2e corre sin red; el CI del proyecto lo cubre', '--yes']).code, 0)
+    assert.equal(mep(['override', 'no-critical-vulnerabilities', 'el e2e corre sin red; el CI del proyecto lo cubre', '--yes', '--human']).code, 0)
+    assert.equal(mep(['override', 'walking-skeleton', 'el e2e corre sin sitio desplegado', '--yes', '--human']).code, 0)
     const security = JSON.parse(mep(['check', '--json', '--fast']).out).results.filter(
       (r: { phase: string; level: string; state: string; id: string }) => r.phase === 'foundation.setup' && r.level === 'required' && r.state === 'active',
     )
@@ -182,6 +186,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
   test('12. /mep:update brings the new catalog items, with grace in closed sub-phases', () => {
     const file = join(root, '.mep/profile.yaml')
     writeFileSync(file, readFileSync(file, 'utf8').replace(/catalog_version: .*/, 'catalog_version: 2026.10.1'))
+    seal(root)
     const list = mep(['update'])
     const version = readFileSync(join(REPO, 'catalog', 'VERSION'), 'utf8').trim()
     assert.ok(list.out.includes(`Catálogo 2026.10.1 → ${version}`), list.out.slice(0, 200))

@@ -1,4 +1,5 @@
 # Diseño de sistemas. Agregado en 2026.11.1.
+# Lo que ya existía y no se repite: health-endpoint, uptime-monitor, twelve-factor, api-rate-limit, usage-events-idempotent.
 # Lo que depende de la escala se activa con la señal high_traffic (solo la fija el scope); lo demás, con lo que el proyecto hace.
 
 - id: idempotency-keys
@@ -25,12 +26,12 @@
   phase: launch.ops
   since: "2026.11.1"
   when: { signals: { high_traffic: true } }
+  depends_on: [health-endpoint, twelve-factor]
   effort: { size: S, hours: [2, 6] }
   why: "Con mucho tráfico una sola instancia es un punto de falla y un techo; para repartir la carga, cualquier instancia debe poder atender cualquier petición."
-  how: "Hosting con balanceo gestionado (Vercel, Cloud Run, Fargate) o un balanceador con health checks. La app sin estado local: sesiones, archivos y caché en un almacén compartido; endpoint /api/health que revisa lo esencial (base, caché) y responde rápido; despliegues sin cortar conexiones."
+  how: "Hosting con balanceo gestionado (Vercel, Cloud Run, Fargate) o un balanceador que use el endpoint de salud para sacar instancias enfermas; mínimo dos instancias en zonas distintas; despliegues sin cortar conexiones (drenado) y límites de conexiones a la base por instancia. El servidor sin estado local ya lo exige twelve-factor."
   verify:
-    - { type: file_exists, path: ["{app,src/app}/api/{health,healthz,status}/route.{ts,js}", "pages/api/{health,healthz}.{ts,js}"] }
-    - { type: manual, prompt: "Hosting con balanceo gestionado o balanceador con health checks, y la app no guarda sesiones ni archivos en la instancia" }
+    - { type: manual, prompt: "El tráfico se reparte entre varias instancias (balanceo gestionado o balanceador con health checks) y una instancia que cae no se nota" }
 
 - id: server-caching
   title: "Caché en capas con invalidación definida: CDN, datos del servidor y consultas calientes"
@@ -84,7 +85,7 @@
   level: recommended
   phase: build.features
   since: "2026.11.1"
-  when: { any: [ { signals: { has_forms: true } }, { capabilities: { any: [api-public, auth, ai-features, search, uploads] } } ] }
+  when: { any: [ { signals: { has_forms: true } }, { capabilities: { any: [auth, ai-features, search, uploads] } } ] }
   depends_on: [form-rate-limit]
   effort: { size: S, hours: [1, 3] }
   why: "Un contador en la memoria de una función serverless se reinicia en cada instancia y no limita nada; y sin 429 claro, los clientes legítimos no saben cuándo reintentar."
@@ -178,20 +179,6 @@
   how: "pino o el logger del hosting en JSON: nivel, mensaje, id de petición (x-request-id), ruta y duración. Mismo id hacia los servicios que se llaman. Sin cuerpos de petición ni datos personales; el id del usuario, no su correo."
   verify:
     - { type: grep, pattern: "pino|winston|@logtail|consola|bunyan|@vercel/otel|x-request-id|requestId|correlation", glob: "**/*.{ts,tsx,js,json}" }
-
-- id: uptime-monitoring
-  title: "Monitor de disponibilidad externo con alerta a una persona y página de estado"
-  category: architecture
-  level: recommended
-  phase: launch.ops
-  since: "2026.11.1"
-  level_overrides:
-    - { when: { type: { any: [saas, ecommerce, booking, marketplace] } }, level: required }
-  effort: { size: XS, hours: [0.5, 1] }
-  why: "Si el sitio cae a las 3 a. m., el primero en enterarse debe ser el equipo, no el cliente. Un monitor desde afuera detecta lo que los logs internos no ven (DNS, certificado, el hosting entero)."
-  how: "Monitor externo (UptimeRobot, Better Stack, Checkly) a la URL de producción y a /api/health cada 1–5 min, con alerta a correo o Slack y una persona responsable. Aviso de vencimiento del certificado y del dominio. Página de estado si hay clientes de pago."
-  verify:
-    - { type: manual, prompt: "Monitor externo activo en producción, con alerta a una persona; certificado y dominio con aviso de vencimiento" }
 
 - id: metrics-and-traces
   title: "Métricas y trazas: tiempos de respuesta, tasa de error y Web Vitals reales con alertas"

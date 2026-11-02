@@ -40,20 +40,6 @@
     - { type: grep, pattern: "California|CCPA|CPRA|Your Privacy Rights|privacy rights", glob: "**/{privacy,privacidad}/**/*.{tsx,jsx,mdx,md,astro}", flags: i }
   references: ["https://oag.ca.gov/privacy/ccpa", "https://leginfo.legislature.ca.gov/faces/codes_displaySection.xhtml?lawCode=BPC&sectionNum=22575"]
 
-- id: usa-coppa
-  title: "COPPA: consentimiento verificable de padres para menores de 13"
-  category: legal
-  level: required
-  phase: build.features
-  since: "2026.10.2"
-  when: { all: [ { markets: { any: [USA] } }, { audience: [minors] } ] }
-  effort: { size: L, hours: [8, 20] }
-  why: "Recoger datos de menores de 13 sin consentimiento verificable de los padres está prohibido por la FTC."
-  how: "Puerta de edad neutral; consentimiento parental verificable; aviso específico para padres; minimizar datos."
-  verify:
-    - { type: grep, pattern: "parental consent|consentimiento parental|age.?gate|birth|edad", glob: "**/*.{ts,tsx}", flags: i }
-  references: ["https://www.ftc.gov/legal-library/browse/rules/childrens-online-privacy-protection-rule-coppa"]
-
 - id: usa-ada
   title: "ADA: accesibilidad WCAG 2.1/2.2 AA documentada"
   category: accessibility

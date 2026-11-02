@@ -2,7 +2,7 @@
 name: add
 description: Agrega o cambia scope en un proyecto con mep y muestra solo el diff del checklist (ítems nuevos, que suben de nivel o que dejan de aplicar).
 argument-hint: "<cambio de scope en lenguaje natural>"
-allowed-tools: Bash(node *), Read, Write, AskUserQuestion
+allowed-tools: Bash(node *), Bash(python *), Bash(python3 *), Read, Write, Edit, AskUserQuestion, Skill
 ---
 
 # /mep:add
@@ -16,3 +16,4 @@ Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 3. Corre `add --from .mep/change.yaml` y muestra el diff tal cual, con su línea de impacto en horas y precio. No muestres el checklist completo.
 4. Si el cambio altera qué es el proyecto, actualiza también `summary`. Si el usuario confirma: `add --from .mep/change.yaml --apply` (recalcula y guarda la cotización interna fuera del repo). Borra `.mep/change.yaml`.
 5. Si cambió una decisión de stack, el motor escribe un ADR nuevo que reemplaza al anterior; menciónalo.
+6. Con el cambio aplicado, actualiza las secciones afectadas de `docs/plan/PRD.md`, `TRD.md` e `IMPLEMENTATION.md` (y sus diagramas si cambian) y corre `check` para confirmar que los ítems `plan-*` siguen pasando.

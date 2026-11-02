@@ -44,23 +44,23 @@ for (const path of PAGES) {
       })
       expect(overlaps, 'elementos encimados').toEqual([])
 
-      // Ítem hit-slop (WCAG 2.5.8): each control is at least 24×24 px, counting the label that wraps it.
-      // Links inside running text and visually hidden elements (skip link, sr-only) are exempt.
-      const small = await page.evaluate(() => {
-        const found: string[] = []
-        for (const el of document.querySelectorAll('a, button, input:not([type="hidden"]), select, textarea, [role="button"]')) {
-          const target = el.closest('label') ?? el
-          const r = target.getBoundingClientRect()
-          const s = getComputedStyle(el)
-          if (r.width <= 1 || r.height <= 1 || s.visibility === 'hidden') continue
-          if (el.tagName === 'A' && s.display === 'inline' && el.closest('p, li, td, dd, blockquote')) continue
-          if (r.width < 24 || r.height < 24) found.push(`${el.outerHTML.slice(0, 60)} (${Math.round(r.width)}×${Math.round(r.height)})`)
-        }
-        return found.slice(0, 5)
-      })
-      expect(small, 'objetivos táctiles menores a 24×24 px').toEqual([])
+      // Touch targets of at least 44×44 px on touch widths (ítem touch-targets). Inline links in running text are exempt.
+      if (width <= 768) {
+        const small = await page.evaluate(() =>
+          [...document.querySelectorAll('a, button, input:not([type="hidden"]), select, textarea, [role="button"]')]
+            .filter(el => {
+              const r = el.getBoundingClientRect()
+              const inText = el.tagName === 'A' && getComputedStyle(el).display === 'inline' && el.parentElement?.closest('p, li')
+              return r.width > 0 && r.height > 0 && !inText && (r.width < 44 || r.height < 44)
+            })
+            .map(el => el.outerHTML.slice(0, 60))
+            .slice(0, 5),
+        )
+        expect(small, 'objetivos táctiles < 44×44 px').toEqual([])
+      }
 
-      // The primary CTA (data-cta="primary") is visible without scrolling (ítem cta-above-fold).
+      // One primary CTA per view (ítem cta-above-fold), visible without scrolling.
+      expect(await page.locator('[data-cta="primary"]').count(), 'CTAs principales en la vista').toBeLessThanOrEqual(1)
       const cta = page.locator('[data-cta="primary"]').first()
       if (await cta.count()) {
         const box = await cta.boundingBox()

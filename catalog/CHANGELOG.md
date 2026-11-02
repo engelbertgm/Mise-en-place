@@ -4,17 +4,79 @@ Cada ítem registra `since` con la versión en que entró. `/mep:update` usa est
 
 ## 2026.11.1
 
-37 reglas nuevas (de 345 a 382 ítems), todas según el scope:
+33 reglas nuevas, todas según el scope. Se revisó lo que ya existía y no se repite (touch-targets, no-dark-patterns, ecommerce-all-in-price, uptime-monitor, health-endpoint, twelve-factor, api-rate-limit):
 
 - **Patrones de interacción** (7 en `ux`): `command-menu`, `shortcut-hints`, `stale-while-revalidate`, `view-transitions`, `swipe-sheets`, `interruptible-motion`, `menu-safe-triangle`. `predictive-back` (PWA) y `otp-autofill` (auth).
-- **Táctil**: `hit-slop` (🔴, objetivos ≥ 24 px verificados por el test responsive; 44 px recomendado).
 - **Tipografía y forma**: `tabular-numbers`, `text-balance`, `continuous-corners` (⚪).
-- **Carga percibida**: `image-placeholders` (blurhash/blurDataURL) y `prerender-public-pages` (SSG/ISR + prefetch; 🔴 en sitios de contenido).
+- **Carga percibida**: `image-placeholders` (blurhash / blurDataURL) y `prerender-public-pages` (SSG/ISR + prefetch; 🔴 en sitios de contenido).
 - **Privacidad y legal**: `form-consent-notice`, `data-minimization`, `third-party-sdk-audit`, `business-identity`. `asset-licenses` se completa con autorizaciones de fotos de personas e imágenes con IA.
-- **Honestidad con el consumidor** (categoría nueva `consumer`): `no-dark-patterns`, `price-transparency`, `no-fake-reviews`, `substantiated-claims`.
-- **Diseño de sistemas** (categoría nueva `architecture`, 14): `idempotency-keys`, `load-balancing`, `server-caching`, `cdn`, `message-queue`, `rate-limit-responses`, `sharding-strategy`, `replication-recovery`, `consistent-hashing`, `consistency-model`, `resilient-external-calls`, `structured-logs`, `uptime-monitoring`, `metrics-and-traces`.
+- **Honestidad con el consumidor** (categoría nueva `consumer`): `no-fake-reviews` (testimonios y reseñas reales) y `substantiated-claims` (afirmaciones con respaldo).
+- **Diseño de sistemas** (categoría nueva `architecture`, 13): `idempotency-keys`, `load-balancing`, `server-caching`, `cdn`, `message-queue`, `rate-limit-responses`, `sharding-strategy`, `replication-recovery`, `consistent-hashing`, `consistency-model`, `resilient-external-calls`, `structured-logs`, `metrics-and-traces`.
 - **Señal nueva `high_traffic`**: solo la fija el scope (el código no la delata). Activa balanceo, réplicas, particionado, hashing consistente y consistencia, y sube a 🔴 caché, CDN, colas, resiliencia y métricas. `/mep:audit` no la compara con el código.
 - Ya cubiertos y sin cambios: skeletons, UI optimista, deshacer con toast (`destructive-severity`), áreas seguras, políticas de privacidad, términos, reembolsos, cookies y banner, texto alternativo, teclado, baja de correo, licencias de imágenes, borrado de datos (`account-deletion`, `data-subject-requests`, `data-retention`), rate limit de formularios, login y API.
+
+## 2026.10.10
+
+Calidad de código en Python, con las mismas garantías que en JS:
+
+- **Nueva señal `has_python`:** se detecta con `pyproject.toml`, `requirements*.txt`, `uv.lock` o `setup.py`. Los ítems de Python aplican solo con ella.
+- **Nuevos ítems:**
+  - 🔴 `py-lint-format`: Ruff (lint y formato) con C90, PLR y S, y los umbrales del perfil (`max-complexity`, `max-args`, `max-statements`); el motor cuenta además el largo de cada archivo .py (nueva regla `quality` `python`).
+  - 🔴 `py-strict-types`: mypy --strict (o pyright strict).
+  - 🔴 `py-tests`: pytest sobre la lógica de negocio.
+  - 🔴 `py-deps-audit`: lockfile (uv.lock, poetry.lock o pdm.lock) y pip-audit.
+  - 🟡 `py-dead-code`: vulture.
+- Las carpetas `.venv`, `venv` y los cachés de Python (`__pycache__`, `.mypy_cache`, `.ruff_cache`, `.pytest_cache`) ya no se revisan.
+
+## 2026.10.9
+
+Documentos de planeación en `docs/plan/`, escritos por Claude desde `templates/plan/` y verificados por el motor:
+
+- **Nuevos 🔴 (categoría `plan`):**
+  - `plan-prd`, `plan-trd` y `plan-implementation` en `foundation.setup` (los escribe `/mep:scope`).
+  - `plan-flows` en `foundation.design` y `plan-schema` en `build.data` (solo con base de datos): se escriben al empezar su sub-etapa.
+- **Nueva verificación `plan`:** encuentra cada sección por su marcador (`<!-- mep:clave -->`), así los títulos pueden estar en cualquier idioma. Comprueba las secciones obligatorias, que el PRD mencione el trabajo a la medida, que el TRD mencione el stack, una fase por sub-etapa, los diagramas obligatorios (por nombre de archivo, hechos con diagram-design) y que cada imagen enlazada exista.
+- **Los documentos no se pudren:** `FLOWS.md` debe listar cada ruta de página del código y `SCHEMA.md` las mismas tablas que las migraciones; si el código cambia y el documento no, el ítem vuelve a pendiente.
+
+Los proyectos existentes reciben estos ítems con `/mep:update`, con el periodo de gracia normal.
+
+## 2026.10.8
+
+Guías de diseño, UX, marketing y código (`catalog/guidelines.md`), convertidas en verificaciones donde se pueden medir:
+
+- **Guías por sub-etapa.** El agente lee solo la sección de la sub-etapa activa (diseño visual en `foundation.design`, interacción y usabilidad en `build.ux`, copy y conversión en `launch.content` para landing, ecommerce, marketplace y SaaS; simplicidad y código siempre). La revisión de cierre revisa las vistas clave contra esa sección; cada incumplimiento es un "must fix".
+- **Nuevos 🔴:**
+  - `touch-targets`: objetivos táctiles ≥ 44×44 px, comprobados por el test responsive a 360 y 768 px.
+  - `no-dark-patterns`: sin extras ni suscripciones premarcados, sin escasez o temporizadores falsos, sin confirmshaming, cancelar tan fácil como registrarse.
+  - `walking-skeleton` (ley de Gall): el sitio desplegado en preview responde antes de cerrar `foundation.setup` (nueva regla `live` `reachable`).
+  - `no-import-cycles`: import/no-cycle en el linter.
+  - `twelve-factor`: env validada al arrancar, servidor sin escritura a disco ni sesiones en memoria, logs a stdout, lockfile y versión de Node fijada.
+- **Cambios:**
+  - Nuevo umbral de calidad `max_params` (4) junto a complexity, max_lines y max_function_lines.
+  - `cta-above-fold`: un solo CTA principal por vista (el test responsive falla con más de uno).
+  - `no-duplication-dead-code`: ahora corre knip y jscpd, no solo revisa que estén instalados.
+  - `ux-laws` y `ui-principles` revisan contra las secciones de las guías; largo de línea 45–75 caracteres.
+
+Los proyectos existentes deben regenerar `tests/responsive.spec.ts` desde la plantilla para que el test compruebe los objetivos táctiles y el CTA único.
+
+## 2026.10.7
+
+Reglas por tipo de proyecto, cobro por uso, operación y datos sensibles:
+
+- **SaaS** (`saas.yaml`): aislamiento entre clientes 🔴 (seguridad, con auditoría), límites de plan en el servidor, organizaciones con invitaciones y roles (B2B), onboarding y registro de actividad.
+- **Cobro por uso o por resultado** — nueva capacidad `usage-billing` ("RaaS"; implica `payments` y base de datos): eventos cobrables idempotentes, tramos en un solo lugar, tope de gasto con avisos, uso visible, factura con desglose, conciliación y página de precios que define la unidad.
+- **Ecommerce y marketplace** (`commerce.yaml`): sin sobreventa, precio total sin cargos sorpresa, emails del pedido, políticas de envío y devolución, schema Product, carrito persistente; vendedores verificados, pagos divididos por el proveedor, disputas, reseñas solo de compras verificadas y términos para vendedores.
+- **Blog, directorio, portafolio y app interna** (`types.yaml`): feed, BlogPosting, páginas de autor; filtros sin trampas de rastreo, schema por ficha, reportar y reclamar fichas; permiso escrito de clientes y casos de estudio; SSO, sin registro público, auditoría y bajas.
+- **Mapas, API pública y subida de archivos** (`integrations.yaml`): llave del mapa restringida, dirección en texto, atribución; rate limit con 429, llaves con hash, OpenAPI, errores problem+json; tamaño máximo en el servidor, archivos privados con URL firmada, EXIF eliminado.
+- **Operación** (`ops.yaml`): monitor de uptime (🔴 en SaaS, tiendas, marketplace, reservas, apps internas, pagos y APIs), endpoint de salud, página de estado, monitoreo de cron y alertas de errores que llegan a una persona.
+- **Datos de salud y financieros** (`sensitive-data.yaml`): cifrado por campo, registro de accesos, sin píxeles de seguimiento con datos de salud; HIPAA (BAA) en USA, art. 9 RGPD (consentimiento explícito y DPIA) en EU/UK y consentimiento expreso de la LFPDPPP en MX.
+- **Verificaciones que prueban el comportamiento real**, no solo texto en el código:
+  - `live` (contra el sitio desplegado: `urls.preview` / `urls.production` del perfil, o `MEP_URL`): encabezados de seguridad y CSP enviados de verdad, HSTS ≥ 180 días, Brotli/gzip y caché inmutable de assets, cookies con Secure/SameSite/HttpOnly, 404 real sin trazas internas, http:// y www redirigen al dominio canónico, sitemap sin páginas privadas ni noindex.
+  - `dns`: SPF (uno, sin +all), DMARC con política y DKIM en el dominio de envío (`email_domain`).
+  - `html` `clean_links`: enlaces internos sin mayúsculas, guiones bajos, .php ni IDs sueltos.
+  - Pasan de manual a automáticas: `clean-urls`, `sitemap-indexable-only`, `compression-caching`, `email-auth-dns`, `canonical-redirects`, `production-errors-hidden`, `secure-session-cookies`. `security-headers`, `csp-strict` y `https-hsts` revisan además lo que el sitio envía.
+  - Sin sitio que revisar, un check `live`/`dns` se omite: no aprueba ni reprueba por sí solo; un ítem que solo depende de ellos queda ❔ hasta definir la URL.
+- **Fuera del alcance de mep**: proyectos para menores de edad o que verifican edad. Se quita `minors` de las audiencias (y `usa-coppa`); un perfil con `minors` o `age-verification` es inválido y `/mep:scope` se detiene.
 
 ## 2026.10.6
 

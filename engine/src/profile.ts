@@ -1,6 +1,7 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse, stringify } from 'yaml'
+import { assertSealed, logEvent, seal } from './seal.ts'
 import type { Catalog, Profile } from './types.ts'
 
 export const MEP_DIR = '.mep'
@@ -106,16 +107,17 @@ export function loadProfile(root: string, catalog: Catalog): Profile {
 }
 
 export function saveProfile(root: string, profile: Profile): void {
+  assertSealed(root)
   mkdirSync(join(root, MEP_DIR), { recursive: true })
   writeFileSync(join(root, PROFILE_FILE), stringify(profile, { lineWidth: 0 }))
+  seal(root)
 }
 
 export function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
 
-/** `.mep/log`: one line per override, bypass or phase change. Versioned with the repo. */
+/** `.mep/log`: one line per override, bypass or phase change, then the seal. Versioned with the repo. */
 export function log(root: string, event: string, detail: string): void {
-  mkdirSync(join(root, MEP_DIR), { recursive: true })
-  appendFileSync(join(root, MEP_DIR, 'log'), `${new Date().toISOString()} ${event} ${detail}\n`)
+  logEvent(root, event, detail)
 }

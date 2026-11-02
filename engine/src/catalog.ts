@@ -7,7 +7,7 @@ import type { Catalog, Check, Condition, Dimensions, Item, Leaf, Matcher, Profil
 const LEVELS = ['required', 'recommended', 'optional']
 const SIZES = ['XS', 'S', 'M', 'L', 'XL']
 const SCALES = ['pages', 'entities', 'languages', 'markets', 'integrations']
-const CHECK_TYPES = ['file_exists', 'route_exists', 'grep', 'json_key', 'command', 'html', 'sql', 'maps', 'quality', 'design', 'build', 'robots', 'manual']
+const CHECK_TYPES = ['file_exists', 'route_exists', 'grep', 'json_key', 'command', 'html', 'sql', 'maps', 'quality', 'design', 'build', 'robots', 'live', 'dns', 'manual', 'plan']
 
 /** The catalog ships next to the engine: `<root>/catalog`, whether run from source or from the bundle. */
 export function defaultCatalogDir(): string {
@@ -40,6 +40,7 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
       presets[f.replace(/\.yaml$/, '')] = readYaml(join(presetsDir, f))
     }
   }
+  const sensitiveGroups = readYaml<{ groups: Record<string, string[]> }>(join(dir, 'sensitive.yaml')).groups
   const catalog: Catalog = {
     version: readFileSync(join(dir, 'VERSION'), 'utf8').trim(),
     dir,
@@ -47,7 +48,8 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
     items: [...readYamlDir<Item>(join(dir, 'items')), ...readYamlDir<Item>(join(dir, 'markets'))],
     stackRules: readYaml<StackRule[]>(join(dir, 'stack-rules.yaml')) ?? [],
     presets,
-    sensitivePaths: readYaml<{ paths: string[] }>(join(dir, 'sensitive.yaml')).paths,
+    sensitiveGroups,
+    sensitivePaths: [...new Set(Object.values(sensitiveGroups).flat())],
   }
   const errors = validateCatalog(catalog)
   if (errors.length) throw new Error(`mep: invalid catalog\n- ${errors.join('\n- ')}`)
@@ -106,7 +108,10 @@ function validateCheck(check: Check, where: string): string[] {
     design: ['rule', 'max'],
     build: ['rule'],
     robots: ['rule'],
+    live: ['rule'],
+    dns: ['rule'],
     manual: ['prompt'],
+    plan: ['doc', 'rule'],
   }
   const errors = required[check.type]
     .filter(f => (check as Record<string, unknown>)[f] === undefined)
@@ -143,6 +148,7 @@ export function validateCatalog(catalog: Catalog): string[] {
     if (!Array.isArray(item.verify) || item.verify.length === 0) errors.push(`${where}: needs at least one verify`)
     else item.verify.forEach(c => errors.push(...validateCheck(c, where)))
     if (item.when) errors.push(...validateCondition(item.when, dims, where))
+    for (const g of item.sensitive ?? []) if (!catalog.sensitiveGroups[g]) errors.push(`${where}: unknown sensitive group ${g}`)
     for (const o of item.level_overrides ?? []) {
       if (!LEVELS.includes(o.level)) errors.push(`${where}: invalid override level`)
       errors.push(...validateCondition(o.when, dims, where))
@@ -168,7 +174,10 @@ export function validateProfile(profile: Profile, catalog: Catalog): string[] {
   if (!dims.type.includes(profile.type)) errors.push(`type "${profile.type}" is not valid`)
   if (!dims.context.includes(profile.context)) errors.push(`context "${profile.context}" is not valid`)
   for (const c of profile.capabilities) if (!dims.capabilities.includes(c)) errors.push(`capability "${c}" is not valid`)
-  for (const a of profile.audience) if (!dims.audience.includes(a)) errors.push(`audience "${a}" is not valid`)
+  for (const a of profile.audience) {
+    if (dims.excluded_audience?.includes(a)) errors.push(`mep no cubre proyectos para menores de edad ni que verifiquen edad (audience "${a}"): sus obligaciones legales quedan fuera del catálogo`)
+    else if (!dims.audience.includes(a)) errors.push(`audience "${a}" is not valid`)
+  }
   for (const m of profile.markets) if (!markets.includes(m)) errors.push(`market "${m}" is not valid`)
   for (const [k, v] of Object.entries(profile.signals)) {
     const def = dims.signals[k]

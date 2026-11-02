@@ -3,10 +3,12 @@ import { parseJsonc, exists, matchFiles, readText } from './files.ts'
 import { routeExists } from './framework.ts'
 import { checkHtml } from './html.ts'
 import { checkCodemap, checkRegistry } from './maps.ts'
+import { checkPlan } from './plan.ts'
 import { checkSql } from './sql.ts'
-import { checkThresholds } from './quality.ts'
+import { checkPythonThresholds, checkThresholds } from './quality.ts'
 import { checkDesign } from './design.ts'
 import { checkBuild, checkRobots } from './build.ts'
+import { checkDns, checkLive } from './live.ts'
 import { reportState } from './security.ts'
 import type { Check, CheckResult, Evaluated, ItemResult, ItemStatus, Profile } from './types.ts'
 
@@ -28,13 +30,13 @@ function grep(root: string, check: Extract<Check, { type: 'grep' }>): CheckResul
     lines.forEach((line, i) => {
       if (re.test(line)) hits.push(`${file}:${i + 1}`)
     })
-    if (hits.length >= 20) break
+    if (hits.length >= 200) break
   }
   if ((check.expect ?? 'present') === 'present') {
     return hits.length ? { ok: true, detail: `encontrado en ${hits[0]}` } : { ok: false, detail: `no se encontró /${check.pattern}/ en ${check.glob}` }
   }
   return hits.length
-    ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(', ')}${hits.length > 5 ? ' …' : ''}` }
+    ? { ok: false, violation: true, detail: `no permitido: ${hits.slice(0, 5).join(', ')}${hits.length > 5 ? ' …' : ''}`, all: hits }
     : { ok: true, detail: 'sin coincidencias' }
 }
 
@@ -81,10 +83,10 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkSql(root, check)
     case 'maps': {
       const errors = check.rule === 'registry' ? checkRegistry(root) : checkCodemap(root)
-      return errors.length ? { ok: false, detail: errors.slice(0, 5).join('; ') + (errors.length > 5 ? ` (+${errors.length - 5})` : '') } : { ok: true, detail: `${check.rule} al día` }
+      return errors.length ? { ok: false, detail: errors.slice(0, 5).join('; ') + (errors.length > 5 ? ` (+${errors.length - 5})` : ''), all: errors } : { ok: true, detail: `${check.rule} al día` }
     }
     case 'quality':
-      return checkThresholds(root, profile)
+      return check.rule === 'python' ? checkPythonThresholds(root, profile) : checkThresholds(root, profile)
     case 'design':
       return checkDesign(root, check)
     case 'build':
@@ -93,6 +95,12 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
       return checkBuild(root, check)
     case 'robots':
       return checkRobots(root)
+    case 'live':
+      return checkLive(profile, check, mode)
+    case 'dns':
+      return checkDns(profile, check, mode)
+    case 'plan':
+      return checkPlan(root, check, profile)
     case 'manual': {
       const confirmed = profile.selections.manual_confirmed.find(c => c.id === itemId)
       return confirmed ? { ok: true, detail: `confirmado por ${confirmed.by} (${confirmed.date})` } : { ok: null, detail: `manual: ${check.prompt}` }
@@ -100,9 +108,11 @@ export function runCheck(root: string, check: Check, profile: Profile, itemId: s
   }
 }
 
-function statusOf(results: CheckResult[]): ItemStatus {
+function statusOf(all: CheckResult[]): ItemStatus {
+  // A check that could not run here does not count; an item with nothing else to go on stays unknown.
+  const results = all.filter(r => !r.skip)
   if (results.some(r => r.ok === false)) return 'fail'
-  if (results.some(r => r.ok === null)) return 'unknown'
+  if (!results.length || results.some(r => r.ok === null)) return 'unknown'
   return 'pass'
 }
 

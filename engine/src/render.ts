@@ -29,13 +29,19 @@ function describeCheck(c: Check): string {
     case 'maps':
       return c.rule === 'registry' ? 'REGISTRY.md al día (mep registry --check)' : 'CODEMAP.md al día'
     case 'quality':
-      return 'umbrales de complejidad y largo en la config del linter'
+      return c.rule === 'python' ? 'Ruff con los umbrales del perfil en pyproject.toml' : 'umbrales de complejidad y largo en la config del linter'
     case 'build':
       return { max_js_chunk: `JS por archivo ≤ ${c.max_kb ?? 200} KB gzip`, no_source_maps: 'sin source maps públicos', server_rendered: 'HTML renderizado en servidor o build' }[c.rule]
     case 'robots':
       return 'robots.txt no bloquea buscadores ni asistentes de IA'
     case 'design':
       return `${c.rule === 'font_families' ? 'familias tipográficas' : 'pesos de texto'} ≤ ${c.max}`
+    case 'live':
+      return { headers: `el sitio envía ${(c.names ?? []).join(', ')}`, hsts: 'el sitio envía HSTS ≥ 180 días', compression: 'el sitio sirve con Brotli/gzip y assets con caché inmutable', cookies: 'las cookies del sitio llevan Secure, SameSite y HttpOnly', error_page: 'una ruta inexistente da 404 sin detalles internos', canonical_redirect: 'http:// y www redirigen al dominio canónico', sitemap: 'el sitemap lista solo páginas públicas e indexables', reachable: 'el sitio desplegado responde' }[c.rule]
+    case 'dns':
+      return `DNS: ${c.rule.toUpperCase()}`
+    case 'plan':
+      return `docs/plan: ${c.doc} (${c.rule})`
     case 'manual':
       return `manual: ${c.prompt}`
   }

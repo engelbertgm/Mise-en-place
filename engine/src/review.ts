@@ -5,6 +5,7 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { listFiles, readText } from './files.ts'
 import { MEP_DIR, today } from './profile.ts'
+import { assertSealed, seal } from './seal.ts'
 
 export const REVIEWS_DIR = join(MEP_DIR, 'reviews')
 
@@ -62,13 +63,14 @@ function projectFiles(root: string): string[] {
 export function hashProject(root: string): string {
   const h = createHash('sha256')
   for (const f of projectFiles(root).filter(f => !GENERATED.has(f))) {
-    let content: Buffer | string
+    let content: string
     try {
-      content = readFileSync(join(root, f))
+      // latin1 keeps every byte; CRLF → LF so a review recorded on Windows stays valid in CI on Linux.
+      content = readFileSync(join(root, f)).toString('latin1').replace(/\r\n/g, '\n')
     } catch {
       content = '<missing>'
     }
-    h.update(`${f}\0`).update(content).update('\0')
+    h.update(`${f}\0`).update(content, 'latin1').update('\0')
   }
   return h.digest('hex')
 }
@@ -84,18 +86,27 @@ export function readReview(root: string, sub: string): Review | undefined {
 }
 
 export function recordReview(root: string, input: Omit<Review, 'hash' | 'date'>): Review {
+  assertSealed(root)
   const review: Review = { ...input, hash: hashProject(root), date: today() }
   mkdirSync(join(root, REVIEWS_DIR), { recursive: true })
   writeFileSync(join(root, REVIEWS_DIR, `${input.sub}.json`), JSON.stringify(review, null, 2) + '\n')
+  seal(root)
   return review
 }
 
-/** What closing `sub` needs from the quality review. With Ponytail installed, only /ponytail-review counts. */
+/** The branch review before a PR into main is stored as the review of `pr`. */
+export const PR_REVIEW = 'pr'
+
+/**
+ * What closing `sub` (or a PR, with `pr`) needs from the quality review. With Ponytail installed, only
+ * /ponytail-review counts. Tied to the code's hash, not to a commit: committing the review does not expire it.
+ */
 export function reviewState(root: string, sub: string, env = process.env): { valid: boolean; detail: string } {
   const ponytail = ponytailInstalled(root, env)
+  const target = sub === PR_REVIEW ? '--pr' : `--sub ${sub}`
   const how = ponytail
-    ? `corre /ponytail-review y registra el resultado: mep review record --sub ${sub} --tool ponytail --must-fix <n>`
-    : `haz la revisión propia (duplicados, nombres, complejidad, reutilización contra REGISTRY.md) y regístrala: mep review record --sub ${sub} --tool mep --must-fix <n>`
+    ? `corre /ponytail-review${sub === PR_REVIEW ? ' branch' : ''} y registra el resultado: mep review record ${target} --tool ponytail --must-fix <n>`
+    : `haz la revisión propia (duplicados, nombres, complejidad, reutilización contra REGISTRY.md) y regístrala: mep review record ${target} --tool mep --must-fix <n>`
   const review = readReview(root, sub)
   if (!review) return { valid: false, detail: `sin revisión de calidad: ${how}` }
   if (ponytail && review.tool !== 'ponytail') return { valid: false, detail: `Ponytail está instalado y la revisión no es de /ponytail-review: ${how}` }

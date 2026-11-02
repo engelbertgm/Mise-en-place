@@ -1,6 +1,6 @@
 {
   "name": "mep",
-  "version": "0.1.7",
+  "version": "0.3.2",
   "description": "Scope → brief → verified checklist for websites and webapps: justified stack, required items, and blocks on closing or deploying while they are missing.",
   "author": {
     "name": "Engel",
@@ -15,5 +15,6 @@
     "security",
     "accessibility",
     "brief"
-  ]
+  ],
+  "types": "./types/index.d.ts"
 }

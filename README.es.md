@@ -6,11 +6,11 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.1.7-informational.svg)](.claude-plugin/plugin.json)
-[![Catálogo](https://img.shields.io/badge/catálogo-2026.10.6-informational.svg)](catalog/CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versión-0.3.2-informational.svg)](.claude-plugin/plugin.json)
+[![Catálogo](https://img.shields.io/badge/catálogo-2026.11.1-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
-[![Funciona con batuta](https://img.shields.io/badge/funciona_con-batuta-555.svg)](https://github.com/engelbertgm/Batuta)
+[![Funciona con baladero](https://img.shields.io/badge/funciona_con-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
 [![PRs bienvenidos](https://img.shields.io/badge/PRs-bienvenidos-brightgreen.svg)](CONTRIBUTING.md)
 
 [English](README.md) · **Español**
@@ -54,22 +54,64 @@ Las sub-etapas van en orden: `foundation.setup → foundation.design → build.d
 | `mep-security` | Opus | alto | Implementa y audita los ítems de seguridad. Sus reportes en `.mep/security/` son lo único que da por cumplido un ítem de seguridad |
 
 > [!NOTE]
-> Un ítem de seguridad cuenta como cumplido solo si sus verificaciones automáticas pasan **y** `mep-security` dejó un reporte vigente. El reporte guarda un hash de los archivos que revisó; si alguno cambia, el reporte vence y el ítem vuelve a estar pendiente.
+> Un ítem de seguridad cuenta como cumplido solo si sus verificaciones automáticas pasan **y** `mep-security` dejó un reporte vigente. El reporte guarda un hash de los archivos que revisó, siempre incluidos los archivos sensibles del grupo del ítem (auth, pagos, base de datos, configuración); si alguno cambia, el reporte vence y el ítem vuelve a estar pendiente.
+
+### Lo que el agente no puede hacer
+
+Los bloqueos de mep aguantan también los atajos del propio agente, no solo errores honestos:
+
+- **El estado cambia solo con la CLI.** `.mep/profile.yaml`, el log, los reportes y las revisiones quedan sellados con un hash después de cada escritura. Una edición por fuera de la CLI bloquea `mep verify` (local y en CI, incluso con `MEP_BYPASS`) hasta que corras `/mep:resync`.
+- **Tus acciones son tuyas.** `/mep:confirm`, `/mep:override`, `/mep:threshold` (al relajar) y `/mep:resync` solo corren cuando tú los escribes o los pulsas en el panel; desde el Bash del agente se niegan. Las confirmaciones registran tu usuario de git.
+- **Los PR necesitan una revisión real.** La revisión de la rama se registra (`mep review record --pr`) y queda ligada al código; reintentar sin ella no pasa, y el CI también la pide.
+- **Nada es silencioso.** El CI escribe en el resumen del job cada cambio de estado del PR (overrides, confirmaciones, cierres de fase, bypass, re-sellados), así lo ves antes del merge.
+
+En la misma máquina nada es a prueba de todo; un truco deliberado igual queda a la vista en ese resumen.
+
+### Documentos de planeación
+
+mep mantiene un plan escrito en `docs/plan/`, así cada sesión construye contra el mismo plan y no contra lo que recuerda:
+
+| Documento | Qué responde | Se escribe |
+| --- | --- | --- |
+| `PRD.md` | Qué se construye, para quién y cómo se mide el éxito | `/mep:scope` |
+| `TRD.md` | Stack, arquitectura, entornos y requisitos no funcionales | `/mep:scope` |
+| `IMPLEMENTATION.md` | Fases, hitos y calendario | `/mep:scope` |
+| `FLOWS.md` | Cada pantalla y cada recorrido principal del usuario | al empezar `foundation.design` |
+| `SCHEMA.md` | Tablas, relaciones, autenticación y seguridad por fila | al empezar `build.data` (solo con base de datos) |
+
+Cada uno tiene secciones fijas y diagramas hechos con [diagram-design](https://github.com/cathrynlavery/diagram-design). El motor comprueba que existan y que coincidan con el código: una ruta de página que falta en `FLOWS.md`, o una tabla de las migraciones que falta en `SCHEMA.md`, regresa el ítem a pendiente. En proyectos para clientes, `/mep:export` genera además versiones sin jerga del PRD, los flujos y la implementación, con los diagramas aptos para el cliente. Cualquiera se convierte a .docx y .pdf con `mep export --in docs/plan/<DOC>.md`.
+
+No tienen un comando propio: `/mep:scope` escribe los tres primeros, la skill `mep` escribe FLOWS y SCHEMA al empezar su sub-etapa, `/mep:add` los actualiza cuando cambia el scope, `/mep:update` escribe los que falten en proyectos ya avanzados, y los ítems `plan-*` del checklist dicen cuáles faltan o están desactualizados.
+
+### Guías y controles de calidad
+
+[`catalog/guidelines.md`](catalog/guidelines.md) reúne los principios de diseño, UX, copy y código con los que trabaja mep: Nielsen, Norman, Shneiderman, las leyes de UX, Maeda y Rams, Cialdini y posicionamiento, KISS, YAGNI, DRY, SOLID, Gall, Conway y Twelve-Factor. Claude lee solo la sección de la sub-etapa activa (diseño visual en `foundation.design`, interacción y usabilidad en `build.ux`, copy y conversión en `launch.content` para landing, ecommerce, marketplace y SaaS), y la revisión de cierre revisa las pantallas clave contra ella.
+
+Lo que se puede medir es una verificación, no un principio:
+
+| Área | Verificaciones |
+| --- | --- |
+| Interfaz | objetivos táctiles ≥ 44×44 px y un solo CTA principal por vista (test responsive), contraste, foco, escala de espaciado, 2 familias tipográficas, 45–75 caracteres por línea, todos los estados asíncronos, sin patrones oscuros |
+| Código (JS/TS) | complejidad ≤ 10, archivos ≤ 300 líneas, funciones ≤ 50 líneas, ≤ 4 parámetros, sin imports circulares, tipos estrictos, sin código duplicado ni muerto (jscpd y knip se ejecutan de verdad) |
+| Código (Python) | Ruff con los mismos límites y sus reglas de seguridad, mypy --strict, pytest, lockfile con pip-audit, vulture; solo en proyectos con `pyproject.toml`, `requirements*.txt` o `uv.lock` |
+| Arquitectura | Twelve-Factor (config validada desde env, servidor sin estado, logs a stdout, runtime fijado) y un esqueleto desplegado antes de las features (ley de Gall) |
 
 ## Funciona con
 
 | Plugin | Cómo se complementan |
 | --- | --- |
 | [ponytail](https://github.com/DietrichGebert/ponytail) | Aplica el mantra de código en cada cambio. `/ponytail-review` reemplaza la revisión de calidad de mep al cerrar una sub-etapa. El motor detecta Ponytail y exige la revisión registrada (`mep review record`), sin "must fix" y sobre el código actual, antes de cerrar |
-| [batuta](https://github.com/engelbertgm/Batuta) | Envía cada tarea al modelo adecuado (Opus decide, Sonnet ejecuta, Haiku lee). Los dos agentes de mep son excepciones fijas: localizar código siempre va a `mep-locator` y seguridad siempre a `mep-security` |
+| [diagram-design](https://github.com/cathrynlavery/diagram-design) | Dibuja los diagramas de los documentos de planeación (recorrido, arquitectura, flujos, secuencia, esquema de datos, Gantt). Requerido para escribirlos; su exportación a PNG necesita Python y Playwright |
+| [baladero](https://github.com/engelbertgm/Baladero) | HUD en vivo para Claude Code: modelo, git, barras de contexto y uso, herramientas, pendientes y el costo de cada tarea. La línea de estado y el panel de mep muestran el checklist; Baladero muestra lo que la sesión gasta en cumplirlo |
 
-Los dos son opcionales. mep funciona solo.
+ponytail y baladero son opcionales. diagram-design es requerido para los documentos de planeación.
 
 ## Requisitos
 
 - Claude Code (los mods necesitan la versión 2.1.287 o posterior; las anteriores usan los hooks incluidos)
 - Node.js 20 o posterior
 - Proyectos en un repositorio git
+- El plugin [diagram-design](https://github.com/cathrynlavery/diagram-design) (2.6.136 o posterior), con Python y Playwright para exportar a PNG, para escribir los documentos de planeación
 - Recomendado: el plugin [ponytail](https://github.com/DietrichGebert/ponytail). mep funciona sin él y usa su propia revisión de calidad
 
 ## Instalación
@@ -92,23 +134,29 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 
 | Comando | Qué hace |
 | --- | --- |
-| `/mep:scope [--preset <nombre>] <descripción>` | Pregunta solo lo que cambia ítems 🔴 y escribe `.mep/profile.yaml`, `SCOPE.md` (el scope en palabras simples: qué incluye y qué no), `BRIEF.md`, los ADRs de stack, el bloque de `CLAUDE.md` y el workflow de CI |
-| `/mep:add <cambio>` | Actualiza el scope y muestra **solo el diff**: ítems nuevos, ítems que suben de nivel e ítems que dejan de aplicar |
+| `/mep:scope [--preset <nombre>] <descripción>` | Pregunta solo lo que cambia ítems 🔴 y escribe `.mep/profile.yaml`, `SCOPE.md` (el scope en palabras simples: qué incluye y qué no), `BRIEF.md`, los ADRs de stack, el bloque de `CLAUDE.md`, el workflow de CI, y el PRD, el TRD y el plan de implementación con sus diagramas |
+| `/mep:add <cambio>` | Actualiza el scope y muestra **solo el diff**: ítems nuevos, ítems que suben de nivel e ítems que dejan de aplicar. Actualiza los documentos de planeación afectados |
 | `/mep:check` | Estado por sub-etapa: ✅ cumplido · ❌ pendiente · ⏭️ omitido · ⚠️ desactivado. Avisa si el código muestra señales que el perfil no tiene |
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
-| `/mep:override <id> <razón>` | Desactiva un ítem 🔴 tras confirmar; rechaza ítems 🔒 |
+| `/mep:override <id> <razón>` | Desactiva un ítem 🔴; rechaza ítems 🔒. Solo lo escribes tú: el agente no puede |
+| `/mep:panel` | Panel junto al chat: pendientes por sub-etapa; un clic en uno muestra qué pide, por qué y todo lo que falla, y permite confirmarlo, omitirlo o desactivarlo |
+| `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Acciones tuyas, nunca del agente: confirmar un ítem manual (con tu usuario de git), relajar un umbral de calidad, re-sellar el estado cambiado fuera de la CLI |
 | `/mep:audit [scope]` | Para un repo existente: parte del scope del proyecto, lo contrasta con lo que muestra el código (lo que sobra y lo que falta) y reporta la brecha solo con las reglas que ese scope activa. No cambia nada hasta que adoptes el brief |
-| `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil. Los que caen en una sub-etapa cerrada tienen periodo de gracia |
+| `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil, marcados ＋ nuevo o ✎ modificado. Los que caen en una sub-etapa cerrada tienen periodo de gracia. Escribe los documentos de planeación que falten |
 | `/mep:quote [--client]` | Cotización desde el brief. Vista interna (horas, tarifa, márgenes) o vista cliente (precio y semanas estimadas por fase, extras, costos recurrentes, planes de mantenimiento) |
-| `/mep:export [--lang es]` | Brief para el cliente en .docx y .pdf, en su idioma, con versión y cambios respecto a la anterior |
+| `/mep:export [--lang es]` | Brief para el cliente en .docx y .pdf, en su idioma, con versión y cambios respecto a la anterior; en proyectos para clientes, también el PRD, los flujos y el plan de implementación con sus diagramas |
 | `/mep:log-time <id> <horas>` | Registra horas reales por ítem fuera del repo; con datos suficientes, mep sugiere nuevos rangos |
 
-Los umbrales de calidad de código (complejidad 10, 300 líneas por archivo, 50 por función) viven en el perfil; relajar uno pide razón: `mep threshold complexity 15 "<razón>" --yes`, marcado con ⚠️ en el brief.
+Los umbrales de calidad de código (complejidad 10, 300 líneas por archivo, 50 por función, 4 parámetros) viven en el perfil y aplican igual a JS/TS y a Python; relajar uno pide razón: `mep threshold complexity 15 "<razón>" --yes`, marcado con ⚠️ en el brief.
 
 La cotización corre sola solo al definir el scope (`/mep:scope`) y cuando cambia (`/mep:add`, que muestra el impacto en horas y precio antes de aceptar). Tarifas, horas reales y cotizaciones internas viven en `~/.config/mep-check/`, nunca en el repo.
 
 Presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace`.
+
+Las verificaciones corren sobre el código, sobre la salida del build y, cuando el perfil tiene `urls.preview`/`urls.production` (o está `MEP_URL`), sobre el sitio desplegado y su DNS: los encabezados que de verdad envía, cookies, compresión y caché, un 404 real, redirecciones al dominio canónico, el sitemap y SPF/DMARC/DKIM.
+
+Fuera del alcance a propósito: proyectos para menores de edad o que requieren verificar edad (contenido para adultos, apuestas, alcohol…). `/mep:scope` se detiene y un perfil con esa audiencia es inválido.
 
 Cada regla se activa por el scope del proyecto (tipo, capacidades, mercados, audiencia, contexto, señales), nunca por defecto: una landing sin cuentas no recibe reglas de RLS, un sitio sin cookies no recibe banner. `mep explain <id>` muestra la condición de la regla con ✓/✗ y por qué aplica o no.
 
@@ -205,7 +253,8 @@ Mise-en-place/
 │   └── marketplace.json       # hace el repo instalable con /plugin
 ├── skills/                    # cada carpeta es un comando /mep:<nombre>
 │   ├── mep/                   # guía: interpretar un scope, usar el catálogo, respetar el brief
-│   ├── scope/  add/  check/  phase/  skip/  override/
+│   ├── scope/  add/  check/  phase/  skip/  panel/
+│   ├── override/  confirm/  threshold/  resync/   # solo tuyas (disable-model-invocation)
 │   ├── audit/  update/
 │   └── quote/  export/  log-time/
 ├── agents/
@@ -214,23 +263,30 @@ Mise-en-place/
 ├── hooks/
 │   └── hooks.json             # módulo de mods + hooks de respaldo (SessionStart, Stop, PreToolUse, PostToolUse)
 ├── mods/
-│   ├── register.ts            # gate, comandos instantáneos y línea de estado, dentro de Claude Code
+│   ├── register.tsx           # gate, guardia, panel, comandos instantáneos y línea de estado
 │   └── register.test.ts       # tests de los mods (claude plugin test .)
+├── types/index.d.ts           # contrato del estado del mod (panel)
 ├── engine/
 │   ├── src/                   # motor determinista en TypeScript, sin LLM
 │   │   ├── evaluate.ts        # perfil + catálogo → ítems que aplican, diff, stack
 │   │   ├── verify.ts          # corre las verificaciones de cada ítem (html.ts, sql.ts, maps.ts)
 │   │   ├── gate.ts            # reglas de bloqueo y cierre de fases
+│   │   ├── seal.ts guard.ts   # estado sellado tras cada escritura; lo que el agente no puede tocar
+│   │   ├── human.ts           # acciones que solo toma la persona
+│   │   ├── live.ts            # verificaciones contra el sitio desplegado y su DNS
 │   │   ├── render.ts          # BRIEF.md, ADRs, bloque de CLAUDE.md
 │   │   ├── scope.ts           # SCOPE.md: el scope en palabras simples
 │   │   ├── audit.ts           # infiere el perfil de un repo existente
 │   │   ├── update.ts          # ítems nuevos del catálogo, periodo de gracia
 │   │   ├── quote.ts           # cotización, horas reales, calibración
-│   │   ├── export.ts docs.ts  # brief para el cliente → .docx y .pdf
+│   │   ├── plan.ts            # documentos de planeación: secciones, diagramas, desvíos contra rutas y migraciones
+│   │   ├── quality.ts         # límites de calidad de código en ESLint/Biome y Ruff
+│   │   ├── export.ts docs.ts  # documentos para el cliente → .docx y .pdf, con imágenes PNG
 │   │   └── cli.ts             # el comando `mep` que llaman skills, mods, hooks y CI
 │   └── dist/mep.mjs           # bundle sin dependencias en ejecución (versionado)
 ├── catalog/
 │   ├── dimensions.yaml        # valores válidos: tipos, capacidades, mercados, señales, fases
+│   ├── guidelines.md          # principios de diseño, UX, copy y código, leídos por sub-etapa
 │   ├── items/                 # un archivo por categoría (base, seo, security, ux, legal…)
 │   ├── markets/               # un archivo por mercado (mx, usa, ca, eu, uk, br, in)
 │   ├── presets/               # landing, corporate, ecommerce, saas, marketplace
@@ -243,7 +299,9 @@ Mise-en-place/
 │   ├── claude-md.md           # bloque que se agrega al CLAUDE.md del proyecto
 │   ├── ci/mep.yml             # workflow de CI que se instala en cada proyecto
 │   ├── tests/responsive.spec.ts  # test responsive de Playwright que se instala en cada proyecto
-│   └── client-brief/          # plantilla del brief para el cliente (es, en)
+│   ├── client-brief/          # plantilla del brief para el cliente (es, en)
+│   ├── plan/                  # plantillas de PRD, TRD, FLOWS, SCHEMA e IMPLEMENTATION
+│   └── client-plan/           # versiones para el cliente de PRD, FLOWS e IMPLEMENTATION (es, en)
 ├── examples/estudio-saas/     # proyecto de prueba que usa tests/e2e.spec.ts
 ├── tests/                     # tests del motor, la CLI y de punta a punta (node:test)
 └── docs/spec.md               # especificación completa
@@ -255,8 +313,9 @@ Mise-en-place/
 tu-proyecto/
 ├── .mep/
 │   ├── profile.yaml           # fuente de verdad: tipo, capacidades, mercados, señales, fase
-│   ├── log                    # overrides, bypass y cambios de fase
+│   ├── log                    # overrides, bypass, cambios de fase y confirmaciones; sellado
 │   ├── security/<id>.json     # reportes de auditoría de mep-security
+│   ├── reviews/<sub|pr>.json  # revisiones de calidad (cierre de fase, PR)
 │   └── exports.yaml           # versiones del brief para el cliente
 ├── SCOPE.md                   # generado: qué es y qué no es el proyecto, en palabras simples
 ├── BRIEF.md                   # brief generado: perfil, stack, checklist por sub-etapa
@@ -265,7 +324,8 @@ tu-proyecto/
 ├── REGISTRY.md                # piezas reutilizables
 ├── docs/
 │   ├── decisions/             # ADRs, empezando por las decisiones de stack
-│   └── client/brief-vN.*      # brief para el cliente (.md, .docx, .pdf)
+│   ├── plan/                  # PRD, TRD, FLOWS, SCHEMA, IMPLEMENTATION + diagrams/
+│   └── client/                # brief y documentos de plan para el cliente (.md, .docx, .pdf)
 ├── tests/responsive.spec.ts   # 360–2560 px, sin scroll horizontal ni elementos encimados (Playwright)
 └── .github/workflows/mep.yml  # mep verify --prod como check obligatorio
 
@@ -278,12 +338,12 @@ tu-proyecto/
 ## Por dentro
 
 - **Motor** ([`engine/src`](engine/src)): TypeScript, sin LLM. Mismo perfil, mismos ítems, mismo resultado. Se empaqueta en [`engine/dist/mep.mjs`](engine/dist/mep.mjs) sin dependencias en tiempo de ejecución y se publica como `@engelbertgm/mep` para el CI.
-- **Mods** ([`mods/register.ts`](mods/register.ts)): corren dentro de Claude Code. `/mep:check` y `/mep:phase` responden al instante, sin turno de Claude; los deploys esperan al gate del motor; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes.
-- **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse y PostToolUse, como respaldo donde no hay mods.
-- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod`.
+- **Mods** ([`mods/register.tsx`](mods/register.tsx)): corren dentro de Claude Code. El chat solo oye a mep cuando algo bloquea; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes; el panel (`/mep:panel`) muestra el porqué, el cómo y todo lo que falla de cada ítem, con tus acciones (confirmar, omitir, desactivar con un diálogo). `/mep:check` y `/mep:phase` responden al instante; los deploys (Vercel, Netlify, Cloudflare, Fly, Railway, Firebase, Supabase, `git push` a main) esperan al gate del motor; se niegan las ediciones al estado de mep y los secretos en archivos versionados.
+- **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse (gate y guardia) y PostToolUse, como respaldo donde no hay mods.
+- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod` (con `--pr` en los pull requests, y contra `MEP_URL` para las verificaciones en vivo), y escribe los cambios de estado del PR en el resumen del job.
 - **Mapas**: `mep codemap` y `mep registry` generan `CODEMAP.md` y `REGISTRY.md` desde el código. "Para qué" y "No usar para" se escriben en el comentario de cada export; un export sin entrada bloquea cuando su sub-etapa está cerrada.
-- **Export**: un subconjunto simple de Markdown se convierte en .docx y .pdf sin dependencias, así funciona en cualquier máquina.
-- **Catálogo** ([`catalog/`](catalog)): 345 ítems de accesibilidad, sistema de diseño, UX, contenido, formularios, datos, responsive, seguridad, privacidad, legal, performance, i18n, calidad de código, despliegue y los mercados MX, USA, CA, EU, UK, BR e IN, cada ítem legal con su fuente oficial.
+- **Export**: un subconjunto simple de Markdown, con imágenes PNG, se convierte en .docx y .pdf sin dependencias, así funciona en cualquier máquina.
+- **Catálogo** ([`catalog/`](catalog)): 415 ítems de accesibilidad, sistema de diseño, UX, contenido, formularios, datos, responsive, seguridad, privacidad, legal, performance, i18n, calidad de código, despliegue y operación; reglas por tipo de proyecto (SaaS, ecommerce, marketplace, reservas, blog, directorio, portafolio, app interna), cobro por uso, datos de salud y financieros, y los mercados MX, USA, CA, EU, UK, BR e IN, cada ítem legal con su fuente oficial o tu confirmación.
 
 ### Proyecto de prueba
 
@@ -296,7 +356,11 @@ tu-proyecto/
 
 - El check de CI solo bloquea merges cuando lo marcas como **obligatorio** en la protección de ramas del repo.
 - Las verificaciones de HTML necesitan una salida de build (`out/`, `.next/server/app`, `dist/`). Sin ella, esos ítems quedan pendientes en lugar de pasar.
-- Muchos ítems de UX, legal y diseño son `manual`: el motor los lleva, pero los confirma una persona (o `mep-security`, en seguridad).
+- Muchos ítems de UX, legal y diseño son `manual`: el motor los lleva, pero los confirmas tú (o `mep-security`, en seguridad).
+- Las verificaciones en vivo y de DNS necesitan el sitio desplegado (`urls` en el perfil, o `MEP_URL`); sin él se omiten, y los ítems que solo dependen de ellas quedan pendientes.
+- La guardia y el sello frenan los atajos obvios; un truco deliberado en la misma máquina no se impide, solo queda a la vista en el resumen del PR.
+- Los documentos de planeación necesitan diagram-design con Python y Playwright para exportar a PNG; si faltan, `/mep:scope` se detiene y dice qué instalar.
+- Las verificaciones de Python corren con `uv run`, así que los proyectos en Python deben usar uv.
 - Los precios de `catalog/costs.yaml` y los rangos de esfuerzo son estimaciones; verifica precios actuales y calibra con `/mep:log-time`.
 
 El diseño completo está en [docs/spec.md](docs/spec.md).

@@ -146,11 +146,13 @@
   phase: launch.ops
   locked: true
   since: "2026.10.1"
+  updated: "2026.10.7"
   effort: { size: XS, hours: [0.5, 1] }
   why: "Sin HTTPS las contraseñas y datos viajan en claro; HSTS evita que un atacante degrade la conexión a HTTP."
   how: "Strict-Transport-Security: max-age=63072000; includeSubDomains; preload (headers en next.config o vercel.json)."
   verify:
     - { type: grep, pattern: "Strict-Transport-Security", glob: "{next.config.{js,mjs,ts},vercel.json,middleware.{ts,js},src/middleware.{ts,js},netlify.toml,public/_headers,astro.config.{mjs,ts}}" }
+    - { type: live, rule: hsts }
   references: ["https://developer.mozilla.org/docs/Web/HTTP/Headers/Strict-Transport-Security", "https://hstspreload.org/"]
 
 - id: noindex-preview

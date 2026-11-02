@@ -56,3 +56,32 @@ export function counts(results: ItemResult[]): { required: number; recommended: 
     recommended: pending.filter(r => r.level === 'recommended').length,
   }
 }
+
+/** What the panel draws: every item that applies, with what it asks, why, and everything that fails. */
+export function panelData(results: ItemResult[], profile: Profile, catalog: Catalog) {
+  return {
+    phases: catalog.dimensions.phases,
+    active: profile.phase.active,
+    closed: profile.phase.closed,
+    counts: counts(results),
+    items: results
+      .filter(r => r.state !== 'offered')
+      .map(r => ({
+        id: r.item.id,
+        title: r.item.title,
+        level: r.level,
+        phase: r.item.phase,
+        state: r.state,
+        status: r.status,
+        category: r.item.category,
+        locked: Boolean(r.item.locked),
+        manual: r.item.verify.some(c => c.type === 'manual'),
+        why: r.item.why,
+        how: r.item.how,
+        detail: r.state === 'active' ? failingDetail(r) : (r.reason ?? ''),
+        all: r.checks.flatMap(c => (c.result.ok === true ? [] : (c.result.all ?? []))),
+      })),
+  }
+}
+
+export type PanelData = ReturnType<typeof panelData>

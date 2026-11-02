@@ -21,6 +21,8 @@ has_destructive_actions:
   - { grep: "\\.delete\\(|method:\\s*[\"']DELETE|onDelete=|variant=[\"']destructive", glob: "**/*.{ts,tsx,js,jsx}" }
 has_embeds:
   - { grep: "<iframe\\b", glob: "**/*.{tsx,jsx,astro,vue,svelte,html,mdx}" }
+has_python:
+  - { file: "{pyproject.toml,requirements*.txt,uv.lock,setup.py}" }
 has_nonessential_cookies:
   - { grep: "googletagmanager|gtag\\(|fbq\\(|connect\\.facebook\\.net|hotjar|clarity\\.ms|posthog|mixpanel|segment\\.com", glob: "**/*.{ts,tsx,js,jsx,astro,html}" }
   - { dependency: [posthog-js, mixpanel-browser, "@segment/analytics-next", react-ga4, "@next/third-parties"] }

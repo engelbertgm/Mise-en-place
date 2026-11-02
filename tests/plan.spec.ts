@@ -1,0 +1,194 @@
+// 0.3.0 / catalog 2026.10.9: planning documents in docs/plan/, checked by the engine.
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import { describe, test } from 'node:test'
+import { PLAN_FILES, checkPlan, section } from '../engine/src/plan.ts'
+import type { Check, Profile } from '../engine/src/types.ts'
+import { loadCatalog } from '../engine/src/catalog.ts'
+import { renderCodemap } from '../engine/src/maps.ts'
+import { REAL_CATALOG, REPO, makeRepo, profile, testCatalog } from './helpers.ts'
+
+type PlanCheck = Extract<Check, { type: 'plan' }>
+const catalog = testCatalog([])
+const prof = (partial: Partial<Profile> = {}) => profile(catalog, { type: 'saas', ...partial })
+const run = (files: Record<string, string>, check: Omit<PlanCheck, 'type'>, p = prof()) => checkPlan(makeRepo(files), { type: 'plan', ...check }, p)
+
+describe('plan documents', () => {
+  test('missing document fails with its path', () => {
+    const r = run({}, { doc: 'prd', rule: 'sections', sections: ['resumen'] })
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /falta docs\/plan\/PRD\.md/)
+  })
+
+  test('sections are found by marker, in any language, with CRLF', () => {
+    const files = { 'docs/plan/PRD.md': '# PRD\r\n\r\n## Summary\r\n<!-- mep:resumen -->\r\ntext\r\n' }
+    assert.equal(run(files, { doc: 'prd', rule: 'sections', sections: ['resumen'] }).ok, true)
+    const r = run(files, { doc: 'prd', rule: 'sections', sections: ['resumen', 'metas'] })
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /metas/)
+  })
+
+  test('custom_work titles must appear (case-insensitive)', () => {
+    const p = prof({ custom_work: [{ title: 'Agenda de clases por instructor', size: 'L' }] })
+    assert.equal(run({ 'docs/plan/PRD.md': 'Incluye la agenda de clases por instructor.' }, { doc: 'prd', rule: 'custom_work' }, p).ok, true)
+    const r = run({ 'docs/plan/PRD.md': 'Nada.' }, { doc: 'prd', rule: 'custom_work' }, p)
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /Agenda de clases por instructor/)
+  })
+
+  test('stack decisions must appear in TRD', () => {
+    const p = prof({ stack: { decided: { framework: 'Next.js' } } })
+    assert.equal(run({ 'docs/plan/TRD.md': 'Usamos next.js con App Router.' }, { doc: 'trd', rule: 'stack' }, p).ok, true)
+    const r = run({ 'docs/plan/TRD.md': 'Usamos Astro.' }, { doc: 'trd', rule: 'stack' }, p)
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /Next\.js/)
+  })
+
+  test('phases: every listed phase as a code heading in the fases section; build.data only with has_db', () => {
+    const files = { 'docs/plan/IMPLEMENTATION.md': '## Fases\n<!-- mep:fases -->\n### `foundation.setup`\nx\n### `build.ux`\ny\n## Hitos\n<!-- mep:hitos -->\n### `build.data`\n' }
+    const check = { doc: 'implementation', rule: 'phases', phases: ['foundation.setup', 'build.data', 'build.ux'] } satisfies Omit<PlanCheck, 'type'>
+    assert.equal(run(files, check, prof({ signals: { has_db: false } })).ok, true)
+    const r = run(files, check, prof({ signals: { has_db: true } }))
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /build\.data/)
+  })
+
+  test('diagrams: required types by file name, linked images must exist', () => {
+    const doc = { 'docs/plan/PRD.md': '![j](diagrams/prd-journey.png)\n' }
+    const png = { 'docs/plan/diagrams/prd-journey.png': 'png' }
+    assert.equal(run({ ...doc, ...png }, { doc: 'prd', rule: 'diagrams', required: ['journey|story-map'] }).ok, true)
+    const missing = run(doc, { doc: 'prd', rule: 'diagrams', required: [] })
+    assert.equal(missing.ok, false)
+    assert.match(missing.detail, /diagrams\/prd-journey\.png/)
+    const arch = run({ ...doc, ...png }, { doc: 'prd', rule: 'diagrams', required: ['architecture'] })
+    assert.equal(arch.ok, false)
+    assert.match(arch.detail, /architecture/)
+  })
+
+  test('diagrams: if_capabilities skips the requirement when no capability matches', () => {
+    const files = { 'docs/plan/FLOWS.md': 'flujos' }
+    const check = { doc: 'flows', rule: 'diagrams', required: ['sequence'], if_capabilities: ['auth', 'payments'] } satisfies Omit<PlanCheck, 'type'>
+    assert.equal(run(files, check, prof({ capabilities: [] })).ok, true)
+    assert.equal(run(files, check, prof({ capabilities: ['auth'] })).ok, false)
+  })
+})
+
+describe('plan drift against the code', () => {
+  const app = {
+    'package.json': '{"dependencies":{"next":"15.0.0"}}',
+    'app/page.tsx': 'export default function P() {}',
+    'app/(marketing)/precios/page.tsx': 'export default function P() {}',
+    'app/blog/[slug]/page.tsx': 'export default function P() {}',
+    'app/api/x/route.ts': 'export function GET() {}',
+  }
+  const flows = (screens: string[]) => ({ 'docs/plan/FLOWS.md': `## Pantallas\n<!-- mep:pantallas -->\n${screens.map(s => `- \`${s}\`: algo`).join('\n')}\n## Flujos\n<!-- mep:flujos -->\n` })
+
+  test('routes: every page route appears in code in the pantallas section', () => {
+    assert.equal(run({ ...app, ...flows(['/', '/precios', '/blog/[slug]']) }, { doc: 'flows', rule: 'routes' }).ok, true)
+    const r = run({ ...app, ...flows(['/', '/precios']) }, { doc: 'flows', rule: 'routes' })
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /\/blog\/\[slug\]/)
+    assert.doesNotMatch(r.detail, /api/)
+  })
+
+  test('tables: migrations and SCHEMA list the same tables, normalized', () => {
+    const migration = { 'supabase/migrations/001.sql': 'create table public."Orders" (id int);\ncreate table profiles (id int);\n' }
+    const schema = (names: string[]) => ({ 'docs/plan/SCHEMA.md': `## Tablas\n<!-- mep:tablas -->\n${names.map(n => `### \`${n}\`\n`).join('')}## Relaciones\n<!-- mep:relaciones -->\n` })
+    assert.equal(run({ ...migration, ...schema(['orders', 'profiles']) }, { doc: 'schema', rule: 'tables' }).ok, true)
+    const extra = run({ ...migration, ...schema(['orders', 'profiles', 'invoices']) }, { doc: 'schema', rule: 'tables' })
+    assert.equal(extra.ok, false)
+    assert.match(extra.detail, /sobra invoices/)
+    const missing = run({ ...migration, ...schema(['orders']) }, { doc: 'schema', rule: 'tables' })
+    assert.equal(missing.ok, false)
+    assert.match(missing.detail, /falta profiles/)
+  })
+
+  test('codemap lists the same pages after the pageRoutes refactor', () => {
+    const md = renderCodemap(makeRepo(app), loadCatalog(REAL_CATALOG))
+    for (const r of ['`/`', '`/precios`', '`/blog/[slug]`']) assert.ok(md.includes(r), r)
+  })
+})
+
+describe('plan catalog and templates', () => {
+  const real = loadCatalog(REAL_CATALOG)
+  const planChecks = real.items.flatMap(i => i.verify.filter((c): c is PlanCheck => c.type === 'plan'))
+
+  test('every template has every marker the catalog requires', () => {
+    assert.ok(planChecks.some(c => c.rule === 'sections'))
+    for (const c of planChecks.filter(c => c.sections)) {
+      const template = readFileSync(join(REPO, 'templates', PLAN_FILES[c.doc].replace('docs/', '')), 'utf8')
+      for (const key of c.sections!) assert.ok(template.includes(`<!-- mep:${key} -->`), `${c.doc}: ${key}`)
+    }
+  })
+
+  test('phases lists in plan.yaml are a subset of dimensions.phases', () => {
+    const phases = planChecks.filter(c => c.rule === 'phases')
+    assert.ok(phases.length > 0)
+    for (const c of phases) for (const p of c.phases ?? []) assert.ok(real.dimensions.phases.includes(p), p)
+  })
+})
+
+describe('client versions of the plan', () => {
+  test('client templates exist and never mention internal diagrams', () => {
+    for (const doc of ['PRD', 'FLOWS', 'IMPLEMENTATION']) {
+      for (const lang of ['es', 'en']) {
+        const text = readFileSync(join(REPO, 'templates', 'client-plan', `${doc}.${lang}.md`), 'utf8')
+        for (const internal of ['-state', 'swimlane', 'heatmap', '-sequence', 'trd-', 'schema-']) assert.ok(!text.includes(internal), `${doc}.${lang}: ${internal}`)
+      }
+    }
+  })
+})
+
+describe('final review fixes', () => {
+  test('diagrams: image links inside HTML comments are ignored', () => {
+    const files = { 'docs/plan/PRD.md': '<!-- ejemplo: ![d](diagrams/prd-<tipo>.png) -->\n# PRD\n' }
+    assert.equal(run(files, { doc: 'prd', rule: 'diagrams', required: [] }).ok, true)
+  })
+
+  test('stack: internal names match product names (nextjs ↔ Next.js), and none is not required', () => {
+    const p = prof({ stack: { decided: { framework: 'nextjs', payments: 'payment-links', cms: 'none' } } })
+    assert.equal(run({ 'docs/plan/TRD.md': 'Next.js con Payment Links de Stripe.' }, { doc: 'trd', rule: 'stack' }, p).ok, true)
+  })
+
+  test('routes: error pages (/404, /500) are not screens', () => {
+    const files = {
+      'package.json': '{"dependencies":{"next":"15.0.0"}}',
+      'app/page.tsx': 'export default function P() {}',
+      'app/not-found.tsx': 'export default function N() {}',
+      'app/error.tsx': 'export default function E() {}',
+      'docs/plan/FLOWS.md': '## Pantallas\n<!-- mep:pantallas -->\n- `/`: inicio\n',
+    }
+    const r = run(files, { doc: 'flows', rule: 'routes' })
+    assert.equal(r.ok, true, r.detail)
+  })
+})
+
+describe('deferred minors', () => {
+  test('section() ignores ## lines inside fenced code blocks', () => {
+    const md = '## Tablas\n<!-- mep:tablas -->\n```sql\n## not a heading\n```\n### `orders`\n## Relaciones\n'
+    assert.match(section(md, 'tablas') ?? '', /### `orders`/)
+  })
+
+  test('diagrams: titled and angle-bracket image links count; external images are not local files', () => {
+    const files = {
+      'docs/plan/PRD.md': '![j](diagrams/prd-journey.png "Recorrido")\n![s](<diagrams/prd story.png>)\n![x](https://example.com/x.png)\n',
+      'docs/plan/diagrams/prd-journey.png': 'png',
+    }
+    const r = run(files, { doc: 'prd', rule: 'diagrams', required: ['journey'] })
+    assert.equal(r.ok, false)
+    assert.match(r.detail, /diagrams\/prd story\.png/)
+    assert.doesNotMatch(r.detail, /example\.com|prd-journey/)
+  })
+
+  test('routes: static .html files in public/ are not screens', () => {
+    const files = {
+      'package.json': '{"dependencies":{"next":"15.0.0"}}',
+      'app/page.tsx': 'export default function P() {}',
+      'public/google1234.html': 'google-site-verification',
+      'docs/plan/FLOWS.md': '## Pantallas\n<!-- mep:pantallas -->\n- `/`: inicio\n',
+    }
+    const r = run(files, { doc: 'flows', rule: 'routes' })
+    assert.equal(r.ok, true, r.detail)
+  })
+})

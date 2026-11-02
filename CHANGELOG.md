@@ -2,11 +2,80 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
-## 0.1.7
+## 0.3.2
 
-- Catalog 2026.11.1: 37 new rules (382 items in total) — interaction patterns (command menu, shortcut hints, stale-while-revalidate, view transitions, swipe sheets, interruptible motion, predictive back, OTP autofill, hit slop), typography (tabular numbers, balanced headlines, continuous corners), image placeholders and pre-rendering, privacy (form notices, data minimization, third-party SDK audit, business identity), consumer honesty (dark patterns, price transparency, fake reviews, unsubstantiated claims) and systems design (idempotency keys, load balancing, caching, CDN, queues, rate limit responses, sharding, replication, consistent hashing, consistency model, circuit breaker, logs, uptime, metrics and traces).
-- New signal `high_traffic` (scope only): turns on the scale-related systems design rules. `/mep:scope` asks about it only for saas, marketplace, ecommerce, directory and booking.
-- The responsive test now also fails on controls smaller than 24×24 px (WCAG 2.5.8).
+- Catalog 2026.11.1: 33 new rules — interaction patterns (command menu, shortcut hints, stale-while-revalidate, view transitions, swipe sheets, interruptible motion, predictive back, OTP autofill), typography (tabular numbers, balanced headlines, continuous corners), image placeholders and pre-rendering, privacy (form notices, data minimization, third-party SDK audit, business identity), consumer honesty (fake reviews, unsubstantiated claims) and systems design (idempotency keys, load balancing, caching, CDN, queues, rate limit responses, sharding, replication, consistent hashing, consistency model, circuit breaker, structured logs, metrics and traces).
+- New signal `high_traffic` (scope only): turns on the scale-related systems design rules. `/mep:scope` asks about it only for saas, marketplace, ecommerce, directory and booking. `/mep:audit` never compares it with the code.
+
+## 0.3.1
+
+Python code quality (catalog 2026.10.10) and export fixes:
+
+- **Python projects** (detected by `pyproject.toml`, `requirements*.txt`, `uv.lock` or `setup.py`) get the same guarantees as JS ones: Ruff with the profile's complexity, argument and statement limits plus its security rules, mypy --strict, pytest, a lockfile with pip-audit, and vulture (recommended). The engine reads `pyproject.toml` and counts the length of every `.py` file.
+- `.venv`, `venv` and the Python caches are no longer scanned by any check.
+- **Export:** Markdown links print as their text (external ones keep the address); image lines accept a title and `<paths with spaces>`; external images fail with a clear message; tall images fit the page in Word.
+- **Planning docs:** a `## ` line inside a code block no longer ends a section; loose `.html` files in `public/` (site verification) are not counted as screens.
+
+## 0.3.0
+
+Planning documents (catalog 2026.10.9):
+
+- **Five documents in `docs/plan/`:** PRD, TRD and IMPLEMENTATION written by `/mep:scope`; FLOWS at the start of `foundation.design`; SCHEMA at the start of `build.data` when there is a database. Fixed templates in `templates/plan/`, with sections found by `<!-- mep:key -->` markers so headings can be in any language.
+- **Diagrams with diagram-design** (now required for these documents): journey, architecture, Gantt, flowcharts, sequence and database schema, saved as HTML and PNG in `docs/plan/diagrams/`.
+- **The engine keeps them honest:** new `plan` check type and five 🔴 items (`plan-prd`, `plan-trd`, `plan-implementation`, `plan-flows`, `plan-schema`). FLOWS must list every page route of the code and SCHEMA the same tables as the migrations.
+- **Client versions:** `/mep:export` writes non-technical PRD, FLOWS and IMPLEMENTATION for client projects, reusing only client-safe diagrams. The .docx and .pdf export now embeds PNG images.
+- **Existing projects** get the items through `/mep:update`, which also writes the missing documents.
+- Fix: `pnpm validate` passes again (`mep.tools` declared in the panel state types).
+
+## 0.2.2
+
+Guidelines and code-quality guardrails (catalog 2026.10.8):
+
+- **`catalog/guidelines.md`.** Design, UX, marketing and code principles, cleaned and merged. The agent reads only the active sub-phase's section; the close review checks key views against it and each miss is a "must fix".
+- **New required items:** `touch-targets` (≥ 44×44 px), `no-dark-patterns`, `walking-skeleton` (Gall's law), `no-import-cycles` and `twelve-factor`.
+- **Engine:** new quality threshold `max_params` (4) and a new live rule `reachable`.
+- **Stricter checks:** one primary CTA per view; knip and jscpd actually run; line length 45–75 characters everywhere.
+- **Responsive test template** checks touch targets and the single primary CTA. Existing projects regenerate `tests/responsive.spec.ts` to get them.
+
+## 0.2.1
+
+Panel (`/mep:panel`):
+
+- **Every item is selectable again.** The hover card on each row is gone: it covered the rows below it and took their pointer.
+- **Item detail fits.** Actions come first and the long list of what fails comes last; while the pane is not focused, a hint says how to scroll (ctrl+x tab, arrows).
+- **Clickable counts.** The 🔴 and 🟡 counts in the top line open the first pending item of that level.
+- **⚙ Herramientas.** Ask the deploy and PR gates ahead of time, run mep commands as if typed (check, phase, quote, audit, update, export, phase close, scope, add, log-time) and see the last events in `.mep/log`. Human-only commands stay out: the engine refuses them from a plugin.
+
+## 0.2.0
+
+Hardening: mep's blocks now hold against the agent's own shortcuts. Nothing on the same machine is tamper-proof, so the rule is that no shortcut is silent: it needs the person, or it shows up in CI.
+
+- **Seal.** Every write through the CLI seals mep's state (`.mep/profile.yaml`, `log`, `security/`, `reviews/`) with a hash line in `.mep/log`. A state changed outside the CLI blocks `mep verify` (also in CI, and `MEP_BYPASS` does not get past it), and no command seals over it until the person runs `/mep:resync`. A 0.1.x repo is sealed once on first use (`seal-initial`, logged).
+- **Guard.** Edit/Write on state files and shell writes into `.mep` are denied (mod and classic hook). Commands that mention `MEP_BYPASS` or the human flag are denied too.
+- **Human-only actions.** `/mep:confirm` (new), `/mep:override`, `/mep:threshold` (new, when relaxing) and `/mep:resync` (new) are user-only skills answered by the mod. From the agent's Bash they are denied; without mods they run only in an interactive terminal. `confirm` records the git user, not a typed name, and is logged.
+- **Security reports cover their files.** `catalog/sensitive.yaml` is grouped (`auth`, `payments`, `db`, `config`) and security items declare `sensitive: [...]`. `security record` always includes the repo files of those groups; `--files` only adds.
+- **PR review is real.** `mep review record --pr` stores the branch review, tied to the code hash (committing it does not expire it). The PR gate blocks until it is current with no "must fix" — a second attempt no longer goes through — and CI asks for it with `verify --pr`.
+- **PR summary.** New `mep changes --base <ref>`: every state event of the PR (overrides, confirmations, phase closes, thresholds, bypasses, seals, reviews, audits). The CI template writes it to the job summary.
+- **More deploy platforms** for the gate: Cloudflare (`wrangler deploy`, `wrangler pages deploy`), Fly.io, Railway, Firebase (`hosting:channel:deploy` is a preview) and Supabase (`db push`, `functions deploy`).
+- Review and report hashes normalize line endings (CRLF), so a review recorded on Windows stays valid in CI. Existing reviews and reports expire once after the upgrade.
+- Build: the bundle banner works on Windows (the hashbang lives in `cli.ts`).
+
+Checks that prove behavior (catalog 2026.10.7):
+
+- New check types `live` (headers, HSTS, compression and caching, cookies, 404 page, canonical redirects, sitemap — against `urls.preview`/`urls.production` in the profile, or `MEP_URL`) and `dns` (SPF, DMARC, DKIM on `email_domain`). Requests run in a short child process so the engine stays synchronous.
+- New HTML rule `clean_links`. Seven manual items become automatic; three header items also check what the site really sends.
+- A check that cannot run (no site, quick mode) is `skip`: it never passes or fails an item on its own.
+- The CI template passes `MEP_URL` from the repository variable of the same name.
+
+Quiet chat, full panel:
+
+- **The chat only hears from mep when something blocks.** The Stop hook no longer lists the active sub-phase's pending items after every message; a block lists at most five. Pending counts stay in the status line.
+- **New panel** beside the chat (`/mep:panel`; opens by itself where the terminal is wide enough): pending items by sub-phase (the active one and regressions open, later ones folded to a count). A press on an item shows what it asks, why, how to meet it and every finding, not the first five. From there the person confirms a manual item, skips a 🟡 with a reason, or turns off a 🔴: after the reason, a dialog of its own shows the risk and the reason, takes the keys, starts on Cancelar, and Esc cancels. Hovering a row (fullscreen terminal, desktop) shows a card with the item's why. "Verificar todo" runs the command and build checks the per-turn quick check leaves as ❔.
+- New `mep check --json --detail` (the panel's data). Check results carry `all`, the full list behind a shortened detail.
+- Human commands answer only when the engine stamps the person's own gesture (`origin.kind` `composer` or `bridge`).
+- The mod is `mods/register.tsx` (JSX), with its state contract in `types/index.d.ts`.
+
+Migration: update `.github/workflows/mep.yml` from `templates/ci/mep.yml` (0.2.0, `--pr`, summary step). Before a PR into main, record the branch review with `mep review record --pr`.
 
 ## 0.1.6
 

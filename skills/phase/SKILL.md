@@ -19,6 +19,7 @@ Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 3. Revisión de calidad (el motor la exige para cerrar). Corre `review` para saber si Ponytail está instalado.
    - Con Ponytail: corre `/ponytail-review` y registra el resultado: `review record --tool ponytail --must-fix <n> --notes "..."`.
    - Sin Ponytail: revisa duplicados, nombres, complejidad y reutilización contra REGISTRY.md y registra: `review record --tool mep --must-fix <n>`.
+   - En `foundation.design`, `build.ux` y `launch.content`, revisa además cada vista clave contra la sección de `${CLAUDE_PLUGIN_ROOT}/catalog/guidelines.md` de esa sub-etapa (la misma que indica la skill mep); cada incumplimiento cuenta como "must fix".
    - Si hay "must fix", arréglalos y vuelve a revisar y registrar con `--must-fix 0`. Registra la revisión al final: si el código cambia después, vence.
 4. Corre `phase close <sub-etapa>`. Si falla, muestra lo pendiente y no insistas: arregla o pregunta.
 5. Al cerrar, los 🔴 de esa sub-etapa quedan protegidos contra regresiones. Antes de `launch.*`, si Ponytail está instalado, corre `/ponytail-debt`.

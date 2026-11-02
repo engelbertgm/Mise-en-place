@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { readText } from './files.ts'
 import { MEP_DIR, today } from './profile.ts'
+import { assertSealed, seal } from './seal.ts'
 
 export const SECURITY_DIR = join(MEP_DIR, 'security')
 
@@ -20,7 +21,8 @@ export type SecurityReport = {
 export function hashFiles(root: string, files: string[]): string {
   const h = createHash('sha256')
   for (const f of [...files].sort()) {
-    h.update(`${f}\0${readText(root, f) ?? '<missing>'}\0`)
+    // Line endings normalized: a report recorded on Windows stays valid in CI on Linux.
+    h.update(`${f}\0${readText(root, f)?.replace(/\r\n/g, '\n') ?? '<missing>'}\0`)
   }
   return h.digest('hex')
 }
@@ -46,8 +48,10 @@ export function reportState(root: string, id: string): ReportState {
 }
 
 export function recordReport(root: string, input: Omit<SecurityReport, 'hash' | 'date' | 'by'>): SecurityReport {
+  assertSealed(root)
   const report: SecurityReport = { ...input, hash: hashFiles(root, input.files), date: today(), by: 'mep-security' }
   mkdirSync(join(root, SECURITY_DIR), { recursive: true })
   writeFileSync(join(root, SECURITY_DIR, `${input.id}.json`), JSON.stringify(report, null, 2) + '\n')
+  seal(root)
   return report
 }
