@@ -44,6 +44,22 @@ for (const path of PAGES) {
       })
       expect(overlaps, 'elementos encimados').toEqual([])
 
+      // Ítem hit-slop (WCAG 2.5.8): each control is at least 24×24 px, counting the label that wraps it.
+      // Links inside running text and visually hidden elements (skip link, sr-only) are exempt.
+      const small = await page.evaluate(() => {
+        const found: string[] = []
+        for (const el of document.querySelectorAll('a, button, input:not([type="hidden"]), select, textarea, [role="button"]')) {
+          const target = el.closest('label') ?? el
+          const r = target.getBoundingClientRect()
+          const s = getComputedStyle(el)
+          if (r.width <= 1 || r.height <= 1 || s.visibility === 'hidden') continue
+          if (el.tagName === 'A' && s.display === 'inline' && el.closest('p, li, td, dd, blockquote')) continue
+          if (r.width < 24 || r.height < 24) found.push(`${el.outerHTML.slice(0, 60)} (${Math.round(r.width)}×${Math.round(r.height)})`)
+        }
+        return found.slice(0, 5)
+      })
+      expect(small, 'objetivos táctiles menores a 24×24 px').toEqual([])
+
       // The primary CTA (data-cta="primary") is visible without scrolling (ítem cta-above-fold).
       const cta = page.locator('[data-cta="primary"]').first()
       if (await cta.count()) {

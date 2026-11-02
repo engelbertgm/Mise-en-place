@@ -85,3 +85,36 @@
   how: "Server Components y carga diferida (dynamic import) para lo pesado; revisar con @next/bundle-analyzer; preconnect a los orígenes críticos."
   verify:
     - { type: build, rule: max_js_chunk, max_kb: 200 }
+
+# ── Agregados en 2026.11.1: carga percibida y pre-renderizado ──
+
+- id: image-placeholders
+  title: "Placeholders de imagen (blurhash, thumbhash o blurDataURL) en lugar de huecos en blanco"
+  category: performance
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  when: { any: [ { type: { any: [ecommerce, portfolio, blog, directory, marketplace, local-business, corporate] } }, { capabilities: { any: [media, cms] } } ] }
+  depends_on: [media-dimensions]
+  effort: { size: S, hours: [1, 3] }
+  why: "Mientras llega una imagen grande, un hueco blanco parece roto; una versión borrosa del mismo color y forma se siente instantánea y no mueve el layout."
+  how: "next/image con placeholder=\"blur\" (blurDataURL generado en el build, p. ej. plaiceholder), o blurhash / thumbhash guardado junto a cada imagen subida; color dominante como mínimo."
+  verify:
+    - { type: grep, pattern: "blurDataURL|placeholder=[\"']blur|blurhash|thumbhash|plaiceholder|lqip", glob: "**/*.{tsx,jsx,ts,js,astro,vue,svelte,json}" }
+
+- id: prerender-public-pages
+  title: "Páginas públicas pre-renderizadas (SSG/ISR) y prefetch de la siguiente navegación"
+  category: performance
+  level: recommended
+  phase: launch.seo
+  since: "2026.11.1"
+  when: { not: { type: internal-app } }
+  level_overrides:
+    - { when: { type: { any: [landing, blog, corporate, portfolio, local-business] } }, level: required }
+  depends_on: [server-rendered-content]
+  effort: { size: S, hours: [1, 3] }
+  why: "Una página que no cambia por usuario no debe armarse en cada visita: servida ya hecha desde el CDN responde en milisegundos y aguanta cualquier pico."
+  how: "Generar en el build (generateStaticParams, output export, Astro) o con revalidación (ISR: revalidate + revalidateTag); lo dinámico por usuario en islas o rutas aparte. next/link ya hace prefetch; en otro stack, Speculation Rules."
+  verify:
+    - { type: grep, pattern: "generateStaticParams|export const revalidate|dynamic\\s*=\\s*[\"']force-static|output:\\s*[\"']export|getStaticProps|use cache|cacheComponents|prerender|\"astro\"|speculationrules", glob: "**/*.{ts,tsx,js,mjs,json,astro,html}" }
+  references: ["https://nextjs.org/docs/app/building-your-application/rendering/server-components#static-rendering-default"]

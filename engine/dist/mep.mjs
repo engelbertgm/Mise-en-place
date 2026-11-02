@@ -9185,8 +9185,9 @@ function inferProfile(root, catalog) {
 function gapReport(root, profile, catalog) {
   return verifyItems(root, profile, evaluate(profile, catalog), "full").filter((r) => r.state === "active");
 }
+var SCOPE_ONLY_SIGNALS = /* @__PURE__ */ new Set(["high_traffic"]);
 function compareScopeAndCode(scope, code) {
-  const flags = (p) => /* @__PURE__ */ new Set([...p.capabilities.map((c2) => `capacidad ${c2}`), ...Object.entries(p.signals).filter(([, v]) => v === true).map(([k]) => `se\xF1al ${k}`)]);
+  const flags = (p) => /* @__PURE__ */ new Set([...p.capabilities.map((c2) => `capacidad ${c2}`), ...Object.entries(p.signals).filter(([k, v]) => v === true && !SCOPE_ONLY_SIGNALS.has(k)).map(([k]) => `se\xF1al ${k}`)]);
   const s = flags(scope);
   const c = flags(code);
   return {

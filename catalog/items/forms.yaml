@@ -118,3 +118,20 @@
   how: "Formatear al salir del campo o mientras se escribe sin impedir pegar ni borrar."
   verify:
     - { type: manual, prompt: "Las máscaras no impiden pegar, borrar ni escribir libremente" }
+
+# ── Agregados en 2026.11.1: códigos de un solo uso ──
+
+- id: otp-autofill
+  title: "Código de un solo uso con autocompletado: one-time-code, teclado numérico, pegado y WebOTP"
+  category: forms
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  when: { capabilities: [auth] }
+  depends_on: [form-autocomplete]
+  effort: { size: XS, hours: [0.5, 1.5] }
+  why: "El código llega por SMS o correo y teclearlo de memoria falla; con el atributo correcto el teléfono lo sugiere sobre el teclado y entra con un toque."
+  how: "Un solo input real (input-otp) con autoComplete=\"one-time-code\", inputMode=\"numeric\" y pattern; acepta pegar el código completo; envío automático al completarlo; WebOTP en Android. El SMS termina con '@dominio #código' para enlazarlo al sitio."
+  verify:
+    - { type: grep, pattern: "one-time-code", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}" }
+  references: ["https://web.dev/articles/sms-otp-form"]

@@ -1,0 +1,211 @@
+# Diseño de sistemas. Agregado en 2026.11.1.
+# Lo que depende de la escala se activa con la señal high_traffic (solo la fija el scope); lo demás, con lo que el proyecto hace.
+
+- id: idempotency-keys
+  title: "Idempotency-Key en operaciones que cobran o crean: reintentar no duplica"
+  category: architecture
+  level: recommended
+  phase: build.features
+  since: "2026.11.1"
+  when: { capabilities: { any: [payments, subscriptions, api-public] } }
+  level_overrides:
+    - { when: { capabilities: { any: [payments, subscriptions] } }, level: required }
+  depends_on: [webhook-idempotency]
+  effort: { size: S, hours: [2, 4] }
+  why: "Un doble clic, una red móvil que se corta o un reintento automático repiten la petición; sin llave, se cobra dos veces o se crean dos pedidos. webhook-idempotency cubre lo que llega del proveedor; esto cubre lo que sale del cliente."
+  how: "El cliente genera un UUID por intención del usuario y lo manda en el header Idempotency-Key. El servidor guarda llave, huella de la petición y respuesta (TTL ≥ 24 h) y devuelve la misma respuesta si se repite; misma llave con otro cuerpo, 422. Al llamar a Stripe u otro proveedor, pasa su idempotencyKey."
+  verify:
+    - { type: grep, pattern: "[Ii]dempotency[-_ ]?[Kk]ey|idempotencyKey|idempotency_key", glob: "**/*.{ts,tsx,js,jsx,sql}" }
+  references: ["https://docs.stripe.com/api/idempotent_requests", "https://datatracker.ietf.org/doc/draft-ietf-httpapi-idempotency-key-header/"]
+
+- id: load-balancing
+  title: "Balanceo de carga con health checks y app sin estado local"
+  category: architecture
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.1"
+  when: { signals: { high_traffic: true } }
+  effort: { size: S, hours: [2, 6] }
+  why: "Con mucho tráfico una sola instancia es un punto de falla y un techo; para repartir la carga, cualquier instancia debe poder atender cualquier petición."
+  how: "Hosting con balanceo gestionado (Vercel, Cloud Run, Fargate) o un balanceador con health checks. La app sin estado local: sesiones, archivos y caché en un almacén compartido; endpoint /api/health que revisa lo esencial (base, caché) y responde rápido; despliegues sin cortar conexiones."
+  verify:
+    - { type: file_exists, path: ["{app,src/app}/api/{health,healthz,status}/route.{ts,js}", "pages/api/{health,healthz}.{ts,js}"] }
+    - { type: manual, prompt: "Hosting con balanceo gestionado o balanceador con health checks, y la app no guarda sesiones ni archivos en la instancia" }
+
+- id: server-caching
+  title: "Caché en capas con invalidación definida: CDN, datos del servidor y consultas calientes"
+  category: architecture
+  level: recommended
+  phase: build.data
+  since: "2026.11.1"
+  when: { signals: { has_db: true } }
+  level_overrides:
+    - { when: { signals: { high_traffic: true } }, level: required }
+  effort: { size: M, hours: [3, 8] }
+  why: "La consulta más barata es la que no se hace: leer del caché baja la latencia y la carga de la base. Pero un caché sin plan de invalidación sirve datos viejos o, peor, de otro usuario."
+  how: "Decidir por dato: qué se cachea, dónde (CDN, caché de datos de Next, Redis/KV), por cuánto y qué lo invalida (tags, eventos). Nada privado en caché compartido; protección contra avalancha (un solo recálculo cuando expira una clave caliente). Documentar claves y TTL en un ADR."
+  verify:
+    - { type: grep, pattern: "unstable_cache|revalidateTag|revalidatePath|use cache|cacheTag|s-maxage|stale-while-revalidate|@upstash/redis|ioredis|@vercel/kv|lru-cache", glob: "**/*.{ts,tsx,js,mjs,json}" }
+
+- id: cdn
+  title: "CDN delante de la app: estáticos, imágenes y páginas públicas con Cache-Control correcto"
+  category: architecture
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.1"
+  when: { not: { type: internal-app } }
+  level_overrides:
+    - { when: { signals: { high_traffic: true } }, level: required }
+  depends_on: [compression-caching]
+  effort: { size: XS, hours: [0.5, 2] }
+  why: "Servir desde un nodo cercano al visitante baja la latencia y absorbe los picos sin tocar el servidor; en mercados lejanos entre sí (México y Europa) la diferencia se nota."
+  how: "Dominio detrás de un CDN (Vercel Edge, Cloudflare, Fastly). HTML público con s-maxage y stale-while-revalidate donde aplique; contenido privado con Cache-Control: private o no-store; Vary correcto; imágenes por el optimizador del CDN."
+  verify:
+    - { type: manual, prompt: "El dominio de producción pasa por un CDN; las páginas públicas llevan Cache-Control con s-maxage y las privadas private/no-store" }
+
+- id: message-queue
+  title: "Cola de mensajes para el trabajo fuera de la petición: reintentos, cola de fallidos e idempotencia"
+  category: architecture
+  level: recommended
+  phase: build.features
+  since: "2026.11.1"
+  when: { capabilities: { any: [email, notifications, newsletter, media, uploads, ai-features, payments, subscriptions] } }
+  level_overrides:
+    - { when: { signals: { high_traffic: true } }, level: required }
+  effort: { size: M, hours: [3, 8] }
+  why: "Enviar correos, procesar imágenes o llamar a una IA dentro de la petición la hace lenta y frágil: si el proveedor falla, el usuario ve el error y el trabajo se pierde. Una cola lo hace después, con reintentos."
+  how: "Cola o motor de trabajos (Inngest, Trigger.dev, QStash, BullMQ, pg-boss, SQS) para correo, procesamiento de archivos, IA y webhooks pesados. Cada trabajo idempotente; reintentos con espera creciente; cola de fallidos con alerta; el usuario ve un estado (\"en proceso\"), no una espera."
+  verify:
+    - { type: grep, pattern: "inngest|@trigger\\.dev|bullmq|@upstash/qstash|pg-boss|graphile-worker|client-sqs|@google-cloud/pubsub|amqplib|kafkajs|@vercel/queue", glob: "**/*.{ts,tsx,js,mjs,json}" }
+
+- id: rate-limit-responses
+  title: "Rate limit con almacén compartido y respuesta 429 con Retry-After"
+  category: architecture
+  level: recommended
+  phase: build.features
+  since: "2026.11.1"
+  when: { any: [ { signals: { has_forms: true } }, { capabilities: { any: [api-public, auth, ai-features, search, uploads] } } ] }
+  depends_on: [form-rate-limit]
+  effort: { size: S, hours: [1, 3] }
+  why: "Un contador en la memoria de una función serverless se reinicia en cada instancia y no limita nada; y sin 429 claro, los clientes legítimos no saben cuándo reintentar."
+  how: "Contador en Redis/KV (Upstash Ratelimit) con ventana deslizante o token bucket por IP, usuario o llave. Al pasarse: 429 con Retry-After y encabezados RateLimit-*. Límites más estrictos en los endpoints caros (login, IA, subida, búsqueda)."
+  verify:
+    - { type: grep, pattern: "429|Retry-After|retryAfter|TOO_MANY_REQUESTS|tooManyRequests", glob: "**/*.{ts,tsx,js,jsx}" }
+
+- id: sharding-strategy
+  title: "Estrategia de particionado (sharding) documentada: umbral, llave y qué se agota antes"
+  category: architecture
+  level: optional
+  phase: build.data
+  since: "2026.11.1"
+  when: { all: [ { signals: { has_db: true } }, { signals: { high_traffic: true } } ] }
+  depends_on: [server-caching]
+  effort: { size: S, hours: [1, 3] }
+  why: "Partir los datos entre servidores es el último recurso: cuesta consultas entre shards, migraciones y operación. Lo sano es saber de antemano en qué número se necesita y qué se prueba antes."
+  how: "ADR con el umbral (filas, tamaño, escrituras por segundo), lo que se agota antes (índices, caché, réplicas de lectura, particionado nativo, archivado) y, si llega el caso, la llave de partición que reparte parejo y evita consultas entre shards."
+  verify:
+    - { type: grep, pattern: "shard|partition|particion|citus|vitess", glob: "docs/decisions/*.md", flags: i }
+
+- id: replication-recovery
+  title: "Réplicas y recuperación: alta disponibilidad, réplicas de lectura y restauración con tiempos medidos"
+  category: architecture
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.1"
+  when: { all: [ { signals: { has_db: true } }, { signals: { high_traffic: true } } ] }
+  depends_on: [migrations-backups]
+  effort: { size: M, hours: [2, 6] }
+  why: "Si la base cae o se corrompe, cada minuto cuesta ventas; una réplica lista y una restauración ya probada la convierten en un incidente corto."
+  how: "Base con alta disponibilidad (réplica en otra zona y failover automático), PITR activado, réplicas de lectura para reportes y listados pesados. Documentar RPO y RTO, y ensayar una restauración y un failover antes de lanzar. Tener en cuenta el retraso de las réplicas al leer lo recién escrito."
+  verify:
+    - { type: grep, pattern: "r[eé]plica|replica|failover|PITR|point.in.time|RPO|RTO", glob: "docs/**/*.md", flags: i }
+    - { type: manual, prompt: "Restauración desde backup y failover ensayados con tiempos medidos (RPO y RTO anotados en el runbook)" }
+
+- id: consistent-hashing
+  title: "Hashing consistente al repartir caché o datos entre nodos propios"
+  category: architecture
+  level: optional
+  phase: build.data
+  since: "2026.11.1"
+  when: { all: [ { signals: { has_db: true } }, { signals: { high_traffic: true } } ] }
+  depends_on: [sharding-strategy]
+  effort: { size: S, hours: [1, 3] }
+  why: "Con hash simple (llave mod N), agregar o quitar un nodo mueve casi todas las llaves y vacía el caché de golpe; el hashing consistente mueve solo una fracción."
+  how: "Solo si se operan nodos propios de caché o de datos: anillo con nodos virtuales (o rendezvous hashing) y la decisión en un ADR. Los servicios gestionados (Upstash, Redis Cloud, Dynamo) ya lo hacen: anotar cuál se usa."
+  verify:
+    - { type: grep, pattern: "consistent.?hash|hash consistente|rendezvous|hash ring", glob: "docs/decisions/*.md", flags: i }
+
+- id: consistency-model
+  title: "Modelo de consistencia por tipo de dato (CAP): qué debe ser exacto y qué puede ser eventual"
+  category: architecture
+  level: recommended
+  phase: build.data
+  since: "2026.11.1"
+  when: { any: [ { all: [ { signals: { has_db: true } }, { signals: { high_traffic: true } } ] }, { capabilities: { any: [realtime, offline] } } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Si la red se parte (o la réplica va atrasada), hay que elegir entre responder con datos posiblemente viejos o no responder. Elegirlo por dato, antes, evita descubrirlo en un incidente."
+  how: "ADR con una tabla: pagos, inventario y reservas son consistentes (se rechaza antes que mentir); feeds, contadores y vistas pueden ser eventuales. Qué ve el usuario si no hay conexión con la base, y cómo se leen los datos recién escritos (leer del primario, o del cliente)."
+  verify:
+    - { type: grep, pattern: "consisten|\\bCAP\\b|eventual|read-your-writes|PACELC", glob: "docs/decisions/*.md", flags: i }
+  references: ["https://en.wikipedia.org/wiki/CAP_theorem"]
+
+- id: resilient-external-calls
+  title: "Llamadas a terceros con timeout, reintentos con espera creciente y circuit breaker"
+  category: architecture
+  level: recommended
+  phase: build.features
+  since: "2026.11.1"
+  when: { capabilities: { any: [payments, subscriptions, email, newsletter, ai-features, notifications, search, maps] } }
+  level_overrides:
+    - { when: { signals: { high_traffic: true } }, level: required }
+  effort: { size: M, hours: [2, 5] }
+  why: "Cuando un proveedor se pone lento, cada petición espera y se llena el servidor: una dependencia caída tumba toda la app. Cortar pronto y degradar con gracia la mantiene viva."
+  how: "Timeout en cada fetch (AbortSignal.timeout); reintentos solo en operaciones idempotentes, con espera creciente y aleatoria; circuit breaker (opossum, cockatiel) que deja de llamar al proveedor caído y responde con una alternativa (cola, mensaje claro, valor en caché). Un proveedor lento no debe frenar el resto de la página."
+  verify:
+    - { type: grep, pattern: "AbortSignal\\.timeout|timeout:|signal:", glob: "**/*.{ts,tsx,js,jsx}" }
+    - { type: grep, pattern: "opossum|cockatiel|circuit.?breaker|p-retry|async-retry|backoff|maxRetries|retries:", glob: "**/*.{ts,tsx,js,jsx,json}", flags: i }
+
+- id: structured-logs
+  title: "Logs estructurados (JSON) con nivel e id de petición, sin datos personales ni secretos"
+  category: architecture
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.1"
+  when: { any: [ { signals: { has_db: true } }, { capabilities: { any: [payments, api-public, auth, email, ai-features] } } ] }
+  depends_on: [logs-without-secrets]
+  effort: { size: S, hours: [1, 3] }
+  why: "Con texto libre no se puede buscar ni agrupar; con un id de petición se sigue una falla de principio a fin, entre el navegador, la API y los terceros."
+  how: "pino o el logger del hosting en JSON: nivel, mensaje, id de petición (x-request-id), ruta y duración. Mismo id hacia los servicios que se llaman. Sin cuerpos de petición ni datos personales; el id del usuario, no su correo."
+  verify:
+    - { type: grep, pattern: "pino|winston|@logtail|consola|bunyan|@vercel/otel|x-request-id|requestId|correlation", glob: "**/*.{ts,tsx,js,json}" }
+
+- id: uptime-monitoring
+  title: "Monitor de disponibilidad externo con alerta a una persona y página de estado"
+  category: architecture
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.1"
+  level_overrides:
+    - { when: { type: { any: [saas, ecommerce, booking, marketplace] } }, level: required }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Si el sitio cae a las 3 a. m., el primero en enterarse debe ser el equipo, no el cliente. Un monitor desde afuera detecta lo que los logs internos no ven (DNS, certificado, el hosting entero)."
+  how: "Monitor externo (UptimeRobot, Better Stack, Checkly) a la URL de producción y a /api/health cada 1–5 min, con alerta a correo o Slack y una persona responsable. Aviso de vencimiento del certificado y del dominio. Página de estado si hay clientes de pago."
+  verify:
+    - { type: manual, prompt: "Monitor externo activo en producción, con alerta a una persona; certificado y dominio con aviso de vencimiento" }
+
+- id: metrics-and-traces
+  title: "Métricas y trazas: tiempos de respuesta, tasa de error y Web Vitals reales con alertas"
+  category: architecture
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.1"
+  when: { not: { type: { any: [landing, portfolio] } } }
+  level_overrides:
+    - { when: { signals: { high_traffic: true } }, level: required }
+  depends_on: [error-monitoring]
+  effort: { size: S, hours: [1, 4] }
+  why: "error-monitoring dice qué falló; esto dice qué está lento y desde cuándo. Sin medir los usuarios reales, el rendimiento se degrada sin que nadie lo note hasta que se quejan."
+  how: "Web Vitals de usuarios reales (Vercel Speed Insights o web-vitals), latencia y errores por ruta, y trazas con OpenTelemetry (@vercel/otel) en las rutas críticas. Alertas sobre un objetivo: p95 de la API, tasa de error, LCP e INP."
+  verify:
+    - { type: grep, pattern: "@vercel/speed-insights|@vercel/analytics|web-vitals|@opentelemetry|@vercel/otel|dd-trace|newrelic|tracesSampleRate", glob: "**/*.{ts,tsx,js,json}" }
+  references: ["https://opentelemetry.io/"]

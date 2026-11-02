@@ -1,0 +1,60 @@
+# Honestidad con el consumidor: patrones oscuros, precios, reseñas y afirmaciones. Agregado en 2026.11.1.
+
+- id: no-dark-patterns
+  title: "Sin patrones oscuros: casillas marcadas, urgencia falsa, culpa al rechazar, baja difícil"
+  category: consumer
+  level: required
+  phase: build.ux
+  since: "2026.11.1"
+  when: { not: { type: internal-app } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Empujar al usuario con trucos es ilegal en la UE (DSA art. 25, Directiva de prácticas desleales), en India (lineamientos de 2023), ante la FTC y la Profeco, y destruye la confianza. Aceptar y rechazar deben costar lo mismo."
+  how: "Casillas de consentimiento y extras desmarcadas; botones de aceptar y rechazar cookies del mismo tamaño y peso; sin cuentas regresivas ni \"quedan 2\" inventados; rechazar sin culpa (nada de \"No, no quiero ahorrar\"); cancelar tan fácil como suscribirse; sin pedir lo mismo una y otra vez."
+  verify:
+    - { type: grep, pattern: "(consent|marketing|newsletter|promo|boletin|terms)[^\\n]*defaultChecked|defaultChecked[^\\n]*(consent|marketing|newsletter|promo|boletin|terms)", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}", flags: i, expect: absent }
+    - { type: manual, prompt: "Sin urgencia o escasez inventada, sin culpa al rechazar, aceptar y rechazar con el mismo peso visual, y cancelar tan fácil como contratar" }
+  references: ["https://www.deceptive.design/", "https://eur-lex.europa.eu/eli/reg/2022/2065/oj"]
+
+- id: price-transparency
+  title: "Precio final claro antes de pagar: impuestos, envío y cargos incluidos, sin extras preseleccionados"
+  category: consumer
+  level: required
+  phase: launch.content
+  since: "2026.11.1"
+  when: { any: [ { type: ecommerce }, { capabilities: { any: [payments, payment-links, subscriptions] } } ] }
+  effort: { size: S, hours: [1, 3] }
+  why: "Un cargo que aparece en el último paso (envío, comisión, \"cargo por servicio\") es el cobro oculto que más quejas genera; la UE (Directiva 2011/83, art. 6), California (SB 478) y la Profeco piden el precio total desde el inicio."
+  how: "El precio mostrado ya incluye impuestos (o dice que no, según el mercado) y se desglosa envío y cargos antes del último clic. Extras y seguros desmarcados; suscripción con precio, periodicidad y renovación al lado del botón; moneda y cobro final idénticos a lo anunciado."
+  verify:
+    - { type: grep, pattern: "subtotal|impuestos|IVA|\\btax\\b|env[ií]o|shipping|total", glob: "**/*{cart,Cart,checkout,Checkout,pricing,Pricing,order,Order,summary,Summary}*.{tsx,jsx,astro,vue,svelte,html}", flags: i }
+    - { type: manual, prompt: "El total que se ve en el primer precio es el que se cobra al final; no hay cargos, extras ni suscripciones añadidos sin que el usuario los marque" }
+  references: ["https://eur-lex.europa.eu/eli/dir/2011/83/oj"]
+
+- id: no-fake-reviews
+  title: "Reseñas y testimonios reales: con permiso, verificables y sin comprar ni inventar"
+  category: consumer
+  level: required
+  phase: launch.content
+  since: "2026.11.1"
+  when: { not: { type: { any: [internal-app, blog] } } }
+  effort: { size: XS, hours: [0.5, 2] }
+  why: "Inventar o comprar reseñas está prohibido: la FTC tiene una regla específica (2024), la UE lo incluye en la Directiva Omnibus y el Reino Unido en la ley DMCC. Un testimonio de relleno que se descubre cuesta más que no tenerlo."
+  how: "Cada testimonio con nombre, permiso por escrito y fecha, guardado fuera del repo si es sensible. Si hay reseñas de clientes, decir cómo se verifican y mostrar las negativas; el schema aggregateRating solo con datos reales. Mientras no haya testimonios, no se ponen (nada de personas de stock con nombre inventado)."
+  verify:
+    - { type: manual, prompt: "Todos los testimonios y reseñas visibles son de clientes reales con permiso; ninguno está inventado, comprado ni escrito por el equipo" }
+  references: ["https://eur-lex.europa.eu/eli/dir/2019/2161/oj"]
+
+- id: substantiated-claims
+  title: "Afirmaciones con respaldo: \"el mejor\", \"#1\", \"garantizado\", \"100% seguro\" y descuentos con evidencia"
+  category: consumer
+  level: required
+  phase: launch.content
+  since: "2026.11.1"
+  when: { not: { type: internal-app } }
+  depends_on: [final-copy]
+  effort: { size: S, hours: [1, 2] }
+  why: "La publicidad debe ser veraz y comprobable (LFPC art. 32 en México, FTC Act sección 5, CDC art. 37 en Brasil, Directiva de prácticas comerciales desleales en la UE). Un \"-50%\" sobre un precio que nunca existió también cuenta."
+  how: "Lista de afirmaciones del sitio con su respaldo (estudio, cifra interna con fecha, certificación, cantidad real de clientes). Lo que no se puede probar se quita o se suaviza. Descuentos contra el precio más bajo de los últimos 30 días (UE); garantías con sus condiciones visibles."
+  verify:
+    - { type: manual, prompt: "Cada superlativo, cifra, garantía y descuento del sitio tiene respaldo documentado o se quitó; las promesas de salud, ahorro o resultados tienen aviso y condiciones" }
+  references: ["https://eur-lex.europa.eu/eli/dir/2005/29/oj"]

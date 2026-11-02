@@ -199,3 +199,106 @@
   how: "Ruta /gracias (o estado de éxito en la misma vista) con mensaje, siguiente paso y evento de conversión en analytics."
   verify:
     - { type: file_exists, path: ["{app,src/app}/**/{gracias,thank-you,thanks,obrigado,merci,danke}/page.{tsx,jsx,mdx}", "src/pages/{gracias,thank-you,thanks}.{astro,md,mdx,tsx}"] }
+
+# ── Agregados en 2026.11.1: patrones de interacción ──
+
+- id: command-menu
+  title: "Menú de comandos (⌘K / Ctrl+K) para ir a cualquier vista y ejecutar acciones"
+  category: ux
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  when: { any: [ { type: { any: [saas, internal-app] } }, { capabilities: [admin-panel] } ] }
+  effort: { size: S, hours: [2, 4] }
+  why: "En una app con muchas vistas, quien la usa a diario llega más rápido con el teclado que navegando menús; es el patrón que ya conocen de otras herramientas."
+  how: "Command (cmdk / shadcn) en un diálogo con ⌘K y Ctrl+K: navegación, acciones frecuentes y recientes, con búsqueda difusa. Accesible: foco atrapado, flechas y Enter, Escape cierra."
+  verify:
+    - { type: grep, pattern: "cmdk|CommandDialog|CommandPalette|kbar|ninja-keys", glob: "**/*.{tsx,jsx,ts,json}" }
+  references: ["https://ui.shadcn.com/docs/components/command"]
+
+- id: shortcut-hints
+  title: "Atajos de teclado visibles junto a la acción (tooltip, menú o botón)"
+  category: ux
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  when: { any: [ { type: { any: [saas, internal-app] } }, { capabilities: [admin-panel] }, { signals: { has_tables: true } } ] }
+  depends_on: [a11y-keyboard]
+  effort: { size: S, hours: [1, 3] }
+  why: "Un atajo que nadie ve no se usa; mostrarlo donde está la acción lo enseña sin manual."
+  how: "<kbd> (o un componente Kbd) en tooltips, menús y botones; aria-keyshortcuts en el elemento. Los atajos de una sola tecla se pueden desactivar o cambiar (WCAG 2.1.4) y no chocan con los del navegador ni con lectores de pantalla."
+  verify:
+    - { type: grep, pattern: "<kbd|<Kbd|KbdGroup|aria-keyshortcuts", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+  references: ["https://www.w3.org/WAI/WCAG22/Understanding/character-key-shortcuts.html"]
+
+- id: stale-while-revalidate
+  title: "Datos del cliente con stale-while-revalidate: mostrar lo que hay y refrescar en segundo plano"
+  category: ux
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  when: { signals: { has_db: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Volver a una vista que ya se vio y encontrarla vacía mientras carga se siente lento; mostrar lo último que se tenía y actualizarlo después se siente inmediato."
+  how: "SWR o TanStack Query con staleTime y revalidación al enfocar la ventana y al reconectar; en respuestas HTTP públicas, Cache-Control con stale-while-revalidate. Los datos con dinero o permisos se revalidan antes de actuar."
+  verify:
+    - { type: grep, pattern: "useSWR|from ['\"]swr['\"]|@tanstack/react-query|useQuery\\(|staleTime|stale-while-revalidate", glob: "**/*.{ts,tsx,js,jsx,json}" }
+  references: ["https://web.dev/articles/stale-while-revalidate"]
+
+- id: view-transitions
+  title: "View Transitions entre páginas y estados, con respaldo sin animación"
+  category: ux
+  level: optional
+  phase: build.ux
+  since: "2026.11.1"
+  when: { not: { type: { any: [internal-app, landing] } } }
+  level_overrides:
+    - { when: { type: { any: [portfolio, ecommerce] } }, level: recommended }
+  depends_on: [a11y-reduced-motion]
+  effort: { size: S, hours: [1, 4] }
+  why: "Una transición continua entre una lista y su detalle (la imagen que crece, el título que se mueve) explica a dónde se fue el usuario mejor que un corte seco."
+  how: "document.startViewTransition (o <ViewTransition> / @view-transition de CSS) con view-transition-name en los elementos compartidos; sin soporte, navegación normal; desactivada con prefers-reduced-motion."
+  verify:
+    - { type: grep, pattern: "startViewTransition|view-transition|ViewTransition|viewTransition", glob: "**/*.{ts,tsx,js,jsx,css,astro,vue,svelte}" }
+  references: ["https://developer.chrome.com/docs/web-platform/view-transitions"]
+
+- id: swipe-sheets
+  title: "Hojas inferiores que se cierran deslizando, con botón de cerrar como alternativa"
+  category: ux
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  when: { type: { any: [ecommerce, saas, marketplace, booking, directory] } }
+  depends_on: [a11y-keyboard]
+  effort: { size: S, hours: [2, 4] }
+  why: "En móvil, un panel que sube desde abajo se cierra con el pulgar; un diálogo centrado con una X arriba queda lejos."
+  how: "Drawer (vaul / shadcn) en móvil y Dialog en escritorio; asa para arrastrar, cierre por distancia o velocidad, puntos de anclaje si hay varios tamaños, scroll del fondo bloqueado. El gesto nunca es la única vía: botón de cerrar y Escape siempre."
+  verify:
+    - { type: grep, pattern: "vaul|DrawerContent|BottomSheet|bottom-sheet|dragConstraints|@use-gesture", glob: "**/*.{tsx,jsx,ts,json}" }
+
+- id: interruptible-motion
+  title: "Animaciones interrumpibles: responden a mitad de camino, sin saltos ni bloqueos"
+  category: ux
+  level: recommended
+  phase: build.ux
+  since: "2026.11.1"
+  depends_on: [motion-transitions]
+  effort: { size: S, hours: [1, 3] }
+  why: "Si abrir y cerrar rápido un menú lo deja trabado o lo hace saltar, la interfaz se siente torpe; una animación debe poder revertirse desde donde va."
+  how: "Transiciones CSS (no @keyframes) para estados reversibles; resortes (motion, react-spring) para gestos; animar solo transform y opacity. Al interrumpir, partir de la posición y velocidad actuales. Nada de pointer-events: none mientras anima."
+  verify:
+    - { type: manual, prompt: "Abrir y cerrar rápido el menú, el modal y el acordeón a mitad de la animación no produce saltos ni bloquea clics" }
+
+- id: menu-safe-triangle
+  title: "Menús con submenú: el cursor puede viajar en diagonal sin que se cierre (zona segura o hover intent)"
+  category: ux
+  level: optional
+  phase: build.ux
+  since: "2026.11.1"
+  when: { type: { any: [ecommerce, marketplace, corporate, saas, directory] } }
+  depends_on: [no-hover-only]
+  effort: { size: XS, hours: [0.5, 2] }
+  why: "Al ir del menú a su submenú en diagonal, el cursor cruza otra opción y el submenú se cierra; es el defecto clásico de los mega menús."
+  how: "Radix (NavigationMenu, DropdownMenu, Menubar) ya trae la zona segura. En un menú propio: triángulo entre el cursor y el submenú, o un retraso de 100–200 ms al cerrar (hover intent). En táctil y teclado abre por clic."
+  verify:
+    - { type: grep, pattern: "@radix-ui/react-(navigation-menu|dropdown-menu|menubar|hover-card)|safeTriangle|safe-triangle|safePolygon|hoverIntent|hover-intent|react-aria", glob: "**/*.{tsx,jsx,ts,json}" }

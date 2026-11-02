@@ -157,3 +157,44 @@
   verify:
     - { type: grep, pattern: "EmptyState|empty-state", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
     - { type: grep, pattern: "Skeleton", glob: "**/*.{tsx,jsx,astro,vue,svelte}" }
+
+# ── Agregados en 2026.11.1: tipografía y forma ──
+
+- id: tabular-numbers
+  title: "Números tabulares (tabular-nums) en precios, tablas, contadores y métricas"
+  category: design
+  level: recommended
+  phase: foundation.design
+  since: "2026.11.1"
+  when: { any: [ { signals: { has_tables: true } }, { capabilities: { any: [payments, payment-links, subscriptions] } }, { type: { any: [ecommerce, saas] } } ] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Con dígitos de ancho variable, una columna de precios no alinea y un contador que cambia hace bailar el texto de al lado."
+  how: "font-variant-numeric: tabular-nums (Tailwind tabular-nums) en la clase de cifras de los tokens; usarla en tablas, precios, cronómetros y métricas."
+  verify:
+    - { type: grep, pattern: "tabular-nums|font-variant-numeric", glob: "**/*.{css,scss,tsx,jsx,ts,astro,vue,svelte}" }
+
+- id: text-balance
+  title: "Títulos equilibrados (text-wrap: balance) y párrafos sin viudas (text-wrap: pretty)"
+  category: design
+  level: recommended
+  phase: foundation.design
+  since: "2026.11.1"
+  when: { not: { type: internal-app } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un título que deja una sola palabra en la última línea se ve descuidado; el navegador puede repartir las líneas por ti."
+  how: "text-wrap: balance en h1–h3 y en textos cortos centrados; text-wrap: pretty en párrafos largos (Tailwind text-balance / text-pretty), definido una vez en los estilos base."
+  verify:
+    - { type: grep, pattern: "text-balance|text-pretty|text-wrap:\\s*(balance|pretty)", glob: "**/*.{css,scss,tsx,jsx,astro,vue,svelte}" }
+
+- id: continuous-corners
+  title: "Esquinas continuas (squircle) en tarjetas, botones e imágenes, con respaldo de border-radius"
+  category: design
+  level: optional
+  phase: foundation.design
+  since: "2026.11.1"
+  depends_on: [design-tokens]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Una esquina redondeada normal tiene un cambio brusco de curvatura; la continua fluye y se siente más cuidada, sobre todo con radios grandes."
+  how: "corner-shape: squircle (mejora progresiva sobre border-radius) o una librería de squircles; el radio sale de los tokens, no de valores sueltos."
+  verify:
+    - { type: grep, pattern: "corner-shape|squircle|superellipse|smooth-corners", glob: "**/*.{css,scss,tsx,jsx,ts,json}" }

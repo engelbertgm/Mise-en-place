@@ -89,9 +89,12 @@ export type ScopeVsCode = {
   typeDiffers?: { scope: string; code: string }
 }
 
+/** Facts only the scope can state: the code cannot show them, so they are never compared. */
+const SCOPE_ONLY_SIGNALS = new Set(['high_traffic'])
+
 /** The scope decides what applies; the code is evidence. This lists where they disagree. */
 export function compareScopeAndCode(scope: Profile, code: Profile): ScopeVsCode {
-  const flags = (p: Profile) => new Set([...p.capabilities.map(c => `capacidad ${c}`), ...Object.entries(p.signals).filter(([, v]) => v === true).map(([k]) => `señal ${k}`)])
+  const flags = (p: Profile) => new Set([...p.capabilities.map(c => `capacidad ${c}`), ...Object.entries(p.signals).filter(([k, v]) => v === true && !SCOPE_ONLY_SIGNALS.has(k)).map(([k]) => `señal ${k}`)])
   const s = flags(scope)
   const c = flags(code)
   return {

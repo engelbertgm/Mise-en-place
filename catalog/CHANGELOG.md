@@ -2,6 +2,20 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.11.1
+
+37 reglas nuevas (de 345 a 382 ítems), todas según el scope:
+
+- **Patrones de interacción** (7 en `ux`): `command-menu`, `shortcut-hints`, `stale-while-revalidate`, `view-transitions`, `swipe-sheets`, `interruptible-motion`, `menu-safe-triangle`. `predictive-back` (PWA) y `otp-autofill` (auth).
+- **Táctil**: `hit-slop` (🔴, objetivos ≥ 24 px verificados por el test responsive; 44 px recomendado).
+- **Tipografía y forma**: `tabular-numbers`, `text-balance`, `continuous-corners` (⚪).
+- **Carga percibida**: `image-placeholders` (blurhash/blurDataURL) y `prerender-public-pages` (SSG/ISR + prefetch; 🔴 en sitios de contenido).
+- **Privacidad y legal**: `form-consent-notice`, `data-minimization`, `third-party-sdk-audit`, `business-identity`. `asset-licenses` se completa con autorizaciones de fotos de personas e imágenes con IA.
+- **Honestidad con el consumidor** (categoría nueva `consumer`): `no-dark-patterns`, `price-transparency`, `no-fake-reviews`, `substantiated-claims`.
+- **Diseño de sistemas** (categoría nueva `architecture`, 14): `idempotency-keys`, `load-balancing`, `server-caching`, `cdn`, `message-queue`, `rate-limit-responses`, `sharding-strategy`, `replication-recovery`, `consistent-hashing`, `consistency-model`, `resilient-external-calls`, `structured-logs`, `uptime-monitoring`, `metrics-and-traces`.
+- **Señal nueva `high_traffic`**: solo la fija el scope (el código no la delata). Activa balanceo, réplicas, particionado, hashing consistente y consistencia, y sube a 🔴 caché, CDN, colas, resiliencia y métricas. `/mep:audit` no la compara con el código.
+- Ya cubiertos y sin cambios: skeletons, UI optimista, deshacer con toast (`destructive-severity`), áreas seguras, políticas de privacidad, términos, reembolsos, cookies y banner, texto alternativo, teclado, baja de correo, licencias de imágenes, borrado de datos (`account-deletion`, `data-subject-requests`, `data-retention`), rate limit de formularios, login y API.
+
 ## 2026.10.6
 
 Cosas a evitar, ahora verificadas:

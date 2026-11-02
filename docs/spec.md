@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.10.6, 345 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.11.1, 382 ítems). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -109,6 +109,7 @@ Muchos bloques no dependen de una capacidad, sino de un hecho del proyecto ("hay
 | `has_embeds` | Embeds de terceros |
 | `has_nonessential_cookies` | Banner de consentimiento |
 | `team` (`solo` / `team`) | Nivel de los ítems de Git |
+| `high_traffic` | Diseño de sistemas para escala (balanceo, réplicas, particionado, consistencia); sube a 🔴 caché, CDN, colas, resiliencia y métricas. Solo la fija el scope: el código no la delata y `/mep:audit` no la compara |
 
 - `/mep:scope` infiere las señales a partir de la descripción y las capacidades (ej. `auth` implica `has_forms`, `has_db` y `has_personal_data`), y pregunta solo las dudosas.
 - `has_db` solo cuando hay algo propio que guardar (cuentas, pedidos, reservas, contenido): lo implican `auth`, `subscriptions`, `ugc` y `admin-panel`. Pagos, uploads o un formulario de contacto no crean una base de datos por sí solos.
@@ -983,6 +984,24 @@ Los umbrales son configurables por proyecto en `profile.yaml`; bajarlos requiere
 🔴 Dominio y cuentas (hosting, DB, pagos) a nombre del cliente · credenciales transferidas de forma segura · README de operación
 
 🟡 Manual de uso para el cliente · acceso del cliente a analytics
+
+**Agregados en 2026.11.1** (37 reglas, todas según el scope)
+
+Patrones de interacción y pulido
+- `ux`: 🟡 menú de comandos ⌘K y atajos visibles (saas, internal-app, admin-panel, tablas) · 🟡 stale-while-revalidate (con DB) · 🟡 hojas inferiores con swipe (ecommerce, saas, marketplace, booking, directory) · 🟡 animaciones interrumpibles · ⚪ View Transitions (🟡 en portfolio y ecommerce) · ⚪ zona segura en menús con submenú
+- `accessibility`: 🔴 objetivos táctiles ≥ 24 px (WCAG 2.5.8), verificado por el test responsive; 44 px recomendado
+- `design`: 🟡 números tabulares (tablas, precios) · 🟡 títulos equilibrados y párrafos sin viudas · ⚪ esquinas continuas
+- `performance`: 🟡 placeholders de imagen (blurhash/blurDataURL) · pre-renderizado y prefetch (🟡; 🔴 en landing, blog, corporate, portfolio y local-business)
+- `forms`: 🟡 código de un solo uso con `autocomplete="one-time-code"` (auth) · `pwa`: 🟡 gesto atrás predictivo
+
+Privacidad, legal y consumidor
+- 🔴 aviso de uso de datos junto a cada formulario con datos personales · 🔴 minimización (inventario de datos con finalidad) · 🔴 auditoría de SDKs de terceros (cookies no esenciales, embeds o analytics) · 🔴 datos del negocio visibles (razón social, domicilio, identificación fiscal)
+- Categoría `consumer`, 🔴: sin patrones oscuros · precio final claro y sin cobros ocultos · reseñas y testimonios reales · afirmaciones con respaldo
+- `asset-licenses` suma autorizaciones de fotos de personas e imágenes generadas con IA
+
+Diseño de sistemas (categoría `architecture`)
+- Según lo que hace el proyecto: 🟡/🔴 `Idempotency-Key` (payments, subscriptions, api-public; 🔴 con cobros) · 🟡 cola de mensajes · 🟡 `429` con `Retry-After` y almacén compartido · 🟡 llamadas a terceros con timeout, backoff y circuit breaker · 🟡 logs estructurados · 🟡 monitor de disponibilidad (🔴 en saas, ecommerce, booking, marketplace) · 🟡 métricas y trazas · 🟡 caché en capas (con DB) · 🟡 CDN
+- Solo con `high_traffic`: 🟡 balanceo de carga con health check · 🟡 réplicas y recuperación (con DB) · 🟡 modelo de consistencia / CAP · ⚪ sharding · ⚪ hashing consistente; y caché, CDN, colas, resiliencia y métricas pasan a 🔴
 
 ### Mercados (`catalog/markets/`)
 

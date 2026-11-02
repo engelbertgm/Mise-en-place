@@ -221,9 +221,10 @@
   level: required
   phase: launch.content
   since: "2026.10.2"
+  updated: "2026.11.1"
   effort: { size: XS, hours: [0.5, 1] }
   why: "Una foto o tipografía sin licencia es un reclamo legal esperando a pasar."
-  how: "docs/licencias.md con la fuente y licencia de cada recurso de terceros."
+  how: "docs/licencias.md con la fuente y licencia de cada recurso de terceros: fotos de stock (licencia y uso permitido), ilustraciones, íconos, fuentes y música. Fotos de personas con autorización firmada; imágenes generadas con IA marcadas como tales (el AI Act pide etiquetarlas cuando puedan confundirse con reales)."
   verify:
     - { type: file_exists, path: ["docs/**/{licencias,licenses,credits,creditos}*.md", "CREDITS.md"] }
 
@@ -326,3 +327,67 @@
   verify:
     - { type: grep, pattern: "license-checker|licensee|license-report|licenses-list|pnpm licenses|@onebeyond/license-checker", glob: "{package.json,.github/workflows/*.{yml,yaml}}" }
     - { type: file_exists, path: ["THIRD-PARTY-NOTICES*", "THIRD_PARTY_NOTICES*", "docs/**/{licencias,licenses,third-party}*.md", "CREDITS.md"] }
+
+# ── Agregados en 2026.11.1: avisos en formularios, minimización, SDKs de terceros y datos del negocio ──
+
+- id: form-consent-notice
+  title: "Cada formulario con datos personales dice para qué se usan y enlaza a la privacidad"
+  category: privacy
+  level: required
+  phase: launch.content
+  since: "2026.11.1"
+  when: { signals: { has_forms: true, has_personal_data: true } }
+  depends_on: [privacy-policy]
+  effort: { size: XS, hours: [0.5, 2] }
+  why: "El aviso se da en el momento de pedir el dato (GDPR art. 13, LFPDPPP, LGPD, CCPA); un enlace solo en el footer no cumple. Lo opcional, como marketing, va aparte y sin marcar."
+  how: "Texto corto junto al botón de envío: quién lo recibe, para qué y enlace a la política de privacidad. Si se necesita aceptar algo, casilla propia desmarcada y separada de cada finalidad; nunca una casilla única que acepte todo."
+  verify:
+    - { type: grep, pattern: "aviso de privacidad|pol[ií]tica de privacidad|privacy (policy|notice)|/privacidad|/privacy|/aviso-de-privacidad|/datenschutz", glob: "**/*.{tsx,jsx,astro,vue,svelte,html}", exclude: "**/*{Footer,footer,layout,Layout,Cookie,cookie,Consent,consent}*", flags: i }
+    - { type: manual, prompt: "Cada formulario que pide datos personales muestra, junto al botón de envío, para qué se usan y el enlace a la privacidad" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj"]
+
+- id: data-minimization
+  title: "Solo se pide y guarda lo necesario: cada dato personal tiene finalidad, base legal y plazo"
+  category: privacy
+  level: required
+  phase: launch.content
+  since: "2026.11.1"
+  when: { signals: { has_personal_data: true } }
+  depends_on: [data-retention]
+  effort: { size: S, hours: [1, 3] }
+  why: "Pedir el teléfono, la fecha de nacimiento o la dirección \"por si acaso\" aumenta el riesgo y la obligación de protegerlo; el principio de minimización está en GDPR (art. 5), LFPDPPP y LGPD."
+  how: "docs/inventario-de-datos.md con una fila por dato: dónde se pide, para qué, base legal y plazo. Lo que no tiene finalidad se quita del formulario y de la base. Campos opcionales marcados como tales; nada de pedir documentos de identidad sin necesidad."
+  verify:
+    - { type: file_exists, path: ["docs/**/{inventario-de-datos,inventario-datos,data-inventory,data-map,record-of-processing}*.md"] }
+    - { type: manual, prompt: "Cada campo de datos personales de los formularios tiene una finalidad en el inventario; los que no, se quitaron" }
+  references: ["https://eur-lex.europa.eu/eli/reg/2016/679/oj"]
+
+- id: third-party-sdk-audit
+  title: "Auditoría de SDKs y scripts de terceros: qué datos envían, si hacen falta y cuánto pesan"
+  category: privacy
+  level: required
+  phase: launch.ops
+  since: "2026.11.1"
+  when: { any: [ { signals: { has_nonessential_cookies: true } }, { signals: { has_embeds: true } }, { capabilities: [analytics] } ] }
+  depends_on: [third-party-disclosure]
+  effort: { size: S, hours: [1, 3] }
+  why: "Cada script de terceros recibe la IP y el comportamiento de tus visitantes, puede cargar más scripts sin avisar y suele ser lo más pesado de la página. Lo que no se necesita se quita."
+  how: "docs/proveedores.md con cada SDK: qué datos recibe, finalidad, país, si carga antes del consentimiento y su peso. Quitar los que no se usan; cargar el resto después del consentimiento, con facade si es un embed, o por proxy propio. Revisar en cada release y al subir dependencias."
+  verify:
+    - { type: file_exists, path: ["docs/**/{proveedores,sdks,terceros,third-party}*.md"] }
+    - { type: manual, prompt: "Cada script o SDK de terceros del build está en docs/proveedores.md, con sus datos, finalidad y peso; los que no se usan se quitaron" }
+
+- id: business-identity
+  title: "Datos del negocio visibles: razón social, domicilio, identificación fiscal y contacto"
+  category: legal
+  level: required
+  phase: launch.content
+  since: "2026.11.1"
+  when: { any: [ { type: { any: [ecommerce, corporate, local-business, marketplace, booking, saas] } }, { capabilities: { any: [payments, payment-links, subscriptions] } } ] }
+  depends_on: [visible-contact]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Quien vende o presta un servicio en línea debe poder ser identificado: la UE lo exige en la Directiva de comercio electrónico (art. 5) y Alemania en el Impressum; en México, la LFPC (art. 76 bis) pide el domicilio y datos de contacto del proveedor."
+  how: "En el footer o en una página legal: razón social, domicilio, identificación fiscal del mercado (RFC, VAT/NIF, EIN, CNPJ, GSTIN), correo y teléfono, y horario si hay atención. El mismo dato en términos, privacidad y facturas. Con varios mercados, el de cada uno."
+  verify:
+    - { type: grep, pattern: "raz[oó]n social|RFC|NIF|CIF|VAT|USt-?IdNr|CNPJ|GSTIN|company (no|number)|registered (office|address)|domicilio|legal (name|entity)", glob: "**/*{Footer,footer,layout,legal,aviso,terminos,terms,imprint,impressum,contact,contacto}*.{tsx,jsx,astro,vue,svelte,html,mdx,md}", flags: i }
+  references: ["https://eur-lex.europa.eu/eli/dir/2000/31/oj"]

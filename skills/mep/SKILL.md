@@ -33,6 +33,7 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
    - Base de datos (`has_db`): solo si hay que guardar algo propio (cuentas, pedidos, reservas, contenido de usuarios). Un formulario de contacto que manda email, un newsletter en el proveedor o pagos por enlace **no** necesitan base de datos. `auth`, `subscriptions`, `ugc` y `admin-panel` ya la implican.
 3. Señales: infiere de verbos y objetos ("reservas con fecha" → `has_dates`; "listado de clientes" → `has_tables`; "borrar proyectos" → `has_destructive_actions`; Supabase con consultas desde el navegador → `db_client_access`).
 4. Pregunta **solo** lo que cambia ítems 🔴 o los `counts`: mercados, si hay menores o datos sensibles, cliente vs. producto propio, número aproximado de páginas, entidades, idiomas e integraciones. Agrupa las preguntas (AskUserQuestion, máximo 4).
+5. Escala (`high_traffic`): solo en `saas`, `marketplace`, `ecommerce`, `directory` y `booking`, y solo si el scope no lo dice: ¿se esperan picos o miles de usuarios a la vez? Si sí, activa balanceo, réplicas, colas, consistencia y demás ítems de diseño de sistemas. En un sitio chico no se pregunta: queda en `false`.
 
 ## Reglas de trabajo en un proyecto con mep
 

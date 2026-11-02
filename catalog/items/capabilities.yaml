@@ -793,3 +793,21 @@
   how: "Copia completa (archivos, DB, export del CMS) y línea base de analytics."
   verify:
     - { type: manual, prompt: "Respaldo completo del sitio anterior guardado y línea base de tráfico registrada" }
+
+# ── Agregados en 2026.11.1: PWA ──
+
+- id: predictive-back
+  title: "Gesto atrás (incluido el predictivo de Android): cierra lo abierto antes de salir de la vista"
+  category: pwa
+  level: recommended
+  phase: build.features
+  since: "2026.11.1"
+  when: { capabilities: [pwa] }
+  depends_on: [pwa-basics]
+  effort: { size: S, hours: [1, 3] }
+  why: "En una app instalada, el gesto atrás es la salida natural; si cierra la app en vez de un modal abierto, o atrapa al usuario, se siente rota."
+  how: "Cada modal, drawer y paso de un flujo es una entrada del historial (pushState o el router) y atrás la deshace; sin trampas de historial. En Android, la animación predictiva sigue el gesto: transiciones de vista con el API de navegación o View Transitions."
+  verify:
+    - { type: grep, pattern: "popstate|history\\.pushState|navigation\\.addEventListener|router\\.back|\\.intercept\\(", glob: "**/*.{ts,tsx,js,jsx}" }
+    - { type: manual, prompt: "Con la PWA instalada, el gesto atrás cierra el modal o drawer abierto antes de salir de la vista, y nunca deja al usuario atrapado" }
+  references: ["https://developer.android.com/guide/navigation/custom-back/predictive-back-gesture"]

@@ -54,6 +54,7 @@ signals:
   has_destructive_actions: "Acciones que borran o cambian datos"
   has_embeds: "Contenido embebido de terceros (videos, mapas, chats)"
   has_nonessential_cookies: "Cookies no esenciales (requieren consentimiento en algunos mercados)"
+  high_traffic: "Tráfico alto o picos fuertes (miles de usuarios a la vez)"
 markets:
   MX: "México"
   USA: "Estados Unidos"

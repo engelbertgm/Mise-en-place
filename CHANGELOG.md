@@ -2,6 +2,12 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.1.7
+
+- Catalog 2026.11.1: 37 new rules (382 items in total) — interaction patterns (command menu, shortcut hints, stale-while-revalidate, view transitions, swipe sheets, interruptible motion, predictive back, OTP autofill, hit slop), typography (tabular numbers, balanced headlines, continuous corners), image placeholders and pre-rendering, privacy (form notices, data minimization, third-party SDK audit, business identity), consumer honesty (dark patterns, price transparency, fake reviews, unsubstantiated claims) and systems design (idempotency keys, load balancing, caching, CDN, queues, rate limit responses, sharding, replication, consistent hashing, consistency model, circuit breaker, logs, uptime, metrics and traces).
+- New signal `high_traffic` (scope only): turns on the scale-related systems design rules. `/mep:scope` asks about it only for saas, marketplace, ecommerce, directory and booking.
+- The responsive test now also fails on controls smaller than 24×24 px (WCAG 2.5.8).
+
 ## 0.1.6
 
 - Ponytail is enforced, not just suggested: `mep phase close` requires a recorded quality review for that sub-phase (`mep review record --must-fix <n>`), with no "must fix" and on the current code (it expires when the code changes).

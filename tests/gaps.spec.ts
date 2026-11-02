@@ -9,7 +9,7 @@ import { prToMain } from '../engine/src/deploy.ts'
 import { checkDesign, fontFamilies, fontWeights } from '../engine/src/design.ts'
 import { prReviewGate } from '../engine/src/gate.ts'
 import { evaluate, stack } from '../engine/src/evaluate.ts'
-import { inferProfile } from '../engine/src/audit.ts'
+import { compareScopeAndCode, inferProfile } from '../engine/src/audit.ts'
 import { checkBuild, checkRobots } from '../engine/src/build.ts'
 import { checkHtml } from '../engine/src/html.ts'
 import { applicability, explainItem } from '../engine/src/explain.ts'
@@ -333,5 +333,47 @@ describe('13. Ponytail is detected from the Claude Code settings', () => {
     addFiles(claude, { 'plugins/installed_plugins.json': '{"plugins":{"ponytail@ponytail":[{}]}}' })
     assert.equal(ponytailInstalled(other, env), true)
     assert.equal(ponytailInstalled(other, { ...env, MEP_PONYTAIL: '0' }), false)
+  })
+})
+
+describe('14. systems design and honesty rules follow the scope', () => {
+  // Optional items are 'offered' until someone picks them: they still apply to the scope.
+  const levels = (p: ReturnType<typeof profile>) => new Map(evaluate(p, real).filter(e => e.state === 'active' || e.state === 'offered').map(e => [e.item.id, e.level]))
+  const scale = ['load-balancing', 'replication-recovery', 'sharding-strategy', 'consistent-hashing', 'consistency-model']
+
+  test('scale rules only appear with high_traffic; the rest rise to required', () => {
+    const base = { type: 'saas', capabilities: ['auth', 'email'] }
+    const normal = levels(profile(real, base))
+    for (const id of scale) assert.ok(!normal.has(id), id)
+    assert.equal(normal.get('server-caching'), 'recommended')
+    assert.equal(normal.get('message-queue'), 'recommended')
+    const busy = levels(profile(real, { ...base, signals: { high_traffic: true } }))
+    for (const id of scale) assert.ok(busy.has(id), id)
+    for (const id of ['server-caching', 'cdn', 'message-queue', 'resilient-external-calls', 'metrics-and-traces']) assert.equal(busy.get(id), 'required', id)
+    assert.equal(busy.get('sharding-strategy'), 'optional')
+  })
+
+  test('a static landing gets no queue, cache or idempotency rules, but does get honesty and touch rules', () => {
+    const landing = levels(profile(real, { type: 'landing' }))
+    for (const id of ['message-queue', 'server-caching', 'idempotency-keys', 'load-balancing']) assert.ok(!landing.has(id), id)
+    for (const id of ['hit-slop', 'no-dark-patterns', 'no-fake-reviews', 'substantiated-claims', 'text-balance']) assert.ok(landing.has(id), id)
+    assert.equal(landing.get('prerender-public-pages'), 'required')
+    assert.ok(!levels(profile(real, { type: 'internal-app' })).has('no-dark-patterns'))
+  })
+
+  test('idempotency keys: required with payments, recommended with only a public API', () => {
+    assert.equal(levels(profile(real, { type: 'ecommerce', capabilities: ['payments'] })).get('idempotency-keys'), 'required')
+    assert.equal(levels(profile(real, { type: 'saas', capabilities: ['api-public'] })).get('idempotency-keys'), 'recommended')
+    assert.equal(levels(profile(real, { type: 'landing', capabilities: ['payment-links'] })).get('price-transparency'), 'required')
+  })
+
+  test('the audit never reports high_traffic as missing from the code', () => {
+    const scope = profile(real, { type: 'saas', signals: { high_traffic: true } })
+    const code = profile(real, { type: 'saas' })
+    assert.ok(!compareScopeAndCode(scope, code).scopeOnly.includes('señal high_traffic'))
+  })
+
+  test('the responsive test also measures touch targets', () => {
+    assert.match(readFileSync(join(import.meta.dirname, '..', 'templates/tests/responsive.spec.ts'), 'utf8'), /24×24 px/)
   })
 })

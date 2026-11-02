@@ -22,6 +22,8 @@ signals:
   has_embeds: { values: [true, false], default: false }
   has_nonessential_cookies: { values: [true, false], default: false }
   team: { values: [solo, team], default: solo }
+  # Solo del scope (el código no la delata): activa los ítems de diseño de sistemas para escala.
+  high_traffic: { values: [true, false], default: false }
 
 # Sub-etapas en orden. Al cerrar una, la activa pasa a la siguiente.
 phases: [foundation.setup, foundation.design, build.data, build.features, build.ux, launch.content, launch.seo, launch.ops]

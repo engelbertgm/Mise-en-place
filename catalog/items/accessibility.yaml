@@ -161,3 +161,18 @@
   how: "@axe-core/playwright en los tests e2e de las páginas clave."
   verify:
     - { type: grep, pattern: "@axe-core|axe-core|pa11y|lighthouse-ci|@lhci", glob: "{package.json,.github/workflows/*.{yml,yaml}}" }
+
+# ── Agregados en 2026.11.1: objetivos táctiles ──
+
+- id: hit-slop
+  title: "Objetivos táctiles de al menos 44×44 px (mínimo 24×24) con zona de toque ampliada"
+  category: accessibility
+  level: required
+  phase: build.ux
+  since: "2026.11.1"
+  effort: { size: S, hours: [1, 3] }
+  why: "Un botón de 16 px se falla con el pulgar; WCAG 2.2 pide 24×24 px como mínimo (criterio 2.5.8) y las guías de Apple y Google piden 44 y 48."
+  how: "Íconos y controles pequeños con padding o un pseudo-elemento (before:absolute before:-inset-2) que amplía la zona de toque sin cambiar cómo se ve; separación entre objetivos vecinos. Los enlaces dentro de un párrafo quedan exentos."
+  verify:
+    - { type: command, run: "pnpm run test:responsive", timeout: 600 }
+  references: ["https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html"]
