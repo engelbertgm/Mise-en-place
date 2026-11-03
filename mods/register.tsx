@@ -15,6 +15,7 @@ const expanded = atom({ plugin: 'mep', key: 'expanded' } as const, [], { shape: 
 const pending = atom({ plugin: 'mep', key: 'pending' } as const, null, { shape: 'pending-1' })
 const flash = atom({ plugin: 'mep', key: 'flash' } as const, '', { shape: 'flash-1' })
 const tools = atom({ plugin: 'mep', key: 'tools' } as const, false, { shape: 'tools-1' })
+const symbols = atom({ plugin: 'mep', key: 'symbols' } as const, 'braille', { shape: 'symbols-1' })
 
 /** The panel's tools: each runs the slash command as if typed. The human-only ones stay out (the engine refuses a plugin's). */
 const INSTANT = [
@@ -34,9 +35,30 @@ const WITH_TEXT = [
   ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
 ] as const
 
-// The panel marks levels with a colored dot (theme colors, so it follows light and dark themes); emoji stay in the status line.
+// The panel marks levels with a glyph that also reads as a fill (density = weight) and takes a theme color, so it
+// follows light and dark themes. The person picks the set in Herramientas; emoji stay in the status line.
+type Symbols = 'braille' | 'dither' | 'dots'
+const SYMBOL_SETS: Record<Symbols, { label: string; level: Record<'required' | 'recommended' | 'optional', string>; fill: string[] }> = {
+  braille: { label: 'braille ⣿⣤⣀', level: { required: '⣿', recommended: '⣤', optional: '⣀' }, fill: ['⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿'] },
+  dither: { label: 'tramado ▓▒░', level: { required: '▓', recommended: '▒', optional: '░' }, fill: ['░', '▒', '▓', '█'] },
+  dots: { label: 'círculos ●●○', level: { required: '●', recommended: '●', optional: '○' }, fill: ['○', '●'] },
+}
+const SYMBOL_ORDER: Symbols[] = ['braille', 'dither', 'dots']
 const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'inactive' } as const
 const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
+
+/** A fill bar of `cells` cells: the done part and the rest, each drawn in its own color by the caller. */
+function meter(set: Symbols, done: number, total: number, cells: number): { filled: string; rest: string } {
+  const glyphs = SYMBOL_SETS[set].fill
+  const steps = glyphs.length - 1
+  const units = total ? Math.round((done / total) * cells * steps) : 0
+  const full = Math.floor(units / steps)
+  const part = units % steps
+  const cell = (i: number) => (i < full ? glyphs[steps]! : i === full ? glyphs[part]! : glyphs[0]!)
+  const all = Array.from({ length: cells }, (_, i) => cell(i))
+  const split = Math.min(cells, full + (part ? 1 : 0))
+  return { filled: all.slice(0, split).join(''), rest: all.slice(split).join('') }
+}
 /** Rows shown per sub-phase and lines of findings before a "ver más". */
 const CAP = 8
 const FINDINGS_CAP = 6
@@ -162,6 +184,8 @@ export const register: Register = on => {
   // ── status and panel: kept current every turn; the chat only hears from mep when something blocks ──
   on('session.start', async ($, e, next) => {
     const result = await next(e)
+    const saved = await $.store.get('symbols').catch(() => undefined)
+    if (saved === 'braille' || saved === 'dither' || saved === 'dots') await update($, symbols, () => saved)
     if (await hasProfile($)) {
       // Opened unasked it waits on a narrow terminal; /mep:panel opens it at any width.
       void $.ui.open({ id: PANE, title: 'mep' })
@@ -228,7 +252,16 @@ export const register: Register = on => {
     const item = id ? data.items.find(i => i.id === id) : undefined
     const open = await read($, expanded)
     const toggle = (key: string) => update($, expanded, list => (list.includes(key) ? list.filter(p => p !== key) : [...list, key]))
-    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>●</Text>
+    const set = await read($, symbols)
+    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>{SYMBOL_SETS[set].level[level]}</Text>
+    const cells = e.props.bodyColumns >= 48 ? 6 : 4
+    /** Done / total required items, drawn as a bar. */
+    const bar = (items: typeof data.items) => {
+      const req = items.filter(i => i.level === 'required' && i.state === 'active')
+      const done = req.filter(i => i.status === 'pass').length
+      const m = meter(set, done, req.length, cells)
+      return { done, total: req.length, node: (<Text><Text color="success">{m.filled}</Text><Text dimColor>{m.rest}</Text></Text>) }
+    }
 
     if (await read($, tools)) {
       const run = async (command: string, args = '') => {
@@ -252,6 +285,18 @@ export const register: Register = on => {
             ← Volver
           </Button>
           {message ? <Text dimColor>{message}</Text> : null}
+          <Button
+            key="symbols"
+            plain
+            onPress={async () => {
+              const next = SYMBOL_ORDER[(SYMBOL_ORDER.indexOf(set) + 1) % SYMBOL_ORDER.length]!
+              await update($, symbols, () => next)
+              await $.store.set('symbols', next).catch(() => undefined)
+            }}
+          >
+            {'Símbolos: '}
+            <Text dimColor>{SYMBOL_SETS[set].label}</Text>
+          </Button>
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Antes de deployar o abrir PR</Text>
             <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nada bloquea el deploy a producción.')}>
@@ -401,6 +446,15 @@ export const register: Register = on => {
             ⚙ Herramientas
           </Button>
         </Box>
+        {(() => {
+          const all = bar(data.items)
+          return all.total ? (
+            <Text>
+              {all.node}
+              <Text dimColor>{` ${all.done}/${all.total} obligatorios`}</Text>
+            </Text>
+          ) : null
+        })()}
         {!data.full && <Text dimColor>Comandos y build se verifican con ↻.</Text>}
         {message ? <Text dimColor>{message}</Text> : null}
         <Box flexDirection="column" marginTop={1}>
@@ -413,10 +467,13 @@ export const register: Register = on => {
             const req = items.filter(i => i.level === 'required').length
             const all = open.includes(`all:${phase}`)
             const rows = all ? items : items.slice(0, CAP)
+            const phaseBar = bar(data.items.filter(i => i.phase === phase))
             return (
               <Box flexDirection="column">
                 <Button key={`phase-${phase}`} plain onPress={() => toggle(phase)}>
                   {`${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}  `}
+                  {phaseBar.total ? phaseBar.node : null}
+                  {phaseBar.total ? '  ' : null}
                   {dot('required')}
                   <Text dimColor>{` ${req}  `}</Text>
                   {dot('recommended')}

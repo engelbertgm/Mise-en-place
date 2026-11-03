@@ -218,6 +218,23 @@ describe('panel', () => {
     }
   })
 
+  test('the person picks the symbol set in Herramientas, and it is remembered', async ($, on) => {
+    const saved: unknown[] = []
+    on('store.set', (_, e) => (saved.push(e.value), { value: undefined }))
+    await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect(await ui.find({ type: 'Text', text: /⣿/ })).toBeTruthy()
+    await ui.press({ key: 'tools' })
+    expect((await ui.find({ type: 'Text', text: /braille/ }))?.text).toMatch(/braille/)
+    await ui.press({ key: 'symbols' })
+    expect((await ui.find({ type: 'Text', text: /tramado/ }))?.text).toMatch(/tramado/)
+    expect(saved).toEqual(['dither'])
+    await ui.press({ key: 'symbols' })
+    await ui.press({ key: 'symbols' })
+    await ui.press({ key: 'tools-back' })
+    await ui.unmount()
+  })
+
   test('the list draws no card over its rows: every item stays pressable', async ($, on) => {
     await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
