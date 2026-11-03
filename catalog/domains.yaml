@@ -1,448 +1,633 @@
 # Dominios y subdominios del catálogo (borrador de la rama restructure).
-# Cada ítem aparece en un solo subdominio. Un dominio o subdominio se puede apagar entero (con razón en el log);
-# lo que no aplica al scope ya queda fuera por su `when`. Los ítems 🔒 nunca se apagan.
+# - items: cada ítem existente tiene UN solo subdominio "hogar"; ahí vive su estado, su nivel y su cierre.
+# - proposed: ítems nuevos propuestos para ese subdominio (aún no están en el catálogo).
+# - links: otros subdominios donde el ítem también se muestra (solo vista; no duplica estado ni bloqueos).
+# - Un dominio o subdominio se puede apagar entero (con razón en el log). Lo que no aplica al scope ya queda fuera por su `when`.
+#   Los ítems 🔒 nunca se apagan.
 domains:
   ui:
-    label: "UI"
-    description: "Cómo se ve: sistema de diseño, tipografía, color, movimiento y adaptación a pantallas."
+    label: UI
+    description: 'Cómo se ve: sistema de diseño, tipografía, color, movimiento y adaptación a pantallas.'
     subdomains:
       design-system:
-        label: "Sistema de diseño"
-        description: "Tokens, componentes, escalas y estados visuales."
+        label: Sistema de diseño
+        description: Tokens, componentes, escalas y estados visuales.
         items: [design-tokens, design-theme-ready, design-system-components, design-system-page, custom-components, no-hardcoded-colors, no-inline-styles, spacing-scale, interactive-states, continuous-corners]
       typography:
-        label: "Tipografía"
-        description: "Jerarquía, fuentes, números y largo de línea."
+        label: Tipografía
+        description: Jerarquía, fuentes, números y largo de línea.
         items: [text-hierarchy, font-families, tabular-numbers, text-balance, line-length]
       color-theme:
-        label: "Color y tema"
-        description: "Modo oscuro y color del navegador."
+        label: Color y tema
+        description: Modo oscuro y color del navegador.
         items: [dark-mode, theme-color]
       motion:
-        label: "Movimiento"
-        description: "Transiciones, View Transitions y animaciones interrumpibles."
+        label: Movimiento
+        description: Transiciones, View Transitions y animaciones interrumpibles.
         items: [motion-transitions, view-transitions, interruptible-motion]
       responsive:
-        label: "Responsive"
-        description: "Mobile first, anchos, áreas seguras y capturas por ancho."
+        label: Responsive
+        description: Mobile first, anchos, áreas seguras y capturas por ancho.
         items: [mobile-first, responsive-screenshots, no-hover-only, safe-areas-dvh]
   ux:
-    label: "UX"
-    description: "Cómo se usa: estados, formularios, navegación, tablas y protección de errores."
+    label: UX
+    description: 'Cómo se usa: estados, formularios, navegación, tablas y protección de errores.'
     subdomains:
       feedback:
-        label: "Retroalimentación y estados"
-        description: "Cargando, vacío, error, progreso, toasts y páginas de error."
+        label: Retroalimentación y estados
+        description: Cargando, vacío, error, progreso, toasts y páginas de error.
         items: [data-view-states, skeletons, page-progress-bar, real-progress, pending-buttons, optimistic-ui, toasts, stale-while-revalidate, live-dropzone, error-pages]
       forms:
-        label: "Formularios"
-        description: "Campos, validación, autocompletado y mensajes de éxito."
+        label: Formularios
+        description: Campos, validación, autocompletado y mensajes de éxito.
         items: [form-floating-label, form-input-types, form-autocomplete, form-validation-timing, form-keep-input, form-required-marks, form-password-ux, form-character-counter, form-input-masks, otp-autofill, inline-validation, form-thank-you]
       navigation:
-        label: "Navegación e interacción"
-        description: "Menús, atajos, hojas y comandos."
+        label: Navegación e interacción
+        description: Menús, atajos, hojas y comandos.
         items: [nav-mobile-menu, nav-active-page, nav-history, nav-logo-footer, command-menu, shortcut-hints, menu-safe-triangle, swipe-sheets]
       data-views:
-        label: "Tablas y búsqueda"
-        description: "Tablas, filtros, exportar y búsqueda."
+        label: Tablas y búsqueda
+        description: Tablas, filtros, exportar y búsqueda.
         items: [table-url-state, table-states, table-sticky-header, table-mobile, table-bulk-actions, csv-export, table-virtualization, search-url-query, search-typo-tolerance, search-shortcut]
       safe-actions:
-        label: "Acciones seguras"
-        description: "Deshacer, confirmar y no perder trabajo."
+        label: Acciones seguras
+        description: Deshacer, confirmar y no perder trabajo.
         items: [destructive-severity, unsaved-changes-warning, autosave-drafts, session-expiry-warning]
       dates:
-        label: "Fechas y horas"
-        description: "Cómo se muestran y agendan las horas."
+        label: Fechas y horas
+        description: Cómo se muestran y agendan las horas.
         items: [timezone-display, timezone-scheduling]
       conversion:
-        label: "Conversión"
-        description: "CTA visible y fijo en móvil."
+        label: Conversión
+        description: CTA visible y fijo en móvil.
         items: [cta-above-fold, sticky-mobile-cta]
       principles:
-        label: "Principios"
-        description: "Leyes de UX y principios de UI."
+        label: Principios
+        description: Leyes de UX y principios de UI.
         items: [ux-laws, ui-principles]
   accessibility:
-    label: "Accesibilidad"
-    description: "Que todas las personas puedan usarlo (WCAG 2.2 AA)."
+    label: Accesibilidad
+    description: Que todas las personas puedan usarlo (WCAG 2.2 AA).
     subdomains:
       perceivable:
-        label: "Perceptible"
-        description: "Contraste, texto alternativo, zoom, subtítulos y movimiento reducido."
+        label: Perceptible
+        description: Contraste, texto alternativo, zoom, subtítulos y movimiento reducido.
         items: [a11y-contrast, a11y-alt-text, a11y-zoom, a11y-reduced-motion, media-captions, media-audio-description, maps-text-alternative]
       operable:
-        label: "Operable"
-        description: "Teclado, foco, enlaces de salto y objetivos táctiles."
+        label: Operable
+        description: Teclado, foco, enlaces de salto y objetivos táctiles.
         items: [a11y-keyboard, a11y-focus-visible, a11y-skip-link, touch-targets, destructive-accessible]
       understandable:
-        label: "Comprensible"
-        description: "Etiquetas, errores de formulario, estructura e idioma."
+        label: Comprensible
+        description: Etiquetas, errores de formulario, estructura e idioma.
         items: [a11y-form-labels, a11y-form-errors, a11y-landmarks, html-lang]
       compliance:
-        label: "Cumplimiento y pruebas"
-        description: "Declaración de accesibilidad, pruebas automáticas y leyes (ADA, AODA)."
+        label: Cumplimiento y pruebas
+        description: Declaración de accesibilidad, pruebas automáticas y leyes (ADA, AODA).
         items: [accessibility-statement, a11y-automated-tests, ca-on-aoda, usa-ada]
   frontend:
-    label: "Frontend"
-    description: "Cómo carga y se renderiza en el navegador."
+    label: Frontend
+    description: Cómo carga y se renderiza en el navegador.
     subdomains:
       rendering:
-        label: "Renderizado"
-        description: "HTML con contenido, páginas pre-renderizadas, sin errores de consola ni source maps."
+        label: Renderizado
+        description: HTML con contenido, páginas pre-renderizadas, sin errores de consola ni source maps.
         items: [server-rendered-content, prerender-public-pages, no-console-errors, no-public-source-maps]
       performance:
-        label: "Rendimiento"
-        description: "Imágenes, fuentes, bundle y Web Vitals."
+        label: Rendimiento
+        description: Imágenes, fuentes, bundle y Web Vitals.
         items: [modern-image-formats, image-loading-priority, media-dimensions, web-fonts, compression-caching, core-web-vitals-budget, bundle-budget, image-placeholders]
       media:
-        label: "Video y audio"
-        description: "Reproducción y streaming."
+        label: Video y audio
+        description: Reproducción y streaming.
         items: [media-playback, media-streaming]
       pwa-offline:
-        label: "PWA y offline"
-        description: "Instalable, offline y gesto atrás."
+        label: PWA y offline
+        description: Instalable, offline y gesto atrás.
         items: [pwa-basics, pwa-install-prompt, predictive-back, offline-strategy, web-manifest]
       html-baseline:
-        label: "Base del HTML"
-        description: "Charset, viewport y favicon."
+        label: Base del HTML
+        description: Charset, viewport y favicon.
         items: [meta-charset, meta-viewport, favicon]
   i18n:
-    label: "Idiomas"
-    description: "Varios idiomas y formatos por mercado."
+    label: Idiomas
+    description: Varios idiomas y formatos por mercado.
     subdomains:
       formats:
-        label: "Formatos e interfaz"
-        description: "Fechas, números, moneda, selector de idioma y textos largos."
+        label: Formatos e interfaz
+        description: Fechas, números, moneda, selector de idioma y textos largos.
         items: [i18n-intl-formats, i18n-language-selector, i18n-text-expansion, i18n-currency-by-market, copy-in-translation-files]
       market-languages:
-        label: "Idiomas por mercado"
-        description: "Qué idiomas exige cada mercado."
+        label: Idiomas por mercado
+        description: Qué idiomas exige cada mercado.
         items: [br-language, ca-language, ca-french, eu-language, in-language, in-hindi, mx-language, uk-language, usa-language, usa-spanish]
       routing:
-        label: "Rutas y señales"
-        description: "hreflang y locale al compartir."
+        label: Rutas y señales
+        description: hreflang y locale al compartir.
         items: [i18n-hreflang, og-locale]
   backend:
-    label: "Backend"
-    description: "Servidor y servicios: API, mensajería, tiempo real, IA, archivos e integraciones."
+    label: Backend
+    description: 'Servidor y servicios: API, mensajería, tiempo real, IA, archivos e integraciones.'
     subdomains:
       api:
-        label: "API"
-        description: "Autenticación, versionado, errores, documentación y límites de uso."
+        label: API
+        description: Autenticación, versionado, errores, documentación y límites de uso.
         items: [api-auth, api-cors, api-versioning, api-docs, api-error-format, api-keys-hashed, api-rate-limit, rate-limit-responses]
       reliability:
-        label: "Confiabilidad"
-        description: "Colas, reintentos, circuit breaker e idempotencia."
+        label: Confiabilidad
+        description: Colas, reintentos, circuit breaker e idempotencia.
         items: [message-queue, resilient-external-calls, idempotency-keys]
       messaging:
-        label: "Email, newsletter y notificaciones"
-        description: "Correo transaccional, newsletter y avisos."
+        label: Email, newsletter y notificaciones
+        description: Correo transaccional, newsletter y avisos.
         items: [email-auth-dns, email-templates, email-unsubscribe-marketing, react-email, newsletter-signup, newsletter-consent, newsletter-double-opt-in, newsletter-unsubscribe, newsletter-sender-address, newsletter-no-purchased-lists, newsletter-preferences, notification-center, push-permission-timing, notification-batching]
       realtime:
-        label: "Tiempo real"
-        description: "Canales, presencia y reconexión."
+        label: Tiempo real
+        description: Canales, presencia y reconexión.
         items: [realtime-resilience, realtime-channel-auth, realtime-presence]
       ai:
-        label: "IA"
-        description: "Gasto, inyección de prompts, moderación y evaluaciones."
+        label: IA
+        description: Gasto, inyección de prompts, moderación y evaluaciones.
         items: [ai-spend-limits, ai-prompt-injection, ai-disclosure, ai-resilience, ai-moderation-privacy, ai-evals]
       uploads:
-        label: "Archivos"
-        description: "Validación, tamaño, URL firmadas y antivirus."
+        label: Archivos
+        description: Validación, tamaño, URL firmadas y antivirus.
         items: [upload-size-limits, upload-private-signed-urls, upload-validation, upload-antivirus, upload-strip-metadata]
       integrations:
-        label: "Integraciones"
-        description: "Mapas y servicios externos."
+        label: Integraciones
+        description: Mapas y servicios externos.
         items: [maps-key-restricted]
   auth:
-    label: "Cuentas y acceso"
-    description: "Quién eres y qué puedes hacer: contraseñas, sesiones, roles y ciclo de vida de la cuenta."
+    label: Cuentas y acceso
+    description: 'Quién eres y qué puedes hacer: contraseñas, sesiones, roles y ciclo de vida de la cuenta.'
     subdomains:
       credentials:
-        label: "Credenciales"
-        description: "Contraseñas, verificación, MFA y avisos de inicio de sesión."
+        label: Credenciales
+        description: Contraseñas, verificación, MFA y avisos de inicio de sesión.
         items: [password-hashing, password-recovery, email-verification, mfa-optional, admin-mfa, new-login-alert, auth-rate-limit, no-user-enumeration]
       sessions:
-        label: "Sesiones"
-        description: "Cookies seguras, expiración y CSRF."
+        label: Sesiones
+        description: Cookies seguras, expiración y CSRF.
         items: [secure-session-cookies, session-expiry, csrf-protection]
       access-control:
-        label: "Autorización"
-        description: "Roles, permisos por recurso y aislamiento entre clientes."
+        label: Autorización
+        description: Roles, permisos por recurso y aislamiento entre clientes.
         items: [resource-authorization, admin-roles, saas-tenant-isolation, internal-no-public-signup, internal-sso]
       account-lifecycle:
-        label: "Ciclo de vida de la cuenta"
-        description: "Borrar cuenta, exportar datos y bajas."
+        label: Ciclo de vida de la cuenta
+        description: Borrar cuenta, exportar datos y bajas.
         items: [account-deletion, data-export, internal-offboarding]
       audit:
-        label: "Auditoría"
-        description: "Quién hizo qué y cuándo."
+        label: Auditoría
+        description: Quién hizo qué y cuándo.
         items: [admin-audit-log, internal-audit-log, saas-activity-log]
   payments:
-    label: "Pagos"
-    description: "Cobrar bien: checkout, suscripciones, cobro por uso, impuestos y pagos entre partes."
+    label: Pagos
+    description: 'Cobrar bien: checkout, suscripciones, cobro por uso, impuestos y pagos entre partes.'
     subdomains:
       checkout:
-        label: "Checkout"
-        description: "Precios en servidor, enlaces de pago, webhooks, recibos y precio total."
+        label: Checkout
+        description: Precios en servidor, enlaces de pago, webhooks, recibos y precio total.
         items: [hosted-checkout, server-side-prices, payment-links-setup, payment-result-pages, payment-receipts, webhook-signature, webhook-idempotency, ecommerce-all-in-price]
       subscriptions:
-        label: "Suscripciones"
-        description: "Cancelar, avisar, reintentar cobros y cambiar de plan."
+        label: Suscripciones
+        description: Cancelar, avisar, reintentar cobros y cambiar de plan.
         items: [subscription-cancel-online, subscription-disclosure, subscription-reminders, subscription-dunning, subscription-plan-changes, subscription-billing-portal, subscription-webhook-sync]
       usage-billing:
-        label: "Cobro por uso"
-        description: "Eventos, tramos, topes, factura y conciliación."
+        label: Cobro por uso
+        description: Eventos, tramos, topes, factura y conciliación.
         items: [usage-events-idempotent, usage-pricing-tiers, usage-spend-cap, usage-visible, usage-invoice-detail, usage-reconciliation, usage-pricing-terms]
       tax-invoicing:
-        label: "Impuestos y facturas"
-        description: "Impuestos, IVA y CFDI."
+        label: Impuestos y facturas
+        description: Impuestos, IVA y CFDI.
         items: [tax-handling, eu-vat, mx-cfdi]
       marketplace-payouts:
-        label: "Pagos entre partes"
-        description: "Vendedores verificados, pagos divididos y disputas."
+        label: Pagos entre partes
+        description: Vendedores verificados, pagos divididos y disputas.
         items: [marketplace-seller-verification, marketplace-split-payments, marketplace-disputes]
   database:
-    label: "Base de datos"
-    description: "Cómo se guardan y protegen los datos propios."
+    label: Base de datos
+    description: Cómo se guardan y protegen los datos propios.
     subdomains:
       access:
-        label: "Acceso a los datos"
-        description: "RLS, mínimo privilegio y conexión cifrada."
+        label: Acceso a los datos
+        description: RLS, mínimo privilegio y conexión cifrada.
         items: [rls-all-tables, rls-policies-per-operation, db-least-privilege, db-ssl]
       model:
-        label: "Modelo de datos"
-        description: "Borrado lógico y fechas en UTC."
+        label: Modelo de datos
+        description: Borrado lógico y fechas en UTC.
         items: [soft-delete, timezone-utc-storage]
       operations:
-        label: "Migraciones y respaldos"
-        description: "Migraciones versionadas y restauración probada."
+        label: Migraciones y respaldos
+        description: Migraciones versionadas y restauración probada.
         items: [migrations-backups]
       scale:
-        label: "Escala de datos"
-        description: "Réplicas, sharding, hashing consistente y modelo de consistencia."
+        label: Escala de datos
+        description: Réplicas, sharding, hashing consistente y modelo de consistencia.
         items: [replication-recovery, sharding-strategy, consistent-hashing, consistency-model]
   security:
-    label: "Seguridad"
-    description: "Que no se filtre ni se abuse: secretos, entradas, cabeceras, dependencias y pruebas."
+    label: Seguridad
+    description: 'Que no se filtre ni se abuse: secretos, entradas, cabeceras, dependencias y pruebas.'
     subdomains:
       secrets:
-        label: "Secretos"
-        description: "Llaves fuera del repo, por entorno y con rotación."
+        label: Secretos
+        description: Llaves fuera del repo, por entorno y con rotación.
         items: [no-secrets-in-repo, env-gitignored, public-env-prefix, server-only-keys, secrets-scan-ci, keys-per-environment, key-rotation-procedure, logs-without-secrets]
       input:
-        label: "Entradas y salidas"
-        description: "Validación, SQL, HTML, redirecciones y SSRF."
+        label: Entradas y salidas
+        description: Validación, SQL, HTML, redirecciones y SSRF.
         items: [form-server-validation, no-sql-injection, no-raw-html, safe-redirects, ssrf-allowlist, owasp-top10-review]
       web-hardening:
-        label: "Endurecimiento web"
-        description: "HTTPS, cabeceras, CSP y errores ocultos."
+        label: Endurecimiento web
+        description: HTTPS, cabeceras, CSP y errores ocultos.
         items: [https-hsts, security-headers, csp-strict, security-txt, production-errors-hidden]
       supply-chain:
-        label: "Dependencias y análisis"
-        description: "Lockfile, vulnerabilidades y análisis estático."
+        label: Dependencias y análisis
+        description: Lockfile, vulnerabilidades y análisis estático.
         items: [lockfile-committed, no-critical-vulnerabilities, dependency-scan-ci, dependency-updates-bot, static-analysis-ci]
       abuse:
-        label: "Abuso y bots"
-        description: "Anti-spam, límite en formularios y WAF."
+        label: Abuso y bots
+        description: Anti-spam, límite en formularios y WAF.
         items: [form-anti-spam, form-rate-limit, waf-ddos]
       data-protection:
-        label: "Datos sensibles"
-        description: "Cifrado por campo y registro de accesos."
+        label: Datos sensibles
+        description: Cifrado por campo y registro de accesos.
         items: [sensitive-data-encryption, sensitive-data-access-log]
       assurance:
-        label: "Verificación"
-        description: "Pentest antes de lanzar."
+        label: Verificación
+        description: Pentest antes de lanzar.
         items: [pentest-before-launch]
   privacy:
-    label: "Privacidad"
-    description: "Qué datos se piden, cuánto se guardan y con quién se comparten."
+    label: Privacidad
+    description: Qué datos se piden, cuánto se guardan y con quién se comparten.
     subdomains:
       data-governance:
-        label: "Gobierno de datos"
-        description: "Retención, minimización, derechos, encargados y brechas."
+        label: Gobierno de datos
+        description: Retención, minimización, derechos, encargados y brechas.
         items: [data-retention, data-minimization, data-subject-requests, data-processing-agreements, third-party-disclosure, third-party-sdk-audit, breach-response-plan, health-no-tracking]
       cookies:
-        label: "Cookies y consentimiento"
-        description: "Inventario, banner, registro y señales de privacidad."
+        label: Cookies y consentimiento
+        description: Inventario, banner, registro y señales de privacidad.
         items: [cookie-inventory, cookie-policy, cookie-attributes, consent-banner, consent-before-load, consent-log, gpc-signal, do-not-sell-link, cookieless-analytics, embeds-facade]
       consent:
-        label: "Avisos y consentimiento en formularios"
-        description: "Qué se dice al pedir datos y consentimiento de marketing."
+        label: Avisos y consentimiento en formularios
+        description: Qué se dice al pedir datos y consentimiento de marketing.
         items: [form-consent-notice, marketing-consent]
   legal:
-    label: "Legal"
-    description: "Políticas, derechos del consumidor, propiedad intelectual y obligaciones por mercado."
+    label: Legal
+    description: Políticas, derechos del consumidor, propiedad intelectual y obligaciones por mercado.
     subdomains:
       policies:
-        label: "Políticas y datos del negocio"
-        description: "Privacidad, términos, reembolsos, contacto e identidad."
+        label: Políticas y datos del negocio
+        description: Privacidad, términos, reembolsos, contacto e identidad.
         items: [privacy-policy, terms-of-service, terms-versioned, refund-policy, legal-last-updated, visible-contact, business-identity]
       consumer:
-        label: "Consumidor y publicidad"
-        description: "Sin patrones oscuros, reseñas reales, afirmaciones con respaldo y derecho de desistimiento."
+        label: Consumidor y publicidad
+        description: Sin patrones oscuros, reseñas reales, afirmaciones con respaldo y derecho de desistimiento.
         items: [no-dark-patterns, no-fake-reviews, substantiated-claims, eu-withdrawal-right, eu-order-button, eu-price-reductions, mx-consumer-ecommerce, br-consumer, uk-consumer-contracts, ecommerce-shipping-returns, eu-dsa]
       content-terms:
-        label: "Contenido de terceros"
-        description: "Términos para vendedores y para contenido de usuarios."
+        label: Contenido de terceros
+        description: Términos para vendedores y para contenido de usuarios.
         items: [marketplace-seller-terms, ugc-content-terms, portfolio-client-permission]
       ip-licenses:
-        label: "Propiedad intelectual y licencias"
-        description: "Imágenes, fuentes, código abierto y DMCA."
+        label: Propiedad intelectual y licencias
+        description: Imágenes, fuentes, código abierto y DMCA.
         items: [asset-licenses, intellectual-property, open-source-licenses, usa-dmca-agent, maps-attribution]
       sensitive-sectors:
-        label: "Datos de salud y financieros"
-        description: "HIPAA, RGPD art. 9 y consentimiento expreso."
+        label: Datos de salud y financieros
+        description: HIPAA, RGPD art. 9 y consentimiento expreso.
         items: [usa-hipaa, eu-health-explicit-consent, mx-sensitive-consent]
       mx:
-        label: "México"
-        description: "Aviso de privacidad y reglas locales."
+        label: México
+        description: Aviso de privacidad y reglas locales.
         items: [mx-privacy-notice]
       usa:
-        label: "Estados Unidos"
-        description: "Privacidad estatal y CAN-SPAM."
+        label: Estados Unidos
+        description: Privacidad estatal y CAN-SPAM.
         items: [usa-privacy-policy, usa-can-spam]
       ca:
-        label: "Canadá"
-        description: "PIPEDA, Ley 25 de Quebec y CASL."
+        label: Canadá
+        description: PIPEDA, Ley 25 de Quebec y CASL.
         items: [ca-pipeda, ca-qc-law25, ca-casl]
       eu:
-        label: "Unión Europea"
-        description: "RGPD, representante, Impressum y SCA."
+        label: Unión Europea
+        description: RGPD, representante, Impressum y SCA.
         items: [eu-gdpr, eu-representative, eu-de-impressum, eu-sca]
       uk:
-        label: "Reino Unido"
-        description: "UK GDPR y cuota del ICO."
+        label: Reino Unido
+        description: UK GDPR y cuota del ICO.
         items: [uk-gdpr, uk-ico-fee]
       br:
-        label: "Brasil"
-        description: "LGPD."
+        label: Brasil
+        description: LGPD.
         items: [br-lgpd]
       in:
-        label: "India"
-        description: "DPDP y oficial de quejas."
+        label: India
+        description: DPDP y oficial de quejas.
         items: [in-dpdp, in-grievance-officer]
   seo:
-    label: "SEO"
-    description: "Que los buscadores y la IA encuentren y entiendan el sitio."
+    label: SEO
+    description: Que los buscadores y la IA encuentren y entiendan el sitio.
     subdomains:
       technical:
-        label: "SEO técnico"
-        description: "Títulos, canonical, robots, sitemap, URLs y redirecciones."
+        label: SEO técnico
+        description: Títulos, canonical, robots, sitemap, URLs y redirecciones.
         items: [unique-title, unique-description, canonical-link, robots-txt, sitemap-xml, noindex-preview, clean-urls, public-page-urls, sitemap-indexable-only, noindex-private-pages, robots-allows-assets, redirects-on-change, crawlable-links, canonical-redirects, search-console, heading-hierarchy]
       structured-data:
-        label: "Datos estructurados"
-        description: "JSON-LD, migas y esquemas por tipo."
+        label: Datos estructurados
+        description: JSON-LD, migas y esquemas por tipo.
         items: [json-ld-base, breadcrumbs, ecommerce-product-schema, local-business-schema, blog-article-schema, directory-listing-schema]
       social-sharing:
-        label: "Compartir en redes"
-        description: "Open Graph e imágenes de preview."
+        label: Compartir en redes
+        description: Open Graph e imágenes de preview.
         items: [open-graph-basic, og-image-default, og-image-specs, og-image-generated]
       ai-discovery:
-        label: "Descubrimiento por IA"
-        description: "llms.txt y robots para crawlers de IA."
+        label: Descubrimiento por IA
+        description: llms.txt y robots para crawlers de IA.
         items: [llms-txt, robots-allows-ai]
       local:
-        label: "SEO local"
-        description: "Nombre, dirección y teléfono, contacto y perfil de Google."
+        label: SEO local
+        description: Nombre, dirección y teléfono, contacto y perfil de Google.
         items: [local-business-nap, local-business-contact, local-business-profile]
       content-types:
-        label: "Blog y directorio"
-        description: "Feed y facetas rastreables."
+        label: Blog y directorio
+        description: Feed y facetas rastreables.
         items: [blog-feed, directory-facets-crawl]
       migration:
-        label: "Migración de sitio"
-        description: "Inventario de URLs, 301 y monitoreo."
+        label: Migración de sitio
+        description: Inventario de URLs, 301 y monitoreo.
         items: [migration-url-inventory, migration-301, migration-preserve-seo, migration-monitoring, migration-backup]
   content:
-    label: "Contenido"
-    description: "Textos, edición y casos."
+    label: Contenido
+    description: Textos, edición y casos.
     subdomains:
       copy:
-        label: "Textos"
-        description: "Sin placeholders, copy final, microcopy y voz."
+        label: Textos
+        description: Sin placeholders, copy final, microcopy y voz.
         items: [no-placeholder-content, final-copy, microcopy, voice-and-tone, about-faq]
       editorial:
-        label: "Editorial"
-        description: "Autores y casos de estudio."
+        label: Editorial
+        description: Autores y casos de estudio.
         items: [blog-author-pages, portfolio-case-studies]
       cms:
-        label: "CMS"
-        description: "Edición sin código, vista previa y versiones."
+        label: CMS
+        description: Edición sin código, vista previa y versiones.
         items: [cms-editing, cms-preview-roles, cms-images, cms-guide-adr, cms-versioning]
   product:
-    label: "Producto por tipo"
-    description: "Funciones propias de cada tipo de proyecto."
+    label: Producto por tipo
+    description: Funciones propias de cada tipo de proyecto.
     subdomains:
       ecommerce:
-        label: "Tienda"
-        description: "Inventario, pedidos y carrito."
+        label: Tienda
+        description: Inventario, pedidos y carrito.
         items: [ecommerce-no-oversell, ecommerce-order-emails, ecommerce-cart-persistence]
       booking:
-        label: "Reservas"
-        description: "Disponibilidad, doble reserva y cancelaciones."
+        label: Reservas
+        description: Disponibilidad, doble reserva y cancelaciones.
         items: [booking-no-double, booking-availability, booking-confirmation, booking-cancellation-policy, booking-admin, booking-extras]
       saas:
-        label: "SaaS"
-        description: "Planes, equipos y onboarding."
+        label: SaaS
+        description: Planes, equipos y onboarding.
         items: [saas-plan-limits, saas-teams, saas-onboarding]
       community:
-        label: "Comunidad y reseñas"
-        description: "Moderación, reportes, reseñas verificadas y fichas reclamadas."
+        label: Comunidad y reseñas
+        description: Moderación, reportes, reseñas verificadas y fichas reclamadas.
         items: [ugc-report, ugc-moderation, directory-report-and-claim, marketplace-review-integrity]
   analytics:
-    label: "Analítica"
-    description: "Medir uso y conversión."
+    label: Analítica
+    description: Medir uso y conversión.
     subdomains:
       tracking:
-        label: "Medición"
-        description: "Instalación, plan de eventos y embudo."
+        label: Medición
+        description: Instalación, plan de eventos y embudo.
         items: [analytics-installed, analytics-event-plan, analytics-funnel]
   infra:
-    label: "Infraestructura y operación"
-    description: "Despliegue, monitoreo, escala y costos."
+    label: Infraestructura y operación
+    description: Despliegue, monitoreo, escala y costos.
     subdomains:
       deploy:
-        label: "Despliegue y entornos"
-        description: "Entornos separados y esqueleto en preview."
+        label: Despliegue y entornos
+        description: Entornos separados y esqueleto en preview.
         items: [separate-environments, walking-skeleton]
       observability:
-        label: "Observabilidad"
-        description: "Uptime, salud, errores, logs, métricas y alertas."
+        label: Observabilidad
+        description: Uptime, salud, errores, logs, métricas y alertas.
         items: [uptime-monitor, health-endpoint, status-page, cron-monitoring, error-alerts-routed, error-monitoring, structured-logs, metrics-and-traces]
       scale:
-        label: "Escala y caché"
-        description: "Balanceo, caché y CDN."
+        label: Escala y caché
+        description: Balanceo, caché y CDN.
         items: [load-balancing, server-caching, cdn]
       operations:
-        label: "Operación y costos"
-        description: "Runbook y revisión de costos."
+        label: Operación y costos
+        description: Runbook y revisión de costos.
         items: [ops-runbook, cost-control, cost-review]
   quality:
-    label: "Calidad y proceso"
-    description: "Cómo se construye y se entrega: código, pruebas, git, documentos y entrega."
+    label: Calidad y proceso
+    description: 'Cómo se construye y se entrega: código por lenguaje, pruebas, git, documentos y entrega.'
     subdomains:
-      code:
-        label: "Código"
-        description: "Principios, estructura, lint, tipos y duplicación."
-        items: [code-principles, code-structure, formatter, strict-lint, strict-types, no-duplication-dead-code, no-debug-leftovers, code-maps, no-import-cycles, twelve-factor, quality-review]
+      principles:
+        label: Principios (cualquier lenguaje)
+        description: Mantra, estructura, mapas de código, revisión de calidad y Twelve-Factor.
+        items: [code-principles, code-structure, code-maps, quality-review, twelve-factor]
+      javascript:
+        label: JavaScript
+        description: 'Ecosistema JS/TS en ejecución: formato, lint, ciclos, código muerto y restos de depuración.'
+        activates_when: has_javascript (package.json con código JS o TS)
+        items: [formatter, strict-lint, no-import-cycles, no-debug-leftovers, no-duplication-dead-code]
+        proposed:
+        - id: js-eslint-security
+          title: 'Reglas de seguridad en el lint: sin eval, new Function ni HTML dinámico'
+        - id: js-error-handling
+          title: 'Errores no tragados: sin catch vacíos ni promesas sin manejar'
+        - id: js-package-hygiene
+          title: package.json con engines, packageManager y scripts estándar (lint, test, build)
+      typescript:
+        label: TypeScript
+        description: Tipos estrictos y seguridad del compilador.
+        activates_when: has_typescript (tsconfig.json)
+        items: [strict-types]
+        proposed:
+        - id: ts-no-ignore
+          title: '@ts-expect-error solo con razón; sin @ts-ignore ni @ts-nocheck'
+        - id: ts-type-aware-lint
+          title: 'Lint con tipos (typescript-eslint): sin promesas flotantes ni mal usadas'
+        - id: ts-unchecked-index
+          title: noUncheckedIndexedAccess y exactOptionalPropertyTypes activos
+        - id: ts-boundary-validation
+          title: Datos externos (API, formularios, env) validados con un esquema (Zod) antes de usarse
+      css:
+        label: CSS
+        description: Lint, especificidad y peso de los estilos.
+        activates_when: has_css (archivos .css/.scss o Tailwind)
+        items: []
+        proposed:
+        - id: css-lint
+          title: Stylelint sin errores
+        - id: css-specificity
+          title: Sin !important ni selectores por id; especificidad baja
+        - id: css-unused-size
+          title: CSS sin uso eliminado y peso del CSS dentro de presupuesto
+        - id: css-tailwind-conventions
+          title: Orden de clases automático y sin valores arbitrarios fuera de los tokens (Tailwind)
+      html:
+        label: HTML
+        description: HTML válido, semántico y sin código inline.
+        activates_when: has_html (HTML, JSX, Astro o plantillas)
+        items: []
+        proposed:
+        - id: html-valid
+          title: HTML válido en la salida del build (html-validate o Nu validator)
+        - id: html-semantic
+          title: 'Elementos semánticos: button y a para acciones, listas para listas, tablas solo para datos'
+        - id: html-no-inline-handlers
+          title: Sin onclick= ni scripts o estilos inline en el HTML (compatible con CSP estricta)
+      sql:
+        label: SQL
+        description: Migraciones y consultas seguras y con linter.
+        activates_when: has_sql (archivos .sql o migraciones)
+        items: []
+        proposed:
+        - id: sql-lint
+          title: Migraciones y consultas con linter (sqlfluff o squawk) sin errores
+        - id: sql-migration-safety
+          title: 'Migraciones seguras: índices concurrentes, sin bloqueos largos, con vuelta atrás o plan'
+        - id: sql-indexes-naming
+          title: Claves foráneas con índice y nombres consistentes
       python:
-        label: "Python"
-        description: "Ruff, mypy, pytest, pip-audit y vulture."
+        label: Python
+        description: Ruff, mypy, pytest, pip-audit y vulture.
+        activates_when: has_python (pyproject.toml, requirements, uv.lock)
         items: [py-lint-format, py-strict-types, py-tests, py-deps-audit, py-dead-code]
+      frameworks:
+        label: Frameworks (React, Next, Astro…)
+        description: 'Reglas propias del framework: hooks, accesibilidad en JSX y frontera cliente/servidor.'
+        activates_when: has_react / Next / Astro / Vue (dependencia detectada)
+        items: []
+        proposed:
+        - id: react-hooks-lint
+          title: Reglas de hooks de React en error
+        - id: jsx-a11y-lint
+          title: Lint de accesibilidad en JSX (jsx-a11y) sin errores
+        - id: client-server-boundary
+          title: '''use client'' solo donde hace falta; el código de servidor nunca lo importa el cliente'
+      config-ci:
+        label: Configuración, CI y contenedores
+        description: Workflows, scripts de shell, Dockerfile y finales de línea.
+        activates_when: workflows de Actions, scripts .sh o Dockerfile presentes
+        items: []
+        proposed:
+        - id: ci-actionlint
+          title: Workflows de GitHub Actions validados (actionlint) y acciones fijadas por versión
+        - id: shell-shellcheck
+          title: Scripts de shell sin errores de shellcheck
+        - id: docker-hadolint
+          title: Dockerfile sin errores (hadolint), usuario sin root e imagen fijada
+        - id: editorconfig-eol
+          title: .editorconfig y .gitattributes con finales de línea LF (evita diferencias Windows/Linux)
       testing:
-        label: "Pruebas y build"
-        description: "Unitarias, end-to-end y build limpio."
+        label: Pruebas y build
+        description: Unitarias, end-to-end y build limpio.
         items: [unit-tests, test-coverage, e2e-tests, build-lint-typecheck]
       git-docs:
-        label: "Git y documentación"
-        description: "Rama protegida, commits, PR, README y ADR."
+        label: Git y documentación
+        description: Rama protegida, commits, PR, README y ADR.
         items: [git-protected-main, git-conventional-commits, git-pr-template, git-tags-codeowners, adr-log, readme, gitignore, env-example]
       planning:
-        label: "Documentos de planeación"
-        description: "PRD, TRD, plan, flujos y esquema."
+        label: Documentos de planeación
+        description: PRD, TRD, plan, flujos y esquema.
         items: [plan-prd, plan-trd, plan-implementation, plan-flows, plan-schema]
       handover:
-        label: "Entrega al cliente"
-        description: "Traspaso y manual."
+        label: Entrega al cliente
+        description: Traspaso y manual.
         items: [client-handover, client-manual]
+links:
+  touch-targets: [ux.principles, ui.responsive]
+  a11y-contrast: [ui.color-theme, ui.design-system]
+  a11y-reduced-motion: [ui.motion]
+  a11y-form-errors: [ux.forms]
+  a11y-form-labels: [ux.forms]
+  a11y-keyboard: [ux.navigation]
+  a11y-focus-visible: [ui.design-system]
+  a11y-automated-tests: [quality.testing]
+  destructive-accessible: [ux.safe-actions]
+  motion-transitions: [accessibility.perceivable]
+  interruptible-motion: [ux.feedback]
+  no-hover-only: [accessibility.operable]
+  safe-areas-dvh: [frontend.pwa-offline]
+  responsive-screenshots: [quality.testing]
+  inline-validation: [accessibility.understandable]
+  heading-hierarchy: [accessibility.understandable, quality.html]
+  form-server-validation: [ux.forms]
+  form-anti-spam: [ux.forms]
+  form-rate-limit: [backend.api]
+  form-consent-notice: [ux.forms, legal.policies]
+  form-password-ux: [auth.credentials]
+  otp-autofill: [auth.credentials]
+  pending-buttons: [payments.checkout, backend.reliability]
+  no-dark-patterns: [ux.conversion, ux.forms, privacy.cookies]
+  consent-banner: [legal.consumer]
+  subscription-disclosure: [legal.consumer]
+  ecommerce-all-in-price: [legal.consumer]
+  refund-policy: [payments.checkout]
+  cookie-policy: [legal.policies]
+  privacy-policy: [privacy.data-governance]
+  newsletter-consent: [privacy.consent]
+  email-unsubscribe-marketing: [privacy.consent]
+  eu-vat: [legal.eu]
+  mx-cfdi: [legal.mx]
+  idempotency-keys: [payments.checkout, ux.feedback]
+  webhook-idempotency: [backend.reliability]
+  saas-plan-limits: [payments.subscriptions]
+  booking-no-double: [database.model, backend.reliability]
+  ecommerce-no-oversell: [database.model, backend.reliability]
+  server-rendered-content: [seo.technical]
+  prerender-public-pages: [seo.technical, infra.scale]
+  core-web-vitals-budget: [seo.technical, infra.observability]
+  image-placeholders: [ux.feedback]
+  compression-caching: [infra.scale]
+  cdn: [frontend.performance]
+  server-caching: [database.scale, backend.api]
+  no-public-source-maps: [security.web-hardening]
+  no-console-errors: [quality.javascript]
+  i18n-hreflang: [seo.technical]
+  og-locale: [seo.social-sharing]
+  copy-in-translation-files: [content.copy]
+  logs-without-secrets: [infra.observability, privacy.data-governance]
+  structured-logs: [security.secrets]
+  error-monitoring: [security.web-hardening, privacy.data-governance]
+  production-errors-hidden: [infra.observability]
+  data-retention: [database.model, auth.account-lifecycle]
+  account-deletion: [privacy.data-governance]
+  data-subject-requests: [auth.account-lifecycle]
+  third-party-sdk-audit: [security.supply-chain, frontend.performance, privacy.cookies]
+  consent-before-load: [analytics.tracking, frontend.performance]
+  cookieless-analytics: [analytics.tracking]
+  analytics-installed: [privacy.cookies]
+  embeds-facade: [frontend.performance]
+  cookie-attributes: [auth.sessions, security.web-hardening]
+  secure-session-cookies: [privacy.cookies]
+  session-expiry-warning: [auth.sessions]
+  rls-all-tables: [auth.access-control]
+  resource-authorization: [database.access]
+  saas-tenant-isolation: [database.access, product.saas]
+  sensitive-data-encryption: [database.access]
+  migrations-backups: [infra.operations, quality.sql]
+  replication-recovery: [infra.operations]
+  timezone-utc-storage: [ux.dates]
+  timezone-display: [database.model]
+  soft-delete: [ux.safe-actions]
+  destructive-severity: [database.model]
+  twelve-factor: [infra.deploy, security.secrets]
+  no-secrets-in-repo: [quality.git-docs]
+  csp-strict: [quality.html]
+  no-raw-html: [quality.frameworks]
+  api-auth: [auth.access-control]
+  api-cors: [security.web-hardening]
+  api-rate-limit: [security.abuse]
+  rate-limit-responses: [security.abuse]
+  upload-validation: [security.input]
+  upload-antivirus: [security.abuse]
+  ai-spend-limits: [infra.operations]
+  no-hardcoded-colors: [quality.css]
+  no-inline-styles: [quality.css]
+  spacing-scale: [quality.css]
