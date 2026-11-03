@@ -30,6 +30,7 @@ export type PanelDomainRow = {
   done: number
   pendingRequired: number
   pendingRecommended: number
+  pendingOptional: number
   deferred: number
   off?: string
 }

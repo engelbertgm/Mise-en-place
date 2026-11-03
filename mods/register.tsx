@@ -44,7 +44,9 @@ const WITH_TEXT = [
 // Levels are circles in a theme color, so they follow light and dark themes: full red (required), full yellow
 // (recommended), empty white (optional). Progress bars fill in braille, and their color moves from red to green.
 const LEVEL_GLYPH = { required: '●', recommended: '●', optional: '○' } as const
-const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'text' } as const
+const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: undefined } as const
+// Outside the terminal (VS Code, desktop) the theme keys may not map to a color: raw colors always paint.
+const LEVEL_HEX = { required: '#e5484d', recommended: '#f5a524', optional: undefined } as const
 const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
@@ -275,16 +277,46 @@ export const register: Register = on => {
     const open = await read($, expanded)
     const toggle = (key: string) => update($, expanded, list => (list.includes(key) ? list.filter(p => p !== key) : [...list, key]))
     const frame = await read($, spinner)
-    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>{LEVEL_GLYPH[level]}</Text>
+    // Colors sit in Text elements of their own, never inside a Button: a Button restyles its label on some surfaces.
+    const paint = (level: keyof typeof LEVEL_COLOR) => (e.surface === 'terminal' ? LEVEL_COLOR[level] : LEVEL_HEX[level])
+    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={paint(level)}>{LEVEL_GLYPH[level]}</Text>
     const cells = e.props.bodyColumns >= 48 ? 6 : 4
-    /** Done / total required items, drawn as a bar. */
+    /** Done / total required items, drawn as a braille bar (the done part colored by progress, the rest dim). */
     const bar = (items: typeof data.items) => {
       const req = items.filter(i => i.level === 'required' && i.state === 'active')
       const done = req.filter(i => i.status === 'pass').length
-      const m = meter(done, req.length, cells)
-      const color = progressColor(req.length ? done / req.length : 0)
-      return { done, total: req.length, node: (<Text><Text color={color}>{m.filled}</Text><Text dimColor>{m.rest}</Text></Text>) }
+      return { done, total: req.length, node: barNode(done, req.length) }
     }
+    function barNode(done: number, total: number) {
+      const m = meter(done, total, cells)
+      return (
+        <Box flexDirection="row">
+          <Text color={progressColor(total ? done / total : 0)}>{m.filled}</Text>
+          <Text dimColor>{m.rest}</Text>
+        </Box>
+      )
+    }
+    /** A count in its level's color, right-aligned in 3 columns; a zero is dim. */
+    const num = (n: number, level: keyof typeof LEVEL_COLOR) => (n ? <Text color={paint(level)}>{String(n).padStart(3)}</Text> : <Text dimColor>{'  0'}</Text>)
+    /**
+     * One line of a list: circle · NAME (grows) · bar · red, yellow and white counts. The circle takes the progress
+     * color; only the name is a Button.
+     */
+    const line = (opts: { key: string; label: string; onPress: () => void; ring?: string; done: number; total: number; counts: [number, number, number] }) => (
+      <Box flexDirection="row">
+        <Text color={opts.ring}>●</Text>
+        <Box flexGrow={1}>
+          <Button key={opts.key} plain onPress={opts.onPress}>
+            {` ${opts.label}`}
+          </Button>
+        </Box>
+        {opts.total ? barNode(opts.done, opts.total) : <Text>{' '.repeat(cells)}</Text>}
+        <Text>{'  '}</Text>
+        {num(opts.counts[0], 'required')}
+        {num(opts.counts[1], 'recommended')}
+        {num(opts.counts[2], 'optional')}
+      </Box>
+    )
 
     if (await read($, tools)) {
       const run = async (command: string, args = '') => {
@@ -444,30 +476,35 @@ export const register: Register = on => {
     const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i) && !i.deferred)
     const count = (level: 'required' | 'recommended') => {
       const target = first(level)
-      const label = <Text dimColor>{` ${data.counts[level]}`}</Text>
-      return target ? (
-        <Button key={`first-${level}`} plain onPress={() => update($, selected, () => target.id)}>
+      const label = ` ${data.counts[level]}`
+      return (
+        <Box flexDirection="row">
           {dot(level)}
-          {label}
-        </Button>
-      ) : (
-        <Text>
-          {dot(level)}
-          {label}
-        </Text>
+          {target ? (
+            <Button key={`first-${level}`} plain onPress={() => update($, selected, () => target.id)}>
+              {label}
+            </Button>
+          ) : (
+            <Text dimColor>{label}</Text>
+          )}
+        </Box>
       )
     }
     const rank = (a: PanelItem, b: PanelItem) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || Number(a.deferred) - Number(b.deferred)
     const row = (i: PanelItem, note?: string) => (
-      <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
-        {'   '}
+      <Box flexDirection="row">
+        <Text>{'  '}</Text>
         {dot(i.level)}
-        {` ${i.id}`}
-        {i.status === 'fail' ? <Text color="error">{' ✗'}</Text> : null}
+        <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
+          {` ${i.id}`}
+        </Button>
+        {i.status === 'fail' ? <Text color={e.surface === 'terminal' ? 'error' : LEVEL_HEX.required}>{' ✗'}</Text> : null}
         {i.deferred ? <Text dimColor>{' ⏳'}</Text> : null}
         {note ? <Text dimColor>{`  ${note}`}</Text> : null}
-      </Button>
+      </Box>
     )
+    const ringOf = (done: number, total: number) => (total ? progressColor(done / total) : undefined)
+    const optionalOf = (items: PanelItem[]) => items.filter(i => i.level === 'optional' && i.state === 'active' && i.status !== 'pass').length
     // Sub-phases with nothing pending fold into one line; the others show a header and, open, up to CAP rows.
     const pendingOf = (phase: string) => data.items.filter(i => i.phase === phase && isPending(i)).sort(rank)
     const clean = data.phases.filter(p => (data.closed.includes(p) || p === data.active) && !pendingOf(p).length)
@@ -483,18 +520,19 @@ export const register: Register = on => {
           const req = items.filter(i => i.level === 'required').length
           const all = open.includes(`all:${phase}`)
           const rows = all ? items : items.slice(0, CAP)
-          const phaseBar = bar(data.items.filter(i => i.phase === phase))
+          const inPhase = data.items.filter(i => i.phase === phase)
+          const progress = bar(inPhase)
           return (
             <Box flexDirection="column">
-              <Button key={`phase-${phase}`} plain onPress={() => toggle(phase)}>
-                {`${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}  `}
-                {phaseBar.total ? phaseBar.node : null}
-                {phaseBar.total ? '  ' : null}
-                {dot('required')}
-                <Text dimColor>{` ${req}  `}</Text>
-                {dot('recommended')}
-                <Text dimColor>{` ${items.length - req}`}</Text>
-              </Button>
+              {line({
+                key: `phase-${phase}`,
+                label: `${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}`,
+                onPress: () => toggle(phase),
+                ring: ringOf(progress.done, progress.total),
+                done: progress.done,
+                total: progress.total,
+                counts: [req, items.length - req, optionalOf(inPhase)],
+              })}
               {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
               {shown && rows.map(i => row(i))}
               {shown && items.length > CAP && (
@@ -508,7 +546,7 @@ export const register: Register = on => {
       </Box>
     )
 
-    // By domain: one row per domain with its bar; open, its pending items (and the ones linked from elsewhere, ↗).
+    // By domain: the same line per domain; open, its pending items (and the ones linked from elsewhere, ↗).
     const byDomain = (
       <Box flexDirection="column" marginTop={1}>
         {data.domains
@@ -516,37 +554,25 @@ export const register: Register = on => {
           .map(d => {
             const key = `dom:${d.row.path}`
             const shown = open.includes(key)
-            const mine = data.items.filter(i => i.domain === d.row.path || i.domain.startsWith(`${d.row.path}.`)).filter(isPending).sort(rank)
-            const linked = data.items.filter(i => !(i.domain === d.row.path || i.domain.startsWith(`${d.row.path}.`)) && i.links.some(l => l === d.row.path || l.startsWith(`${d.row.path}.`))).filter(isPending).sort(rank)
+            const inside = (i: PanelItem) => i.domain === d.row.path || i.domain.startsWith(`${d.row.path}.`)
+            const mine = data.items.filter(inside).filter(isPending).sort(rank)
+            const linked = data.items.filter(i => !inside(i) && i.links.some(l => l === d.row.path || l.startsWith(`${d.row.path}.`))).filter(isPending).sort(rank)
             const all = open.includes(`all:${key}`)
             const rows = all ? mine : mine.slice(0, CAP)
-            const m = meter(d.row.done, d.row.required, cells)
             return (
               <Box flexDirection="column">
-                <Button key={key} plain onPress={() => toggle(key)}>
-                  {`${shown ? '▾' : '▸'} ${d.row.label}  `}
-                  {d.row.off ? (
-                    <Text dimColor>apagado</Text>
-                  ) : (
-                    <Text>
-                      {d.row.required ? (
-                        <Text>
-                          <Text color={progressColor(d.row.done / d.row.required)}>{m.filled}</Text>
-                          <Text dimColor>{m.rest}</Text>
-                        </Text>
-                      ) : null}
-                      <Text dimColor>{d.row.required ? ' ' : ''}</Text>
-                    </Text>
-                  )}
-                  {d.row.off ? null : dot('required')}
-                  {d.row.off ? null : <Text dimColor>{` ${d.row.pendingRequired}  `}</Text>}
-                  {d.row.off ? null : dot('recommended')}
-                  {d.row.off ? null : <Text dimColor>{` ${d.row.pendingRecommended}`}</Text>}
-                </Button>
+                {line({
+                  key,
+                  label: `${shown ? '▾' : '▸'} ${d.row.label}${d.row.off ? ' · apagado' : ''}`,
+                  onPress: () => toggle(key),
+                  ring: d.row.off ? undefined : ringOf(d.row.done, d.row.required),
+                  done: d.row.off ? 0 : d.row.done,
+                  total: d.row.off ? 0 : d.row.required,
+                  counts: d.row.off ? [0, 0, 0] : [d.row.pendingRequired, d.row.pendingRecommended, d.row.pendingOptional],
+                })}
                 {shown && d.row.off && (
                   <Button key={`on-${d.row.path}`} plain onPress={() => act($, ['domain', 'on', d.row.path])}>
-                    {`   ${d.row.off} · `}
-                    <Text dimColor>activar</Text>
+                    {`   ${d.row.off} · activar`}
                   </Button>
                 )}
                 {shown && !d.row.off && rows.map(i => row(i, i.domain.slice(d.row.path.length + 1)))}
@@ -563,6 +589,7 @@ export const register: Register = on => {
       </Box>
     )
 
+    const overall = bar(data.items)
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1}>
@@ -581,15 +608,12 @@ export const register: Register = on => {
             ⚙ Herramientas
           </Button>
         </Box>
-        {(() => {
-          const all = bar(data.items)
-          return all.total ? (
-            <Text>
-              {all.node}
-              <Text dimColor>{` ${all.done}/${all.total} obligatorios`}</Text>
-            </Text>
-          ) : null
-        })()}
+        {overall.total ? (
+          <Box flexDirection="row" gap={1}>
+            {overall.node}
+            <Text dimColor>{`${overall.done}/${overall.total} obligatorios`}</Text>
+          </Box>
+        ) : null}
         <Box flexDirection="row" gap={2}>
           <Text dimColor>Ver por</Text>
           <Button key="view-phase" plain onPress={() => update($, view, () => 'fase')}>

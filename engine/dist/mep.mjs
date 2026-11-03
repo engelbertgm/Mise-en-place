@@ -7948,6 +7948,7 @@ function rowFor(path, label, results, deferred, offReason) {
     done: required.filter((r) => r.status === "pass").length,
     pendingRequired: pending("required"),
     pendingRecommended: pending("recommended"),
+    pendingOptional: pending("optional"),
     deferred: required.filter((r) => r.status !== "pass" && deferred.has(r.item.id)).length,
     off: offReason
   };

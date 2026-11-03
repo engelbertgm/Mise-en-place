@@ -16,7 +16,7 @@ const RAW_PANEL = {
   ],
 }
 
-const DOMAIN_ROW = { applies: 3, required: 2, done: 0, pendingRequired: 2, pendingRecommended: 1, deferred: 0 }
+const DOMAIN_ROW = { applies: 3, required: 2, done: 0, pendingRequired: 2, pendingRecommended: 1, pendingOptional: 0, deferred: 0 }
 /** What the engine adds around the items: the stage, the domain summary and each item's home, links and deferral. */
 const PANEL = {
   ...RAW_PANEL,
@@ -25,7 +25,7 @@ const PANEL = {
     { row: { path: 'quality', label: 'Calidad y proceso', ...DOMAIN_ROW }, subs: [] },
     { row: { path: 'ux', label: 'UX', ...DOMAIN_ROW, applies: 1, required: 0, pendingRequired: 0, pendingRecommended: 0 }, subs: [] },
     { row: { path: 'security', label: 'Seguridad', ...DOMAIN_ROW, applies: 1, required: 0, pendingRequired: 0, pendingRecommended: 1 }, subs: [] },
-    { row: { path: 'seo', label: 'SEO', applies: 0, required: 0, done: 0, pendingRequired: 0, pendingRecommended: 0, deferred: 0, off: 'lo lleva otro equipo' }, subs: [] },
+    { row: { path: 'seo', label: 'SEO', applies: 0, required: 0, done: 0, pendingRequired: 0, pendingRecommended: 0, pendingOptional: 0, deferred: 0, off: 'lo lleva otro equipo' }, subs: [] },
   ],
   items: RAW_PANEL.items.map(i => ({ domain: i.category === 'security' ? 'security.web-hardening' : 'quality.code', links: i.id === 'code-maps' ? ['ux.principles'] : [], deferred: false, ...i })),
 }

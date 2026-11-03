@@ -2,6 +2,11 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.4.1
+
+- **Panel en columnas:** cada línea de sub-etapa o dominio es `● NOMBRE … barra de braille  rojos amarillos blancos`. La barra y los números van a la derecha; el círculo toma el color del avance (rojo → verde), y el nombre es lo único que es botón. El número blanco cuenta los opcionales elegidos que faltan.
+- **Color en VS Code:** los colores salían en blanco y negro porque estaban dentro de un botón, que en algunas superficies repinta su texto. Ahora cada color va en su propio texto, y fuera de la terminal se usan colores fijos (`#e5484d`, `#f5a524`) en vez de los del tema.
+
 ## 0.4.0
 
 Avanzar sin que cerrar sub-etapas bloquee un push, y el catálogo por dominios.

@@ -41,6 +41,8 @@ export type DomainRow = {
   /** Pending (not passing, not deferred). */
   pendingRequired: number
   pendingRecommended: number
+  /** Optional items the person chose and that are not done. */
+  pendingOptional: number
   /** Required items postponed until go-live. */
   deferred: number
   /** Why the domain is off, when it is. */
@@ -53,7 +55,7 @@ function rowFor(path: string, label: string, results: ItemResult[], deferred: Se
   const inside = results.filter(r => r.item.domain === path || r.item.domain?.startsWith(`${path}.`))
   const active = inside.filter(r => r.state === 'active')
   const required = active.filter(r => r.level === 'required')
-  const pending = (level: 'required' | 'recommended') => active.filter(r => r.level === level && r.status !== 'pass' && !deferred.has(r.item.id)).length
+  const pending = (level: 'required' | 'recommended' | 'optional') => active.filter(r => r.level === level && r.status !== 'pass' && !deferred.has(r.item.id)).length
   return {
     path,
     label,
@@ -62,6 +64,7 @@ function rowFor(path: string, label: string, results: ItemResult[], deferred: Se
     done: required.filter(r => r.status === 'pass').length,
     pendingRequired: pending('required'),
     pendingRecommended: pending('recommended'),
+    pendingOptional: pending('optional'),
     deferred: required.filter(r => r.status !== 'pass' && deferred.has(r.item.id)).length,
     off: offReason,
   }
