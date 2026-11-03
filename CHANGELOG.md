@@ -4,7 +4,8 @@ The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md
 
 ## 0.4.1
 
-- **Panel en columnas:** cada línea de sub-etapa o dominio es `● NOMBRE … barra de braille  rojos amarillos blancos`. La barra y los números van a la derecha; el círculo toma el color del avance (rojo → verde), y el nombre es lo único que es botón. El número blanco cuenta los opcionales elegidos que faltan.
+- **Panel en columnas:** cada línea de sub-etapa o dominio es `NOMBRE … barra de braille  rojos amarillos blancos`. La barra y los números van a la derecha y los números llevan el color (rojo, amarillo, blanco); el nombre es lo único que es botón. El número blanco cuenta los opcionales elegidos que faltan.
+- **Secciones por nivel:** dentro de una categoría los ítems van bajo un encabezado por nivel (`Obligatorios (12)` en rojo, `Recomendados (4)` en amarillo, `Opcionales elegidos`), con su círculo. El encabezado dice el nivel con palabras, así que se entiende aunque el color no se vea. Los contadores de arriba también llevan la palabra (`Obligatorios 12`).
 - **Color en VS Code:** los colores salían en blanco y negro porque estaban dentro de un botón, que en algunas superficies repinta su texto. Ahora cada color va en su propio texto, y fuera de la terminal se usan colores fijos (`#e5484d`, `#f5a524`) en vez de los del tema.
 
 ## 0.4.0

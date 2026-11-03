@@ -299,15 +299,14 @@ export const register: Register = on => {
     /** A count in its level's color, right-aligned in 3 columns; a zero is dim. */
     const num = (n: number, level: keyof typeof LEVEL_COLOR) => (n ? <Text color={paint(level)}>{String(n).padStart(3)}</Text> : <Text dimColor>{'  0'}</Text>)
     /**
-     * One line of a list: circle · NAME (grows) · bar · red, yellow and white counts. The circle takes the progress
-     * color; only the name is a Button.
+     * One line of a list: NAME (grows) · bar · red, yellow and white counts. The numbers carry the color (the
+     * circles live inside the category, next to each item); only the name is a Button.
      */
-    const line = (opts: { key: string; label: string; onPress: () => void; ring?: string; done: number; total: number; counts: [number, number, number] }) => (
+    const line = (opts: { key: string; label: string; onPress: () => void; done: number; total: number; counts: [number, number, number] }) => (
       <Box flexDirection="row">
-        <Text color={opts.ring}>●</Text>
         <Box flexGrow={1}>
           <Button key={opts.key} plain onPress={opts.onPress}>
-            {` ${opts.label}`}
+            {opts.label}
           </Button>
         </Box>
         {opts.total ? barNode(opts.done, opts.total) : <Text>{' '.repeat(cells)}</Text>}
@@ -474,12 +473,14 @@ export const register: Register = on => {
     const deferredPending = data.items.filter(i => i.deferred && isPending(i)).length
     // A count opens its first pending item; a zero count is not a button.
     const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i) && !i.deferred)
+    const narrow = e.props.bodyColumns < 56
+    const WORD = { required: narrow ? 'Oblig.' : 'Obligatorios', recommended: narrow ? 'Recom.' : 'Recomendados' } as const
     const count = (level: 'required' | 'recommended') => {
       const target = first(level)
       const label = ` ${data.counts[level]}`
       return (
         <Box flexDirection="row">
-          {dot(level)}
+          <Text color={paint(level)}>{WORD[level]}</Text>
           {target ? (
             <Button key={`first-${level}`} plain onPress={() => update($, selected, () => target.id)}>
               {label}
@@ -493,7 +494,7 @@ export const register: Register = on => {
     const rank = (a: PanelItem, b: PanelItem) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || Number(a.deferred) - Number(b.deferred)
     const row = (i: PanelItem, note?: string) => (
       <Box flexDirection="row">
-        <Text>{'  '}</Text>
+        <Text>{'    '}</Text>
         {dot(i.level)}
         <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
           {` ${i.id}`}
@@ -503,10 +504,23 @@ export const register: Register = on => {
         {note ? <Text dimColor>{`  ${note}`}</Text> : null}
       </Box>
     )
-    const ringOf = (done: number, total: number) => (total ? progressColor(done / total) : undefined)
+    /** Rows grouped under a heading per level, the heading in the level's color and naming it, so the level reads even if the color does not. */
+    const SECTION = { required: 'Obligatorios', recommended: 'Recomendados', optional: 'Opcionales elegidos' } as const
+    const sections = (shownRows: PanelItem[], all: PanelItem[], note?: (i: PanelItem) => string | undefined) =>
+      (['required', 'recommended', 'optional'] as const).map(level => {
+        const here = shownRows.filter(i => i.level === level)
+        if (!here.length) return null
+        return (
+          <Box flexDirection="column">
+            <Text bold color={paint(level)}>{`   ${SECTION[level]} (${all.filter(i => i.level === level).length})`}</Text>
+            {here.map(i => row(i, note?.(i)))}
+          </Box>
+        )
+      })
     const optionalOf = (items: PanelItem[]) => items.filter(i => i.level === 'optional' && i.state === 'active' && i.status !== 'pass').length
     // Sub-phases with nothing pending fold into one line; the others show a header and, open, up to CAP rows.
-    const pendingOf = (phase: string) => data.items.filter(i => i.phase === phase && isPending(i)).sort(rank)
+    const listed = (i: PanelItem) => isPending(i) || (i.state === 'active' && i.level === 'optional' && i.status !== 'pass')
+    const pendingOf = (phase: string) => data.items.filter(i => i.phase === phase && listed(i)).sort(rank)
     const clean = data.phases.filter(p => (data.closed.includes(p) || p === data.active) && !pendingOf(p).length)
 
     const byPhase = (
@@ -518,6 +532,7 @@ export const register: Register = on => {
           // Open by default: the active sub-phase and regressions in closed ones. Later ones fold to a count.
           const shown = phase === data.active || closed || open.includes(phase)
           const req = items.filter(i => i.level === 'required').length
+          const rec = items.filter(i => i.level === 'recommended').length
           const all = open.includes(`all:${phase}`)
           const rows = all ? items : items.slice(0, CAP)
           const inPhase = data.items.filter(i => i.phase === phase)
@@ -528,13 +543,12 @@ export const register: Register = on => {
                 key: `phase-${phase}`,
                 label: `${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}`,
                 onPress: () => toggle(phase),
-                ring: ringOf(progress.done, progress.total),
                 done: progress.done,
                 total: progress.total,
-                counts: [req, items.length - req, optionalOf(inPhase)],
+                counts: [req, rec, optionalOf(inPhase)],
               })}
               {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
-              {shown && rows.map(i => row(i))}
+              {shown && sections(rows, items)}
               {shown && items.length > CAP && (
                 <Button key={`more-${phase}`} plain onPress={() => toggle(`all:${phase}`)}>
                   {all ? '     ver menos' : `     … ${items.length - CAP} más`}
@@ -555,7 +569,7 @@ export const register: Register = on => {
             const key = `dom:${d.row.path}`
             const shown = open.includes(key)
             const inside = (i: PanelItem) => i.domain === d.row.path || i.domain.startsWith(`${d.row.path}.`)
-            const mine = data.items.filter(inside).filter(isPending).sort(rank)
+            const mine = data.items.filter(inside).filter(listed).sort(rank)
             const linked = data.items.filter(i => !inside(i) && i.links.some(l => l === d.row.path || l.startsWith(`${d.row.path}.`))).filter(isPending).sort(rank)
             const all = open.includes(`all:${key}`)
             const rows = all ? mine : mine.slice(0, CAP)
@@ -565,7 +579,6 @@ export const register: Register = on => {
                   key,
                   label: `${shown ? '▾' : '▸'} ${d.row.label}${d.row.off ? ' · apagado' : ''}`,
                   onPress: () => toggle(key),
-                  ring: d.row.off ? undefined : ringOf(d.row.done, d.row.required),
                   done: d.row.off ? 0 : d.row.done,
                   total: d.row.off ? 0 : d.row.required,
                   counts: d.row.off ? [0, 0, 0] : [d.row.pendingRequired, d.row.pendingRecommended, d.row.pendingOptional],
@@ -575,7 +588,7 @@ export const register: Register = on => {
                     {`   ${d.row.off} · activar`}
                   </Button>
                 )}
-                {shown && !d.row.off && rows.map(i => row(i, i.domain.slice(d.row.path.length + 1)))}
+                {shown && !d.row.off && sections(rows, mine, i => i.domain.slice(d.row.path.length + 1))}
                 {shown && !d.row.off && mine.length > CAP && (
                   <Button key={`more-${key}`} plain onPress={() => toggle(`all:${key}`)}>
                     {all ? '     ver menos' : `     … ${mine.length - CAP} más`}

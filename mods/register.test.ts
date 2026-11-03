@@ -281,6 +281,18 @@ describe('panel', () => {
     await ui.unmount()
   })
 
+  test('inside a category the items sit under a heading per level, named so it reads without color', async ($, on) => {
+    await opened($, on)
+    for (const surface of ['terminal', 'vscode'] as const) {
+      const ui = await $.ui.mount({ ...PANE, surface })
+      expect((await ui.find({ type: 'Text', text: /Obligatorios \(2\)/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /Recomendados \(1\)/ }))?.text).toBeTruthy()
+      await ui.press({ key: 'csp-strict' }) // the recommended item is under its own heading and pressable
+      await ui.press({ key: 'back' })
+      await ui.unmount()
+    }
+  })
+
   test('by domain: a row per domain; open, its pending items and the ones linked from elsewhere', async ($, on) => {
     await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
