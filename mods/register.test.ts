@@ -218,11 +218,11 @@ describe('panel', () => {
     }
   })
 
-  test('levels are circles that fill, the bars are braille and shift from red to green', async ($, on) => {
+  test('levels are circles, the bars are braille and shift from red to green', async ($, on) => {
     await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
     expect(await ui.find({ type: 'Text', text: /●/ })).toBeTruthy() // required
-    expect(await ui.find({ type: 'Text', text: /◐/ })).toBeTruthy() // recommended
+    expect(await ui.find({ type: 'Text', text: /◐/ })).toBeFalsy() // no half circles
     expect(await ui.find({ type: 'Text', text: /⣀/ })).toBeTruthy() // an empty bar: nothing done yet
     expect(await ui.find({ type: 'Text', text: /▓|▒|░/ })).toBeFalsy()
     await ui.unmount()

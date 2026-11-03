@@ -21,7 +21,7 @@ const ENGINE = String.raw`(?:mep\.mjs["']?|@engelbertgm\/mep\S*|(?:^|[;&|]\s*|\b
 const ENGINE_CALL = new RegExp(ENGINE)
 
 /** Actions only the person takes: confirming a manual item, turning off a 🔴, re-sealing, relaxing a threshold. */
-const HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`)
+const HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync|defer|domain\\s+off|stage\\s+building)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`)
 
 const STATE_HINT = 'mep: el estado de mep (.mep/profile.yaml, log, security/, reviews/) solo cambia con la CLI de mep. Usa /mep:add, /mep:skip, /mep:phase o mep review/security record.'
 
@@ -33,8 +33,8 @@ export function guardFile(path: string): string | undefined {
 /** A Bash command the agent may not run. Undefined when it may. */
 export function guardCommand(command: string): string | undefined {
   if (/\bMEP_BYPASS\b/.test(command)) return 'mep: MEP_BYPASS es una decisión tuya, no del agente: ponla en tu entorno al abrir la sesión.'
-  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return 'mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:threshold, /mep:resync).'
-  if (HUMAN_ACTION.test(command)) return 'mep: esta acción es tuya. Escríbela tú: /mep:confirm <id>, /mep:override <id> <razón>, /mep:threshold <clave> <valor> <razón> o /mep:resync.'
+  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return 'mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:defer, /mep:domain, /mep:threshold, /mep:resync).'
+  if (HUMAN_ACTION.test(command)) return 'mep: esta acción es tuya. Escríbela tú: /mep:confirm <id>, /mep:override <id> <razón>, /mep:defer <id> <razón>, /mep:domain off <ruta> <razón>, /mep:threshold <clave> <valor> <razón> o /mep:resync.'
   if (REDIRECT_INTO_MEP.test(command)) return STATE_HINT
   // A lone engine call is the legitimate writer.
   if (ENGINE_CALL.test(command) && !/[;&|]/.test(command)) return undefined

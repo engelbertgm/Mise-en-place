@@ -80,6 +80,28 @@ function stackSection(decisions: StackDecision[]): string {
     .join('\n')
 }
 
+/** One row per domain: what applies, how many 🔴 already pass, and what is switched off. */
+function domainSection(evaluated: Evaluated[], catalog: Catalog, byId?: Map<string, ItemResult>): string[] {
+  if (!catalog.domains.length) return []
+  const rows = catalog.domains
+    .map(d => {
+      const mine = evaluated.filter(e => e.item.domain === d.key || e.item.domain?.startsWith(`${d.key}.`))
+      const active = mine.filter(e => e.state === 'active')
+      const required = active.filter(e => e.level === 'required')
+      const done = required.filter(e => byId?.get(e.item.id)?.status === 'pass').length
+      const off = mine.filter(e => e.state === 'off').length
+      return { d, active: active.length, required: required.length, done, off }
+    })
+    .filter(r => r.active || r.off)
+  return [
+    '## Por dominio',
+    '| Dominio | Aplican | 🔴 | Hechos |',
+    '| --- | --- | --- | --- |',
+    ...rows.map(r => `| ${r.d.label} (\`${r.d.key}\`) | ${r.active}${r.off ? ` (${r.off} apagados)` : ''} | ${r.required} | ${byId ? `${r.done}/${r.required}` : '—'} |`),
+    '',
+  ]
+}
+
 export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: Catalog, results?: ItemResult[]): string {
   const byId = results ? new Map(results.map(r => [r.item.id, r])) : undefined
   const out: string[] = [
@@ -97,7 +119,9 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
     '## Fase actual',
     `- **Cerradas:** ${profile.phase.closed.join(', ') || '—'}`,
     `- **Activa:** ${profile.phase.active}`,
+    `- **Etapa:** ${profile.stage === 'live' ? 'en vivo: un push a main es un deploy a producción' : 'en construcción: un push o PR solo se detiene por regresiones; `mep launch` pasa a en vivo'}`,
     '',
+    ...domainSection(evaluated, catalog, byId),
     '## Checklist',
   ]
   for (const phase of catalog.dimensions.phases) {
@@ -118,6 +142,10 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
   const relaxed = profile.selections.overrides.filter(o => o.id.startsWith('threshold:'))
   const disabled = [...overridden.map(e => `- ⚠️ \`${e.item.id}\` — ${e.reason}`), ...relaxed.map(o => `- ⚠️ umbral \`${o.id.slice(10)}\` — ${o.reason}`)]
   out.push('', '### ⚠️ Desactivados (🔴 con override, con razón)', disabled.length ? disabled.join('\n') : '—')
+  const off = profile.selections.domains_off
+  out.push('', '### 🚫 Dominios apagados (con razón)', off.length ? off.map(o => `- ⚠️ \`${o.path}\` — ${o.reason}`).join('\n') : '—')
+  const deferred = profile.selections.deferred
+  out.push('', '### ⏳ Diferidos hasta el go-live (🔴 con razón)', deferred.length ? deferred.map(d => `- \`${d.id}\` — ${d.reason}`).join('\n') : '—')
   const warns = warnings(evaluated)
   if (warns.length) out.push('', '### Avisos', ...warns.map(w => `- ${w.message}`))
   out.push('', '## Costos recurrentes estimados', '_Se completan con /mep:quote (hosting, dominio, servicios)._')

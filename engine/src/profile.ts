@@ -26,7 +26,8 @@ export function emptyProfile(catalog: Catalog): Profile {
     context: 'own-product',
     counts: {},
     signals,
-    selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [] },
+    selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [], domains_off: [], deferred: [] },
+    stage: 'building',
     stack: { decided: {} },
   }
 }
@@ -47,7 +48,7 @@ export function normalizeProfile(raw: Partial<Profile>, catalog: Catalog): Profi
     audience: [...(raw.audience ?? [])],
   }
   profile.phase.closed = [...(profile.phase.closed ?? [])]
-  for (const key of ['optional_added', 'recommended_skipped', 'overrides', 'manual_confirmed', 'grace'] as const) {
+  for (const key of ['optional_added', 'recommended_skipped', 'overrides', 'manual_confirmed', 'grace', 'domains_off', 'deferred'] as const) {
     profile.selections[key] = [...((profile.selections[key] as unknown[]) ?? [])] as never
   }
   return applyImplications(profile, catalog)

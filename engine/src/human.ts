@@ -31,7 +31,7 @@ function readLine(): string {
   return line.trim()
 }
 
-export const NOT_HUMAN = 'esta acción es tuya, no del agente. Escríbela tú en Claude Code (/mep:confirm, /mep:override, /mep:threshold, /mep:resync) o córrela en tu propia terminal.'
+export const NOT_HUMAN = 'esta acción es tuya, no del agente. Escríbela tú en Claude Code (/mep:confirm, /mep:override, /mep:defer, /mep:domain, /mep:threshold, /mep:resync) o córrela en tu propia terminal.'
 
 /**
  * Actions only the person takes. Two channels: the mod's slash command (--human; the guard denies that flag

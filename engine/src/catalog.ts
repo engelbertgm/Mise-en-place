@@ -2,7 +2,7 @@ import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parse } from 'yaml'
-import type { Catalog, Check, Condition, Dimensions, Item, Leaf, Matcher, Profile, StackRule } from './types.ts'
+import type { Catalog, Check, Condition, Dimensions, Domain, Item, Leaf, Matcher, Profile, StackRule } from './types.ts'
 
 const LEVELS = ['required', 'recommended', 'optional']
 const SIZES = ['XS', 'S', 'M', 'L', 'XL']
@@ -41,11 +41,14 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
     }
   }
   const sensitiveGroups = readYaml<{ groups: Record<string, string[]> }>(join(dir, 'sensitive.yaml')).groups
+  const items = [...readYamlDir<Item>(join(dir, 'items')), ...readYamlDir<Item>(join(dir, 'markets'))]
+  const domains = loadDomains(dir, items)
   const catalog: Catalog = {
     version: readFileSync(join(dir, 'VERSION'), 'utf8').trim(),
     dir,
     dimensions: readYaml<Dimensions>(join(dir, 'dimensions.yaml')),
-    items: [...readYamlDir<Item>(join(dir, 'items')), ...readYamlDir<Item>(join(dir, 'markets'))],
+    items,
+    domains,
     stackRules: readYaml<StackRule[]>(join(dir, 'stack-rules.yaml')) ?? [],
     presets,
     sensitiveGroups,
@@ -54,6 +57,39 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
   const errors = validateCatalog(catalog)
   if (errors.length) throw new Error(`mep: invalid catalog\n- ${errors.join('\n- ')}`)
   return catalog
+}
+
+type DomainsFile = {
+  domains: Record<string, { label: string; description: string; subdomains: Record<string, { label: string; description: string; activates_when?: string; items?: string[] }> }>
+  links?: Record<string, string[]>
+}
+
+/** catalog/domains.yaml is the one source: it gives each item its home (`domain.subdomain`) and its links. */
+function loadDomains(dir: string, items: Item[]): Domain[] {
+  const file = join(dir, 'domains.yaml')
+  if (!existsSync(file)) return []
+  const raw = readYaml<DomainsFile>(file)
+  const byId = new Map(items.map(i => [i.id, i]))
+  const domains: Domain[] = Object.entries(raw.domains).map(([key, d]) => ({
+    key,
+    label: d.label,
+    description: d.description,
+    subdomains: Object.entries(d.subdomains).map(([sub, s]) => ({ key: sub, label: s.label, description: s.description, activates_when: s.activates_when, items: s.items ?? [] })),
+  }))
+  for (const d of domains) {
+    for (const s of d.subdomains) {
+      for (const id of s.items) {
+        const item = byId.get(id)
+        if (item && !item.domain) item.domain = `${d.key}.${s.key}`
+        else if (item) item.domain = `${item.domain},${d.key}.${s.key}` // duplicate: validateCatalog reports it
+      }
+    }
+  }
+  for (const [id, targets] of Object.entries(raw.links ?? {})) {
+    const item = byId.get(id)
+    if (item) item.links = targets
+  }
+  return domains
 }
 
 function dimensionValues(dims: Dimensions, key: keyof Leaf): string[] {
@@ -159,9 +195,31 @@ export function validateCatalog(catalog: Catalog): string[] {
       if (!ids.has(ref)) errors.push(`item ${item.id}: references unknown item ${ref}`)
     }
   }
+  if (catalog.domains.length) errors.push(...validateDomains(catalog))
   for (const rule of catalog.stackRules) {
     if (!rule.why) errors.push(`stack rule ${rule.id}: missing why`)
     if (rule.when) errors.push(...validateCondition(rule.when, dims, `stack rule ${rule.id}`))
+  }
+  return errors
+}
+
+/** Every item has exactly one home, every link points at a real subdomain, and no link points at the item's own home. */
+function validateDomains(catalog: Catalog): string[] {
+  const errors: string[] = []
+  const paths = new Set(catalog.domains.flatMap(d => d.subdomains.map(s => `${d.key}.${s.key}`)))
+  const known = new Set(catalog.items.map(i => i.id))
+  for (const d of catalog.domains) {
+    for (const s of d.subdomains) {
+      for (const id of s.items) if (!known.has(id)) errors.push(`domains.yaml: ${d.key}.${s.key} lists unknown item ${id}`)
+    }
+  }
+  for (const item of catalog.items) {
+    if (!item.domain) errors.push(`item ${item.id}: no home in domains.yaml`)
+    else if (item.domain.includes(',')) errors.push(`item ${item.id}: listed in more than one subdomain (${item.domain})`)
+    for (const t of item.links ?? []) {
+      if (!paths.has(t)) errors.push(`item ${item.id}: link to unknown subdomain ${t}`)
+      else if (t === item.domain) errors.push(`item ${item.id}: linked to its own home ${t}`)
+    }
   }
   return errors
 }
@@ -186,6 +244,11 @@ export function validateProfile(profile: Profile, catalog: Catalog): string[] {
   }
   for (const p of [...profile.phase.closed, profile.phase.active]) {
     if (!dims.phases.includes(p)) errors.push(`phase "${p}" is not valid`)
+  }
+  if (!['building', 'live'].includes(profile.stage)) errors.push(`stage "${profile.stage}" is not valid`)
+  const paths = new Set(catalog.domains.flatMap(d => [d.key, ...d.subdomains.map(s => `${d.key}.${s.key}`)]))
+  for (const o of profile.selections.domains_off) {
+    if (catalog.domains.length && !paths.has(o.path)) errors.push(`domain "${o.path}" is not valid`)
   }
   return errors
 }

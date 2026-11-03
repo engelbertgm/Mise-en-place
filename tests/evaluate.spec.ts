@@ -98,6 +98,8 @@ describe('evaluate', () => {
         ],
         manual_confirmed: [],
         grace: [],
+        domains_off: [],
+        deferred: [],
       },
     })
     const state = Object.fromEntries(evaluate(q, c).map(e => [e.item.id, e.state]))

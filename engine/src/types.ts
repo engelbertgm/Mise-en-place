@@ -79,6 +79,10 @@ export type Item = {
   when?: Condition
   level_overrides?: { when: Condition; level: Level }[]
   depends_on?: string[]
+  /** `domain.subdomain`, from catalog/domains.yaml (set by the loader; the item's one home). */
+  domain?: string
+  /** Other subdomains where the item also shows. Display only: the home owns its state and level. */
+  links?: string[]
   why: string
   how: string
   verify: Check[]
@@ -110,11 +114,16 @@ export type Dimensions = {
   implies: Record<string, { signals?: Record<string, string | boolean>; capabilities?: string[] }>
 }
 
+export type Subdomain = { key: string; label: string; description: string; activates_when?: string; items: string[] }
+export type Domain = { key: string; label: string; description: string; subdomains: Subdomain[] }
+
 export type Catalog = {
   version: string
   dir: string
   dimensions: Dimensions
   items: Item[]
+  /** Domains and subdomains (catalog/domains.yaml); empty in a catalog without the file. */
+  domains: Domain[]
   stackRules: StackRule[]
   presets: Record<string, Partial<Profile>>
   sensitiveGroups: Record<string, string[]>
@@ -141,7 +150,13 @@ export type Profile = {
     manual_confirmed: { id: string; by: string; date: string }[]
     /** Items from /mep:update that landed in a closed sub-phase: they do not block until the next close or a production deploy. */
     grace: string[]
+    /** Domains or subdomains (`security`, `security.abuse`) switched off, with the reason. Locked items stay on. */
+    domains_off: { path: string; reason: string; date: string }[]
+    /** Items postponed until go-live: they do not block closing a sub-phase or integrating, but production needs them. */
+    deferred: { id: string; reason: string; date: string }[]
   }
+  /** `building` (default): pushes and PRs only stop on regressions; `live`: every push to main is a production deploy. */
+  stage: 'building' | 'live'
   stack: { decided: Record<string, string> }
   /** Features of the scope that are not in the catalog; Claude sizes them and they show as "estimación a revisar". */
   custom_work?: { title: string; size: Size; phase?: string }[]
@@ -156,7 +171,7 @@ export type Profile = {
   quality?: Partial<Record<'complexity' | 'max_lines' | 'max_function_lines' | 'max_params', number>>
 }
 
-export type ItemState = 'active' | 'skipped' | 'overridden' | 'offered'
+export type ItemState = 'active' | 'skipped' | 'overridden' | 'offered' | 'off'
 
 export type Evaluated = {
   item: Item

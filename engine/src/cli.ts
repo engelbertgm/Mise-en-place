@@ -7,7 +7,8 @@ import { loadCatalog, validateProfile } from './catalog.ts'
 import { deployKind, mayDeploy, prToMain } from './deploy.ts'
 import { diff, evaluate, warnings } from './evaluate.ts'
 import { matchFiles } from './files.ts'
-import { cachedGate, closePhase, formatItems, gate, prReviewGate } from './gate.ts'
+import { formatDomains, formatFocus, summarize } from './domains.ts'
+import { cachedGate, closePhase, formatItems, gate, launch, prReviewGate } from './gate.ts'
 import { hasProfile, loadProfile, log, normalizeProfile, saveProfile, today } from './profile.ts'
 import { linkClaudeMd, renderBrief, writeBrief, writeStackAdrs } from './render.ts'
 import { counts, formatCheck, formatProposal, panelData } from './report.ts'
@@ -203,9 +204,10 @@ function runHook(event: string, root: string, catalog: Catalog): void {
         if (review.block) json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: review.message } })
         return
       }
-      const kind = deployKind(command, currentBranch(cwd))
+      const stage = hasProfile(cwd) ? loadProfile(cwd, catalog).stage : 'building'
+      const kind = deployKind(command, currentBranch(cwd), stage)
       if (!kind) return
-      const result = cachedGate(cwd, catalog, kind)
+      const result = cachedGate(cwd, catalog, kind === 'integrate' ? 'stop' : kind)
       if (result.block) {
         json({ hookSpecificOutput: { hookEventName: 'PreToolUse', permissionDecision: 'deny', permissionDecisionReason: result.message } })
       }
@@ -322,7 +324,8 @@ function main(): void {
     }
     case 'verify': {
       if (!hasProfile(root)) return print('mep: sin .mep/profile.yaml, nada que verificar.')
-      const kind = args.flags.prod ? 'prod' : 'stop'
+      // --ci (the workflow): the stage decides. Building → integrate (regressions only); live → the full gate.
+      const kind = args.flags.prod || (args.flags.ci && loadProfile(root, catalog).stage === 'live') ? 'prod' : 'stop'
       const result = args.flags['no-cache'] ? gate(root, catalog, kind) : cachedGate(root, catalog, kind)
       // --pr (CI on a pull request into main): the branch review must be recorded and current too.
       const review = args.flags.pr ? prReviewGate(root) : { block: false, message: '' }
@@ -394,6 +397,87 @@ function main(): void {
       log(root, cmd, `${id} "${reason}"`)
       regenerate(root, profile, catalog)
       return print(cmd === 'skip' ? `⏭️ ${id} omitido: ${reason}` : `⚠️ ${id} desactivado: ${reason} (registrado en .mep/log)\nRiesgo aceptado: ${e.item.why}`)
+    }
+    case 'launch': {
+      requireProfile(root, catalog)
+      const r = launch(root, catalog)
+      if (r.ok) regenerate(root, loadProfile(root, catalog), catalog)
+      print(r.message)
+      process.exitCode = r.ok ? 0 : 1
+      return
+    }
+    case 'stage': {
+      const profile = requireProfile(root, catalog)
+      if (rest[0] === 'building') {
+        if (profile.stage === 'building') return print('Ya está en construcción.')
+        if (!confirmHuman(args.flags, 'building')) fail(NOT_HUMAN, 3)
+        profile.stage = 'building'
+        saveProfile(root, profile)
+        log(root, 'stage', 'building')
+        regenerate(root, profile, catalog)
+        return print('🛠️ De vuelta en construcción: un push a main ya no corre la barrera de producción.')
+      }
+      return print(`stage: ${profile.stage === 'live' ? 'live (en vivo): cada push a main es un deploy a producción' : 'building (en construcción): un push o PR solo se detiene por regresiones; mep launch pasa a vivo'}`)
+    }
+    case 'defer':
+    case 'undefer': {
+      const [id, ...reasonParts] = rest
+      const reason = reasonParts.join(' ').trim()
+      if (!id || (cmd === 'defer' && !reason)) fail(cmd === 'defer' ? 'Uso: mep defer <id> <razón>' : 'Uso: mep undefer <id>')
+      const profile = requireProfile(root, catalog)
+      if (cmd === 'undefer') {
+        profile.selections.deferred = profile.selections.deferred.filter(d => d.id !== id)
+        saveProfile(root, profile)
+        log(root, 'undefer', id)
+        regenerate(root, profile, catalog)
+        return print(`${id} vuelve a contar para cerrar la sub-etapa.`)
+      }
+      const e = evaluate(profile, catalog).find(x => x.item.id === id)
+      if (!e || e.state !== 'active') fail(`${id} no está activo en este perfil`)
+      if (e.level !== 'required') fail(`mep defer solo aplica a 🔴; ${id} es ${e.level}.`)
+      if (e.item.locked) fail(`${id} es locked 🔒: no se puede diferir.`)
+      if (!confirmHuman(args.flags, id)) fail(NOT_HUMAN, 3)
+      profile.selections.deferred = profile.selections.deferred.filter(d => d.id !== id).concat({ id, reason, date: today() })
+      saveProfile(root, profile)
+      log(root, 'defer', `${id} "${reason}"`)
+      regenerate(root, profile, catalog)
+      return print(`⏳ ${id} diferido hasta el go-live: no frena sub-etapas ni pushes, pero mep launch lo exige. (${reason})`)
+    }
+    case 'domain': {
+      const [action, path, ...reasonParts] = rest
+      const reason = reasonParts.join(' ').trim()
+      if (!['off', 'on'].includes(action ?? '') || !path || (action === 'off' && !reason)) fail('Uso: mep domain off <dominio[.subdominio]> <razón> · mep domain on <dominio[.subdominio]>')
+      const profile = requireProfile(root, catalog)
+      const valid = new Set(catalog.domains.flatMap(d => [d.key, ...d.subdomains.map(s => `${d.key}.${s.key}`)]))
+      if (!valid.has(path)) fail(`${path} no es un dominio. Mira mep domains.`)
+      if (action === 'on') {
+        profile.selections.domains_off = profile.selections.domains_off.filter(o => o.path !== path)
+        saveProfile(root, profile)
+        log(root, 'domain-on', path)
+        regenerate(root, profile, catalog)
+        return print(`${path} activo otra vez.`)
+      }
+      if (!confirmHuman(args.flags, path)) fail(NOT_HUMAN, 3)
+      profile.selections.domains_off = profile.selections.domains_off.filter(o => o.path !== path).concat({ path, reason, date: today() })
+      saveProfile(root, profile)
+      log(root, 'domain-off', `${path} "${reason}"`)
+      regenerate(root, profile, catalog)
+      return print(`⚠️ ${path} apagado: ${reason}. Sus ítems no cuentan (los 🔒 siguen activos). Queda en .mep/log y en BRIEF.md.`)
+    }
+    case 'domains': {
+      const profile = requireProfile(root, catalog)
+      const results = verifyItems(root, profile, evaluate(profile, catalog), 'fast')
+      const tree = summarize(results, catalog, profile.selections.deferred.map(d => d.id), profile.selections.domains_off)
+      if (args.flags.json) return json(tree)
+      return print(formatDomains(tree, profile.stage, rest[0]))
+    }
+    case 'focus': {
+      const profile = requireProfile(root, catalog)
+      if (!rest[0]) fail('Uso: mep focus <dominio[.subdominio]>')
+      const valid = new Set(catalog.domains.flatMap(d => [d.key, ...d.subdomains.map(s => `${d.key}.${s.key}`)]))
+      if (!valid.has(rest[0])) fail(`${rest[0]} no es un dominio. Mira mep domains.`)
+      const results = verifyItems(root, profile, evaluate(profile, catalog), 'fast')
+      return print(formatFocus(rest[0], results, profile.selections.deferred.map(d => d.id)))
     }
     case 'threshold': {
       const [key, valueText, ...reasonParts] = rest
@@ -639,7 +723,10 @@ function main(): void {
           '  init --from perfil.yaml [--preset x]                  crea perfil, BRIEF.md, ADRs, CLAUDE.md y CI',
           '  add --from cambio.yaml [--apply]                      diff del checklist',
           '  check [--fast] [--all] [--json [--detail]]            verificación por sub-etapa (--detail: datos del panel)',
-          '  verify [--prod] [--pr]                                gate para CI (sale con 1 si bloquea; --pr exige la revisión de la rama)',
+          '  verify [--prod | --ci] [--pr]                         gate para CI (--ci: building → regresiones; live → barrera completa; --pr exige la revisión)',
+          '  launch · stage [building]                             go-live: la barrera completa una vez; activa el modo en vivo',
+          '  defer <id> <razón> · undefer <id>                     posponer un 🔴 hasta el go-live (no frena sub-etapas ni pushes)',
+          '  domains [ruta] · focus <ruta> · domain off|on <ruta> [razón]   ítems por dominio; apagar un dominio entero',
           '  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)',
           '  phase [close <sub-etapa>]',
           '  skip <id> <razón> · override <id> <razón> --yes · select <id…> · confirm <id> · resync   (override, confirm y resync: solo el usuario)',

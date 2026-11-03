@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { blockersByDomain } from './domains.ts'
 import { evaluate } from './evaluate.ts'
 import { MEP_DIR, hasProfile, loadProfile, log, saveProfile } from './profile.ts'
 import { PR_REVIEW, reviewState } from './review.ts'
@@ -46,12 +47,15 @@ export function gate(root: string, catalog: Catalog, kind: GateKind, env = proce
   const locked = results.filter(r => r.item.locked && r.violation)
   const required = results.filter(r => r.level === 'required')
   const grace = new Set(profile.selections.grace)
+  // Postponed on purpose: they do not stop a push or a sub-phase, but go-live needs them.
+  const deferred = new Set(profile.selections.deferred.map(d => d.id))
   const regressions =
     kind === 'prod'
       ? required.filter(r => r.status !== 'pass')
-      : required.filter(r => closed.has(r.item.phase) && r.status === 'fail' && !grace.has(r.item.id))
+      : required.filter(r => closed.has(r.item.phase) && r.status === 'fail' && !grace.has(r.item.id) && !deferred.has(r.item.id))
   const blockers = uniq([...locked, ...regressions])
-  const info = kind === 'prod' ? [] : required.filter(r => r.item.phase === profile.phase.active && r.status !== 'pass' && !blockers.includes(r))
+  const info = kind === 'prod' ? [] : required.filter(r => r.item.phase === profile.phase.active && r.status !== 'pass' && !blockers.includes(r) && !deferred.has(r.item.id))
+  const postponed = kind === 'prod' ? 0 : required.filter(r => deferred.has(r.item.id) && r.status !== 'pass').length
 
   const bypassed = env.MEP_BYPASS === '1' && blockers.length > 0 && locked.length === 0
   if (bypassed) log(root, 'bypass', `${kind}: ${blockers.map(b => b.item.id).join(',')}`)
@@ -61,10 +65,13 @@ export function gate(root: string, catalog: Catalog, kind: GateKind, env = proce
   const parts: string[] = []
   if (block) {
     parts.push(`mep bloquea ${label}: ${blockers.length} 🔴 pendiente(s).`)
+    if (blockers.length > 3) parts.push(`Por dominio: ${blockersByDomain(blockers)}`)
     if (locked.length) parts.push('Ítems locked violados (no aceptan MEP_BYPASS):')
     parts.push(formatItems(blockers, kind === 'stop' ? 5 : 15))
+    if (kind === 'prod' && profile.stage === 'building') parts.push('Sigues en construcción: un push o un PR no exige esto. `mep launch` hace esta misma revisión y, si pasa, activa el modo en vivo.')
   } else if (bypassed) parts.push(`MEP_BYPASS=1: ${blockers.length} 🔴 omitidos para ${label} (registrado en .mep/log).`)
   if (info.length) parts.push(`Pendientes de ${profile.phase.active} (aún no bloquean):\n${formatItems(info, 5)}`)
+  if (postponed) parts.push(`⏳ ${postponed} 🔴 diferidos hasta el go-live (mep defer).`)
   return { block, blockers, info, bypassed, message: parts.join('\n') }
 }
 
@@ -86,13 +93,14 @@ export function closePhase(root: string, catalog: Catalog, sub: string, { review
 
   // Items still in their grace period (from /mep:update) must be met at the next close.
   const grace = new Set(profile.selections.grace)
+  const deferredIds = new Set(profile.selections.deferred.map(d => d.id))
   // Only this sub-phase's items (and graced ones) are verified: closing never runs other phases' commands.
   const relevant = evaluate(profile, catalog).filter(e => e.item.phase === sub || grace.has(e.item.id))
   // The review is checked before the verification commands run, so files they create do not expire it.
   const quality = review ? reviewState(root, sub, env) : { valid: true, detail: '' }
   const results = verifyItems(root, profile, relevant, 'full')
   const pending = results.filter(
-    r => r.state === 'active' && r.level === 'required' && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass',
+    r => r.state === 'active' && r.level === 'required' && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass' && !deferredIds.has(r.item.id),
   )
   if (pending.length || !quality.valid) {
     const parts = [`No se puede cerrar ${sub}:`]
@@ -148,4 +156,19 @@ export function prReviewGate(root: string, env = process.env): { block: boolean;
   if (!hasProfile(root)) return { block: false, message: '' }
   const state = reviewState(root, PR_REVIEW, env)
   return state.valid ? { block: false, message: '' } : { block: true, message: `mep: antes del PR a main, revisión de calidad de la rama: ${state.detail}` }
+}
+
+/**
+ * Go-live: the full gate, once. If it passes the project is `live`, and from then on every push to main is a
+ * production deploy. It cannot be bypassed: it only ever makes the gates stricter.
+ */
+export function launch(root: string, catalog: Catalog): { ok: boolean; message: string } {
+  const profile = loadProfile(root, catalog)
+  if (profile.stage === 'live') return { ok: true, message: 'Este proyecto ya está en vivo (stage: live).' }
+  const result = gate(root, catalog, 'prod', { ...process.env, MEP_BYPASS: '' })
+  if (result.block) return { ok: false, message: result.message }
+  profile.stage = 'live'
+  saveProfile(root, profile)
+  log(root, 'launch', profile.phase.active)
+  return { ok: true, message: '🚀 En vivo. Desde ahora un push a main es un deploy a producción: corre la barrera completa.' }
 }

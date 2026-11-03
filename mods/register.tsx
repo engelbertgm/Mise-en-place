@@ -36,11 +36,11 @@ const WITH_TEXT = [
   ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
 ] as const
 
-// Levels are circles that read as a fill (full, half, empty) in a theme color, so they follow light and dark themes.
-// Progress bars fill in braille, and their color moves from red to green with how far along they are.
-const LEVEL_GLYPH = { required: '●', recommended: '◐', optional: '○' } as const
+// Levels are circles in a theme color, so they follow light and dark themes: full red (required), full yellow
+// (recommended), empty white (optional). Progress bars fill in braille, and their color moves from red to green.
+const LEVEL_GLYPH = { required: '●', recommended: '●', optional: '○' } as const
 const BRAILLE_FILL = ['⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿']
-const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'inactive' } as const
+const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'text' } as const
 const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 

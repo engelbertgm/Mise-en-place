@@ -10,12 +10,18 @@ export function effectiveLevel(item: Item, profile: Profile): Level {
   return level
 }
 
+/** Does the item belong to `path` (`security` covers `security.abuse`; `security.abuse` covers only itself)? */
+export function inDomain(item: Item, path: string): boolean {
+  return item.domain === path || (item.domain?.startsWith(`${path}.`) ?? false)
+}
+
 /** Profile + catalog → applicable items. Pure and deterministic: same input, same output. */
 export function evaluate(profile: Profile, catalog: Catalog): Evaluated[] {
   const phaseOrder = catalog.dimensions.phases
   const skipped = new Map(profile.selections.recommended_skipped.map(s => [s.id, s.reason]))
   const overridden = new Map(profile.selections.overrides.map(s => [s.id, s.reason]))
   const optional = new Set(profile.selections.optional_added)
+  const off = profile.selections.domains_off
 
   const result: Evaluated[] = []
   for (const item of catalog.items) {
@@ -23,7 +29,11 @@ export function evaluate(profile: Profile, catalog: Catalog): Evaluated[] {
     const level = effectiveLevel(item, profile)
     let state: Evaluated['state'] = 'active'
     let reason: string | undefined
-    if (level === 'optional' && !optional.has(item.id)) state = 'offered'
+    const switchedOff = item.locked ? undefined : off.find(o => inDomain(item, o.path))
+    if (switchedOff) {
+      state = 'off'
+      reason = `dominio apagado (${switchedOff.path}): ${switchedOff.reason}`
+    } else if (level === 'optional' && !optional.has(item.id)) state = 'offered'
     else if (level === 'recommended' && skipped.has(item.id)) {
       state = 'skipped'
       reason = skipped.get(item.id)

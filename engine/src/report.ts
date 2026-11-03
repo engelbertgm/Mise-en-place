@@ -1,3 +1,4 @@
+import { summarize } from './domains.ts'
 import { LEVEL_ICON } from './types.ts'
 import type { Catalog, Evaluated, ItemResult, Profile } from './types.ts'
 import { failingDetail } from './verify.ts'
@@ -26,13 +27,14 @@ export function formatProposal(evaluated: Evaluated[]): string {
 function stateIcon(r: ItemResult): string {
   if (r.state === 'skipped') return '⏭️'
   if (r.state === 'overridden') return '⚠️'
+  if (r.state === 'off') return '⊘'
   return STATUS_ICON[r.status]
 }
 
 /** What /mep:check shows: status by sub-phase. */
 export function formatCheck(results: ItemResult[], profile: Profile, catalog: Catalog, { verbose = false } = {}): string {
   const out: string[] = []
-  const shown = results.filter(r => r.state !== 'offered')
+  const shown = results.filter(r => r.state !== 'offered' && r.state !== 'off')
   for (const phase of catalog.dimensions.phases) {
     const items = shown.filter(r => r.item.phase === phase)
     if (!items.length) continue
@@ -46,6 +48,13 @@ export function formatCheck(results: ItemResult[], profile: Profile, catalog: Ca
       out.push(`  ${stateIcon(r)} ${LEVEL_ICON[r.level]} ${r.item.id}${detail ? ` — ${detail}` : ''}`)
     }
   }
+  // A domain switched off is one line, not one per item.
+  for (const o of profile.selections.domains_off) {
+    const n = results.filter(r => r.state === 'off' && (r.item.domain === o.path || r.item.domain?.startsWith(`${o.path}.`))).length
+    if (n) out.push(`\n⊘ ${o.path} apagado (${n} ítems): ${o.reason}`)
+  }
+  const deferred = profile.selections.deferred.filter(d => results.some(r => r.item.id === d.id && r.state === 'active' && r.status !== 'pass'))
+  if (deferred.length) out.push(`\n⏳ ${deferred.length} 🔴 diferidos hasta el go-live: ${deferred.map(d => d.id).join(', ')}`)
   return out.join('\n').trim()
 }
 
@@ -60,14 +69,19 @@ export function counts(results: ItemResult[]): { required: number; recommended: 
 /** What the panel draws: every item that applies, with what it asks, why, and everything that fails. */
 export function panelData(results: ItemResult[], profile: Profile, catalog: Catalog) {
   return {
+    stage: profile.stage,
+    domains: summarize(results, catalog, profile.selections.deferred.map(d => d.id), profile.selections.domains_off),
     phases: catalog.dimensions.phases,
     active: profile.phase.active,
     closed: profile.phase.closed,
     counts: counts(results),
     items: results
-      .filter(r => r.state !== 'offered')
+      .filter(r => r.state !== 'offered' && r.state !== 'off')
       .map(r => ({
         id: r.item.id,
+        domain: r.item.domain ?? '',
+        links: r.item.links ?? [],
+        deferred: profile.selections.deferred.some(d => d.id === r.item.id),
         title: r.item.title,
         level: r.level,
         phase: r.item.phase,
