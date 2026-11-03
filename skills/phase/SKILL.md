@@ -13,7 +13,7 @@ Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 
 **Sin argumentos:** corre `phase` y muestra la salida.
 
-**`close <sub-etapa>`:** cerrar es cuando se revisa que estemos cumpliendo.
+**`close <sub-etapa>`:** cerrar es opcional y nunca hace falta para subir avance: sirve para proteger lo hecho contra regresiones y se hace cuando el usuario lo quiere. Un 🔴 que puede esperar se difiere con `/mep:defer` (lo escribe el usuario) y no cuenta para cerrar. Es cuando se revisa que estemos cumpliendo.
 1. Regenera los mapas (`codemap` y `registry`) y corre `check` para ver el estado completo de la sub-etapa. Si `registry` reporta piezas sin "Para qué", escríbelo en el comentario `/** */` de cada una.
 2. Si la sub-etapa es `foundation.setup`, `build.data`, `build.features` o `launch.ops`, lanza el agente `mep-security` para auditar los ítems de seguridad de esa sub-etapa (registra reportes con `security record`).
 3. Revisión de calidad (el motor la exige para cerrar). Corre `review` para saber si Ponytail está instalado.

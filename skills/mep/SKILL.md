@@ -37,6 +37,9 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
 
 ## Reglas de trabajo en un proyecto con mep
 
+- **Etapa y push.** Un proyecto está `building` (en construcción) o `live` (en vivo). En construcción, un push o un PR a `main` solo se detiene por secretos, ítems 🔒 violados o regresiones en sub-etapas ya cerradas: **no pidas al usuario cerrar sub-etapas ni cumplir los 🔴 pendientes para poder subir avance.** Cerrar una sub-etapa es opcional (protege lo hecho contra regresiones). El momento de exigirlo todo es `/mep:launch`; ya en vivo, cada push a `main` es un deploy a producción con la barrera completa.
+- **Dominios.** Cada ítem vive en un dominio y subdominio (`ui.motion`, `security.abuse`, `payments.checkout`…). `/mep:domains` muestra el avance por dominio y `/mep:focus <ruta>` lo pendiente de uno (con ↗ los ítems enlazados desde otro dominio). Trabaja por dominio si el usuario lo prefiere; no hace falta seguir el orden de las sub-etapas. Apagar un dominio (`/mep:domain off`) y diferir un 🔴 hasta el go-live (`/mep:defer`) son decisiones del usuario, no tuyas.
+
 - `BRIEF.md` es la instrucción maestra; se regenera desde el perfil, no se edita a mano.
 - Fases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Trabaja la sub-etapa activa; las 🔴 de sub-etapas cerradas están protegidas contra regresiones.
 - Documentos de planeación (`docs/plan/`): son el plan contra el que se construye.
@@ -55,5 +58,5 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
 - Ítems 🔒 (`locked`) no se desactivan nunca. 🟡 se omite solo con `/mep:skip` y razón; 🔴 se desactiva solo con `/mep:override`, con razón y confirmación del usuario.
 - `MEP_BYPASS=1` es un escape de emergencia del usuario, no tuyo: la guardia niega comandos que lo mencionen. No aplica a ítems locked ni a un estado modificado fuera de la CLI.
 - El estado de mep (`.mep/profile.yaml`, `log`, `security/`, `reviews/`) solo cambia con la CLI y queda sellado; nunca lo edites a mano ni por script. Si `verify` dice "modificado fuera de la CLI", explica el cambio al usuario: re-sellarlo es suyo (`/mep:resync`).
-- Acciones del usuario, nunca tuyas: `/mep:confirm`, `/mep:override`, `/mep:threshold` (relajar) y `/mep:resync`. Cada una queda en `.mep/log` y en el resumen del PR.
+- Acciones del usuario, nunca tuyas: `/mep:confirm`, `/mep:override`, `/mep:defer`, `/mep:domain off`, `/mep:threshold` (relajar) y `/mep:resync`. Cada una queda en `.mep/log` y en el resumen del PR.
 - "Checklist orientativo, no sustituye asesoría legal."

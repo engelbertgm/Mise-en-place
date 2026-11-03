@@ -3,6 +3,7 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 import { deployKind, mayDeploy, prToMain } from '../engine/src/deploy.ts'
+import { meter, progressColor } from '../engine/src/domains.ts'
 import { guardCommand, guardFile } from '../engine/src/guard.ts'
 import { findSecret, LOCAL_SECRET_FILE } from '../engine/src/secrets.ts'
 import type { Panel, PanelItem } from '../types'
@@ -15,12 +16,16 @@ const expanded = atom({ plugin: 'mep', key: 'expanded' } as const, [], { shape: 
 const pending = atom({ plugin: 'mep', key: 'pending' } as const, null, { shape: 'pending-1' })
 const flash = atom({ plugin: 'mep', key: 'flash' } as const, '', { shape: 'flash-1' })
 const tools = atom({ plugin: 'mep', key: 'tools' } as const, false, { shape: 'tools-1' })
+// How the list is grouped: by sub-phase (the order of the work) or by domain (the area).
+const view = atom({ plugin: 'mep', key: 'view' } as const, 'fase', { shape: 'view-1' })
 // Frame of the braille spinner while the engine works; -1 when idle.
 const spinner = atom({ plugin: 'mep', key: 'spinner' } as const, -1, { shape: 'spinner-1' })
 
 /** The panel's tools: each runs the slash command as if typed. The human-only ones stay out (the engine refuses a plugin's). */
 const INSTANT = [
   ['mep:check', 'Estado del checklist'],
+  ['mep:domains', 'Avance por dominio'],
+  ['mep:launch', 'Pasar a en vivo (corre la barrera completa)'],
   ['mep:phase', 'Sub-etapa activa'],
   ['mep:quote', 'Cotización interna'],
 ] as const
@@ -39,32 +44,9 @@ const WITH_TEXT = [
 // Levels are circles in a theme color, so they follow light and dark themes: full red (required), full yellow
 // (recommended), empty white (optional). Progress bars fill in braille, and their color moves from red to green.
 const LEVEL_GLYPH = { required: '●', recommended: '●', optional: '○' } as const
-const BRAILLE_FILL = ['⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿']
 const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'text' } as const
 const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-
-/** A braille bar of `cells` cells: the done part and the rest, each drawn in its own color by the caller. */
-function meter(done: number, total: number, cells: number): { filled: string; rest: string } {
-  const steps = BRAILLE_FILL.length - 1
-  const units = total ? Math.round((done / total) * cells * steps) : 0
-  const full = Math.floor(units / steps)
-  const part = units % steps
-  const cell = (i: number) => (i < full ? BRAILLE_FILL[steps]! : i === full ? BRAILLE_FILL[part]! : BRAILLE_FILL[0]!)
-  const all = Array.from({ length: cells }, (_, i) => cell(i))
-  const split = Math.min(cells, full + (part ? 1 : 0))
-  return { filled: all.slice(0, split).join(''), rest: all.slice(split).join('') }
-}
-
-/** Red at 0, amber halfway, green at 1: a hex color, so the bar shifts smoothly with how OK it is. */
-const STOPS = [[229, 72, 77], [245, 165, 36], [48, 164, 108]] as const
-function progressColor(ratio: number): string {
-  const x = Math.min(1, Math.max(0, ratio)) * 2
-  const i = Math.min(1, Math.floor(x))
-  const [from, to] = [STOPS[i]!, STOPS[i + 1]!]
-  const hex = from.map((c, k) => Math.round(c + (to[k]! - c) * (x - i)).toString(16).padStart(2, '0')).join('')
-  return `#${hex}`
-}
 
 // While the engine works the spinner turns: one ticker for all overlapping jobs, cancelled with the last one.
 let jobs = 0
@@ -150,7 +132,9 @@ export const register: Register = on => {
       return review.exitCode !== 0 ? { deny: review.stdout.trim() } : next(e)
     }
     const branch = await $.process.run(['git', 'rev-parse', '--abbrev-ref', 'HEAD']).catch(() => undefined)
-    const kind = deployKind(e.command, branch?.stdout.trim())
+    // While building, a push to main integrates (regressions only); live, it is a production deploy.
+    const live = /^stage:\s*live\s*$/m.test(await $.fs.read('.mep/profile.yaml').catch(() => ''))
+    const kind = deployKind(e.command, branch?.stdout.trim(), live ? 'live' : 'building')
     if (!kind) return next(e)
     const result = await runEngine($, ['verify', ...(kind === 'prod' ? ['--prod'] : [])])
     if (result.exitCode !== 0) return { deny: result.stdout.trim() || result.stderr.trim() }
@@ -169,7 +153,7 @@ export const register: Register = on => {
 
   // ── human actions: user-only skills (disable-model-invocation), answered here without a Claude turn, and
   // only when the engine stamps the person's own gesture. They pass the human channel the agent's Bash is denied. ──
-  const HUMAN: Record<string, string> = { 'mep:confirm': 'confirm', 'mep:override': 'override', 'mep:threshold': 'threshold', 'mep:resync': 'resync' }
+  const HUMAN: Record<string, string> = { 'mep:confirm': 'confirm', 'mep:override': 'override', 'mep:threshold': 'threshold', 'mep:resync': 'resync', 'mep:defer': 'defer', 'mep:domain': 'domain' }
   for (const [command, engineCmd] of Object.entries(HUMAN)) {
     on('command.run', { command }, async ($, e, next) => {
       if (!(await hasProfile($))) return next(e)
@@ -195,6 +179,16 @@ export const register: Register = on => {
     const r = await runEngine($, ['phase'])
     return { text: (r.stdout || r.stderr).trim() }
   })
+
+  // Where things are by domain, what to do in one, and go-live: instant. Launch only ever makes the gates stricter.
+  for (const [command, engineCmd] of [['mep:domains', 'domains'], ['mep:focus', 'focus'], ['mep:launch', 'launch']] as const) {
+    on('command.run', { command }, async ($, e, next) => {
+      if (!(await hasProfile($))) return next(e)
+      const r = await runEngine($, [engineCmd, ...e.args.split(/\s+/).filter(Boolean)])
+      if (engineCmd === 'launch') await refresh($).catch(() => undefined)
+      return { text: (r.stdout || r.stderr).trim() }
+    })
+  }
 
   // Manual quote: instant, but never automatic (the toggle lives in init and add --apply).
   on('command.run', { command: 'mep:quote' }, async ($, e, next) => {
@@ -380,8 +374,11 @@ export const register: Register = on => {
           </Box>
           <Text dimColor>
             {item.phase}
+            {item.domain ? ` · ${item.domain}` : ''}
             {item.locked ? ' · 🔒 locked' : ''}
+            {item.deferred ? ' · ⏳ diferido hasta el go-live' : ''}
           </Text>
+          {item.links.length > 0 && <Text dimColor>{`También en: ${item.links.join(', ')}`}</Text>}
           <Text>{item.title}</Text>
           {/* Actions sit above the long text, so they stay in the frame; the rest scrolls. */}
           {!e.props.isFocused && <Text dimColor>ctrl+x tab y flechas para desplazar.</Text>}
@@ -400,6 +397,15 @@ export const register: Register = on => {
             <Input key={`override-${item.id}`} label="Desactivar, razón:" submitLabel="siguiente" onSubmit={v => (v.trim() ? askOverride($, item.id, v.trim()) : undefined)} />
           )}
           {confirming && confirming.id === item.id && <Text dimColor>Confirma o cancela en el diálogo.</Text>}
+          {/* Postponing is not turning off: the item still has to pass at go-live. */}
+          {item.deferred && (
+            <Button key="undefer" plain onPress={() => act($, ['undefer', item.id])}>
+              Quitar el diferido
+            </Button>
+          )}
+          {Input && !item.deferred && item.level === 'required' && item.state === 'active' && !item.locked && item.status !== 'pass' && (
+            <Input key={`defer-${item.id}`} label="Diferir hasta el go-live, razón:" submitLabel="diferir" onSubmit={v => (v.trim() ? act($, ['defer', item.id, ...v.trim().split(/\s+/)]) : undefined)} />
+          )}
           {/* What to do first, then how, then why. */}
           {item.detail ? (
             <Box flexDirection="column" marginTop={1}>
@@ -432,8 +438,10 @@ export const register: Register = on => {
       )
     }
 
+    const mode = await read($, view)
+    const deferredPending = data.items.filter(i => i.deferred && isPending(i)).length
     // A count opens its first pending item; a zero count is not a button.
-    const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i))
+    const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i) && !i.deferred)
     const count = (level: 'required' | 'recommended') => {
       const target = first(level)
       const label = <Text dimColor>{` ${data.counts[level]}`}</Text>
@@ -449,17 +457,122 @@ export const register: Register = on => {
         </Text>
       )
     }
+    const rank = (a: PanelItem, b: PanelItem) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level] || Number(a.deferred) - Number(b.deferred)
+    const row = (i: PanelItem, note?: string) => (
+      <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
+        {'   '}
+        {dot(i.level)}
+        {` ${i.id}`}
+        {i.status === 'fail' ? <Text color="error">{' ✗'}</Text> : null}
+        {i.deferred ? <Text dimColor>{' ⏳'}</Text> : null}
+        {note ? <Text dimColor>{`  ${note}`}</Text> : null}
+      </Button>
+    )
     // Sub-phases with nothing pending fold into one line; the others show a header and, open, up to CAP rows.
-    const pendingOf = (phase: string) => data.items.filter(i => i.phase === phase && isPending(i)).sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level])
+    const pendingOf = (phase: string) => data.items.filter(i => i.phase === phase && isPending(i)).sort(rank)
     const clean = data.phases.filter(p => (data.closed.includes(p) || p === data.active) && !pendingOf(p).length)
+
+    const byPhase = (
+      <Box flexDirection="column" marginTop={1}>
+        {data.phases.map(phase => {
+          const items = pendingOf(phase)
+          if (!items.length) return null
+          const closed = data.closed.includes(phase)
+          // Open by default: the active sub-phase and regressions in closed ones. Later ones fold to a count.
+          const shown = phase === data.active || closed || open.includes(phase)
+          const req = items.filter(i => i.level === 'required').length
+          const all = open.includes(`all:${phase}`)
+          const rows = all ? items : items.slice(0, CAP)
+          const phaseBar = bar(data.items.filter(i => i.phase === phase))
+          return (
+            <Box flexDirection="column">
+              <Button key={`phase-${phase}`} plain onPress={() => toggle(phase)}>
+                {`${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}  `}
+                {phaseBar.total ? phaseBar.node : null}
+                {phaseBar.total ? '  ' : null}
+                {dot('required')}
+                <Text dimColor>{` ${req}  `}</Text>
+                {dot('recommended')}
+                <Text dimColor>{` ${items.length - req}`}</Text>
+              </Button>
+              {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
+              {shown && rows.map(i => row(i))}
+              {shown && items.length > CAP && (
+                <Button key={`more-${phase}`} plain onPress={() => toggle(`all:${phase}`)}>
+                  {all ? '     ver menos' : `     … ${items.length - CAP} más`}
+                </Button>
+              )}
+            </Box>
+          )
+        })}
+      </Box>
+    )
+
+    // By domain: one row per domain with its bar; open, its pending items (and the ones linked from elsewhere, ↗).
+    const byDomain = (
+      <Box flexDirection="column" marginTop={1}>
+        {data.domains
+          .filter(d => d.row.applies || d.row.off)
+          .map(d => {
+            const key = `dom:${d.row.path}`
+            const shown = open.includes(key)
+            const mine = data.items.filter(i => i.domain === d.row.path || i.domain.startsWith(`${d.row.path}.`)).filter(isPending).sort(rank)
+            const linked = data.items.filter(i => !(i.domain === d.row.path || i.domain.startsWith(`${d.row.path}.`)) && i.links.some(l => l === d.row.path || l.startsWith(`${d.row.path}.`))).filter(isPending).sort(rank)
+            const all = open.includes(`all:${key}`)
+            const rows = all ? mine : mine.slice(0, CAP)
+            const m = meter(d.row.done, d.row.required, cells)
+            return (
+              <Box flexDirection="column">
+                <Button key={key} plain onPress={() => toggle(key)}>
+                  {`${shown ? '▾' : '▸'} ${d.row.label}  `}
+                  {d.row.off ? (
+                    <Text dimColor>apagado</Text>
+                  ) : (
+                    <Text>
+                      {d.row.required ? (
+                        <Text>
+                          <Text color={progressColor(d.row.done / d.row.required)}>{m.filled}</Text>
+                          <Text dimColor>{m.rest}</Text>
+                        </Text>
+                      ) : null}
+                      <Text dimColor>{d.row.required ? ' ' : ''}</Text>
+                    </Text>
+                  )}
+                  {d.row.off ? null : dot('required')}
+                  {d.row.off ? null : <Text dimColor>{` ${d.row.pendingRequired}  `}</Text>}
+                  {d.row.off ? null : dot('recommended')}
+                  {d.row.off ? null : <Text dimColor>{` ${d.row.pendingRecommended}`}</Text>}
+                </Button>
+                {shown && d.row.off && (
+                  <Button key={`on-${d.row.path}`} plain onPress={() => act($, ['domain', 'on', d.row.path])}>
+                    {`   ${d.row.off} · `}
+                    <Text dimColor>activar</Text>
+                  </Button>
+                )}
+                {shown && !d.row.off && rows.map(i => row(i, i.domain.slice(d.row.path.length + 1)))}
+                {shown && !d.row.off && mine.length > CAP && (
+                  <Button key={`more-${key}`} plain onPress={() => toggle(`all:${key}`)}>
+                    {all ? '     ver menos' : `     … ${mine.length - CAP} más`}
+                  </Button>
+                )}
+                {shown && !d.row.off && linked.length > 0 && <Text dimColor>{`   ↗ enlazados (${linked.length})`}</Text>}
+                {shown && !d.row.off && linked.slice(0, 3).map(i => row(i, `↗ ${i.domain}`))}
+              </Box>
+            )
+          })}
+      </Box>
+    )
+
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" gap={1}>
           <Text bold>{`${data.active} · `}</Text>
           {count('required')}
           {count('recommended')}
+          {deferredPending > 0 && <Text dimColor>{`⏳ ${deferredPending}`}</Text>}
           <Text color="claude">{frame >= 0 ? SPINNER_FRAMES[frame % SPINNER_FRAMES.length] : ' '}</Text>
         </Box>
+        <Text dimColor>{data.stage === 'live' ? 'en vivo: un push a main es un deploy' : 'en construcción: un push solo frena por regresiones'}</Text>
         <Box flexDirection="row" gap={2}>
           <Button key="full" plain onPress={() => refresh($, true)}>
             ↻ Verificar todo
@@ -477,50 +590,19 @@ export const register: Register = on => {
             </Text>
           ) : null
         })()}
+        <Box flexDirection="row" gap={2}>
+          <Text dimColor>Ver por</Text>
+          <Button key="view-phase" plain onPress={() => update($, view, () => 'fase')}>
+            {mode === 'fase' ? <Text bold>sub-etapa</Text> : <Text dimColor>sub-etapa</Text>}
+          </Button>
+          <Button key="view-domain" plain onPress={() => update($, view, () => 'dominio')}>
+            {mode === 'dominio' ? <Text bold>dominio</Text> : <Text dimColor>dominio</Text>}
+          </Button>
+        </Box>
         {!data.full && <Text dimColor>Comandos y build se verifican con ↻.</Text>}
         {message ? <Text dimColor>{message}</Text> : null}
-        <Box flexDirection="column" marginTop={1}>
-          {data.phases.map(phase => {
-            const items = pendingOf(phase)
-            if (!items.length) return null
-            const closed = data.closed.includes(phase)
-            // Open by default: the active sub-phase and regressions in closed ones. Later ones fold to a count.
-            const shown = phase === data.active || closed || open.includes(phase)
-            const req = items.filter(i => i.level === 'required').length
-            const all = open.includes(`all:${phase}`)
-            const rows = all ? items : items.slice(0, CAP)
-            const phaseBar = bar(data.items.filter(i => i.phase === phase))
-            return (
-              <Box flexDirection="column">
-                <Button key={`phase-${phase}`} plain onPress={() => toggle(phase)}>
-                  {`${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}  `}
-                  {phaseBar.total ? phaseBar.node : null}
-                  {phaseBar.total ? '  ' : null}
-                  {dot('required')}
-                  <Text dimColor>{` ${req}  `}</Text>
-                  {dot('recommended')}
-                  <Text dimColor>{` ${items.length - req}`}</Text>
-                </Button>
-                {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
-                {shown &&
-                  rows.map(i => (
-                    <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
-                      {'   '}
-                      {dot(i.level)}
-                      {` ${i.id}`}
-                      {i.status === 'fail' ? <Text color="error">{' ✗'}</Text> : null}
-                    </Button>
-                  ))}
-                {shown && items.length > CAP && (
-                  <Button key={`more-${phase}`} plain onPress={() => toggle(`all:${phase}`)}>
-                    {all ? '     ver menos' : `     … ${items.length - CAP} más`}
-                  </Button>
-                )}
-              </Box>
-            )
-          })}
-        </Box>
-        {clean.length > 0 && <Text dimColor>{`✓ ${clean.join(' · ')}`}</Text>}
+        {mode === 'dominio' ? byDomain : byPhase}
+        {mode === 'fase' && clean.length > 0 && <Text dimColor>{`✓ ${clean.join(' · ')}`}</Text>}
       </Box>
     )
   })

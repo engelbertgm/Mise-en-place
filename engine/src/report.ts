@@ -58,8 +58,9 @@ export function formatCheck(results: ItemResult[], profile: Profile, catalog: Ca
   return out.join('\n').trim()
 }
 
-export function counts(results: ItemResult[]): { required: number; recommended: number } {
-  const pending = results.filter(r => r.state === 'active' && r.status !== 'pass')
+/** Pending 🔴 and 🟡. A deferred item is not pending until go-live: it has its own count. */
+export function counts(results: ItemResult[], deferred: Set<string> = new Set()): { required: number; recommended: number } {
+  const pending = results.filter(r => r.state === 'active' && r.status !== 'pass' && !deferred.has(r.item.id))
   return {
     required: pending.filter(r => r.level === 'required').length,
     recommended: pending.filter(r => r.level === 'recommended').length,
@@ -74,7 +75,7 @@ export function panelData(results: ItemResult[], profile: Profile, catalog: Cata
     phases: catalog.dimensions.phases,
     active: profile.phase.active,
     closed: profile.phase.closed,
-    counts: counts(results),
+    counts: counts(results, new Set(profile.selections.deferred.map(d => d.id))),
     items: results
       .filter(r => r.state !== 'offered' && r.state !== 'off')
       .map(r => ({

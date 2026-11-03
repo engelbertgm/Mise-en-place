@@ -19,6 +19,8 @@ Si ya hay dominio o URL de preview, guárdalos en el perfil (`urls: { production
 
 Si cobra por uso o por resultado (por unidad, por resultado generado, por usuario activo a partir de un umbral), es la capacidad `usage-billing`.
 
+Lenguajes y herramientas (`has_*`): el stack por defecto (Next.js) deja `has_javascript`, `has_typescript`, `has_css` y `has_html` en verdadero. Pon en `false` los que el proyecto no usa (por ejemplo un backend solo en Python) y en `true` los que sí (`has_python`, `has_sql`, `has_react`, `has_tailwind`, `has_ci`, `has_shell`, `has_docker`): solo se agregan las reglas de calidad de lo que se usa.
+
 3. Propón el perfil (tipo, capacidades, mercados, audiencia, contexto, señales, counts) en una tabla corta. Pregunta **solo** lo que cambia 🔴 o los counts (ver skill `mep`). Si el scope cobra algo y no queda claro, pregunta si el pago es con enlace del proveedor (`payment-links`) o con checkout propio (`payments`); no marques `has_db` sin algo que guardar.
 4. Escribe en `summary` un párrafo con las palabras del usuario: qué es el proyecto, para quién y qué debe lograr (encabeza SCOPE.md). Las features del scope que no están en el catálogo (ej. "agenda por instructor") van en `custom_work` con su talla: `[{ title, size: XS|S|M|L|XL, phase }]`. Escribe la propuesta en `.mep/draft.yaml` (incluye `project` y `preset` si aplica) y corre `evaluate --from .mep/draft.yaml`. Si el motor rechaza un valor, corrígelo; no inventes valores.
 5. Muestra el resultado agrupado (🔴, 🟡, ⚪ por categoría) y las recomendaciones de stack con su porqué. Pide al usuario que elija los ⚪ que quiere y confirme.

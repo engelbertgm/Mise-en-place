@@ -14,9 +14,30 @@ export type PanelItem = {
   how: string
   detail: string
   all: string[]
+  /** `domain.subdomain`: the item's one home. */
+  domain: string
+  /** Other subdomains where it also shows. */
+  links: string[]
+  /** Postponed until go-live. */
+  deferred: boolean
 }
 
+export type PanelDomainRow = {
+  path: string
+  label: string
+  applies: number
+  required: number
+  done: number
+  pendingRequired: number
+  pendingRecommended: number
+  deferred: number
+  off?: string
+}
+export type PanelDomain = { row: PanelDomainRow; subs: PanelDomainRow[] }
+
 export type Panel = {
+  stage: 'building' | 'live'
+  domains: PanelDomain[]
   phases: string[]
   active: string
   closed: string[]
@@ -38,6 +59,7 @@ declare module 'claude-code' {
       pending: Shaped<PendingOverride | null>
       flash: Shaped<string>
       tools: Shaped<boolean>
+      view: Shaped<'fase' | 'dominio'>
       spinner: Shaped<number>
     }
   }

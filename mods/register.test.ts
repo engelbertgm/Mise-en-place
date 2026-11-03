@@ -4,7 +4,7 @@ import { describe, expect, test } from 'claude-code/testing'
 
 
 /** What `check --json --detail` answers: one manual 🔴 with a long list of findings, one 🔴 to turn off, one 🟡. */
-const PANEL = {
+const RAW_PANEL = {
   phases: ['foundation.setup', 'foundation.design'],
   active: 'foundation.setup',
   closed: [],
@@ -14,6 +14,20 @@ const PANEL = {
     { id: 'git-protected-main', title: 'main protegida', level: 'required', phase: 'foundation.setup', state: 'active', status: 'unknown', category: 'quality', locked: false, manual: true, why: 'Nadie empuja a main sin revisión.', how: 'Branch protection.', detail: 'manual: ¿main protegida?', all: [] },
     { id: 'csp-strict', title: 'CSP estricta', level: 'recommended', phase: 'foundation.setup', state: 'active', status: 'fail', category: 'security', locked: false, manual: false, why: 'Frena XSS.', how: 'Header CSP.', detail: 'sin CSP', all: [] },
   ],
+}
+
+const DOMAIN_ROW = { applies: 3, required: 2, done: 0, pendingRequired: 2, pendingRecommended: 1, deferred: 0 }
+/** What the engine adds around the items: the stage, the domain summary and each item's home, links and deferral. */
+const PANEL = {
+  ...RAW_PANEL,
+  stage: 'building',
+  domains: [
+    { row: { path: 'quality', label: 'Calidad y proceso', ...DOMAIN_ROW }, subs: [] },
+    { row: { path: 'ux', label: 'UX', ...DOMAIN_ROW, applies: 1, required: 0, pendingRequired: 0, pendingRecommended: 0 }, subs: [] },
+    { row: { path: 'security', label: 'Seguridad', ...DOMAIN_ROW, applies: 1, required: 0, pendingRequired: 0, pendingRecommended: 1 }, subs: [] },
+    { row: { path: 'seo', label: 'SEO', applies: 0, required: 0, done: 0, pendingRequired: 0, pendingRecommended: 0, deferred: 0, off: 'lo lleva otro equipo' }, subs: [] },
+  ],
+  items: RAW_PANEL.items.map(i => ({ domain: i.category === 'security' ? 'security.web-hardening' : 'quality.code', links: i.id === 'code-maps' ? ['ux.principles'] : [], deferred: false, ...i })),
 }
 
 const PENDING = 'mep bloquea el deploy a producción: 2 🔴 pendiente(s).'
@@ -97,6 +111,35 @@ describe('human actions', () => {
     expect(calls.some(a => a.includes('confirm') && a.includes('--human') && !a.includes('--yes'))).toBe(true)
     await $.command.run(cmd('mep:resync'))
     expect(calls.some(a => a.includes('resync') && a.includes('--human'))).toBe(true)
+  })
+
+  test('/mep:defer and /mep:domain are the person\'s too; go-live and the domain views answer at once', async ($, on) => {
+    const calls = repo(on)
+    await $.command.run(cmd('mep:defer', 'code-maps lo hago después'))
+    expect(calls.some(a => a.includes('defer') && a.includes('code-maps') && a.includes('--human'))).toBe(true)
+    await $.command.run(cmd('mep:domain', 'off seo lo lleva otro equipo'))
+    expect(calls.some(a => a.includes('domain') && a.includes('off') && a.includes('--human'))).toBe(true)
+    calls.length = 0
+    await $.command.run(cmd('mep:domains'))
+    await $.command.run(cmd('mep:focus', 'ux.principles'))
+    await $.command.run(cmd('mep:launch'))
+    expect(calls.map(a => a[2])).toEqual(expect.arrayContaining(['domains', 'focus', 'launch']))
+    expect(calls.some(a => a.includes('--human'))).toBe(false)
+  })
+
+  test('a push to main goes through while the project is building and is held once it is live', async ($, on) => {
+    let live = false
+    on('fs.read', (_, e) => (e.path.endsWith('.mep/profile.yaml') ? { value: live ? 'stage: live\n' : 'stage: building\n' } : { deny: 'ENOENT' }))
+    const calls = repo(on, { verifyExit: 1 })
+    // building: `verify` (regressions only), never `verify --prod`
+    await $.tool.call({ tool: 'Bash', command: 'git push origin main' })
+    expect(calls.some(a => a.includes('verify') && !a.includes('--prod'))).toBe(true)
+    expect(calls.some(a => a.includes('--prod'))).toBe(false)
+    live = true
+    calls.length = 0
+    const held = await $.tool.call({ tool: 'Bash', command: 'git push origin main' })
+    expect(calls.some(a => a.includes('verify') && a.includes('--prod'))).toBe(true)
+    expect(held.deny).toContain('bloquea el deploy a producción')
   })
 
   test('a human command that is not the person typing it never reaches the engine', async ($, on) => {
@@ -235,6 +278,39 @@ describe('panel', () => {
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
     await ui.press({ key: 'full' })
     expect(asked).toBeGreaterThan(0)
+    await ui.unmount()
+  })
+
+  test('by domain: a row per domain; open, its pending items and the ones linked from elsewhere', async ($, on) => {
+    await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    expect((await ui.find({ type: 'Text', text: /en construcción/ }))?.text).toMatch(/un push solo frena por regresiones/)
+    await ui.press({ key: 'view-domain' })
+    await ui.press({ key: 'dom:quality' }) // opens: its own pending item can be pressed
+    await ui.press({ key: 'code-maps' })
+    expect((await ui.find({ type: 'Text', text: /quality\.code/ }))?.text).toMatch(/quality\.code/)
+    expect((await ui.find({ type: 'Text', text: /También en: ux\.principles/ }))?.text).toBeTruthy()
+    await ui.press({ key: 'back' })
+    await ui.press({ key: 'dom:quality' }) // fold it again
+    await ui.press({ key: 'dom:ux' }) // nothing of its own: the item linked to ux.principles shows with ↗
+    expect((await ui.find({ type: 'Text', text: /↗ enlazados \(1\)/ }))?.text).toBeTruthy()
+    await ui.press({ key: 'dom:ux' })
+    await ui.press({ key: 'view-phase' })
+    await ui.unmount()
+  })
+
+  test('postponing a 🔴 from the panel goes through the human channel; the off domain can be turned on again', async ($, on) => {
+    const calls = await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await ui.press({ key: 'first-required' })
+    await ui.input({ key: 'defer-code-maps', text: 'lo hago después', kind: 'submit' })
+    expect(calls.some(a => a.includes('defer') && a.includes('code-maps') && a.includes('--human'))).toBe(true)
+    await ui.press({ key: 'back' })
+    await ui.press({ key: 'view-domain' })
+    await ui.press({ key: 'dom:seo' })
+    await ui.press({ key: 'on-seo' })
+    expect(calls.some(a => a.includes('domain') && a.includes('on') && a.includes('seo') && a.includes('--human'))).toBe(true)
+    await ui.press({ key: 'view-phase' })
     await ui.unmount()
   })
 
