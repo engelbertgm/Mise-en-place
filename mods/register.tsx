@@ -15,7 +15,6 @@ const expanded = atom({ plugin: 'mep', key: 'expanded' } as const, [], { shape: 
 const pending = atom({ plugin: 'mep', key: 'pending' } as const, null, { shape: 'pending-1' })
 const flash = atom({ plugin: 'mep', key: 'flash' } as const, '', { shape: 'flash-1' })
 const tools = atom({ plugin: 'mep', key: 'tools' } as const, false, { shape: 'tools-1' })
-const symbols = atom({ plugin: 'mep', key: 'symbols' } as const, 'mixto', { shape: 'symbols-2' })
 // Frame of the braille spinner while the engine works; -1 when idle.
 const spinner = atom({ plugin: 'mep', key: 'spinner' } as const, -1, { shape: 'spinner-1' })
 
@@ -37,38 +36,35 @@ const WITH_TEXT = [
   ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
 ] as const
 
-// Level glyphs read as a fill (density = weight) and take a theme color, so they follow light and dark themes; progress
-// bars fill in braille and take their color from how far along they are. The person picks the set in Herramientas.
-type Symbols = 'mixto' | 'braille' | 'tramado'
-const DITHER = { required: '▓', recommended: '▒', optional: '░' } as const
-const BRAILLE = { required: '⣿', recommended: '⣤', optional: '⣀' } as const
+// Levels are circles that read as a fill (full, half, empty) in a theme color, so they follow light and dark themes.
+// Progress bars fill in braille, and their color moves from red to green with how far along they are.
+const LEVEL_GLYPH = { required: '●', recommended: '◐', optional: '○' } as const
 const BRAILLE_FILL = ['⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿']
-const DITHER_FILL = ['░', '▒', '▓', '█']
-const SYMBOL_SETS: Record<Symbols, { label: string; level: Record<'required' | 'recommended' | 'optional', string>; fill: string[] }> = {
-  mixto: { label: 'mixto ▓▒░ + ⣿ en barras', level: DITHER, fill: BRAILLE_FILL },
-  braille: { label: 'braille ⣿⣤⣀', level: BRAILLE, fill: BRAILLE_FILL },
-  tramado: { label: 'tramado ▓▒░', level: DITHER, fill: DITHER_FILL },
-}
-const SYMBOL_ORDER: Symbols[] = ['mixto', 'braille', 'tramado']
 const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'inactive' } as const
 const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
-/** A fill bar of `cells` cells: the done part and the rest, each drawn in its own color by the caller. */
-function meter(set: Symbols, done: number, total: number, cells: number): { filled: string; rest: string } {
-  const glyphs = SYMBOL_SETS[set].fill
-  const steps = glyphs.length - 1
+/** A braille bar of `cells` cells: the done part and the rest, each drawn in its own color by the caller. */
+function meter(done: number, total: number, cells: number): { filled: string; rest: string } {
+  const steps = BRAILLE_FILL.length - 1
   const units = total ? Math.round((done / total) * cells * steps) : 0
   const full = Math.floor(units / steps)
   const part = units % steps
-  const cell = (i: number) => (i < full ? glyphs[steps]! : i === full ? glyphs[part]! : glyphs[0]!)
+  const cell = (i: number) => (i < full ? BRAILLE_FILL[steps]! : i === full ? BRAILLE_FILL[part]! : BRAILLE_FILL[0]!)
   const all = Array.from({ length: cells }, (_, i) => cell(i))
   const split = Math.min(cells, full + (part ? 1 : 0))
   return { filled: all.slice(0, split).join(''), rest: all.slice(split).join('') }
 }
 
-/** Red below a third, yellow below two thirds, green after. */
-const progressColor = (done: number, total: number) => (done / total < 1 / 3 ? 'error' : done / total < 2 / 3 ? 'warning' : 'success')
+/** Red at 0, amber halfway, green at 1: a hex color, so the bar shifts smoothly with how OK it is. */
+const STOPS = [[229, 72, 77], [245, 165, 36], [48, 164, 108]] as const
+function progressColor(ratio: number): string {
+  const x = Math.min(1, Math.max(0, ratio)) * 2
+  const i = Math.min(1, Math.floor(x))
+  const [from, to] = [STOPS[i]!, STOPS[i + 1]!]
+  const hex = from.map((c, k) => Math.round(c + (to[k]! - c) * (x - i)).toString(16).padStart(2, '0')).join('')
+  return `#${hex}`
+}
 
 // While the engine works the spinner turns: one ticker for all overlapping jobs, cancelled with the last one.
 let jobs = 0
@@ -218,8 +214,6 @@ export const register: Register = on => {
   on('session.start', async ($, e, next) => {
     const result = await next(e)
     await update($, spinner, () => -1) // a hot reload cancels the ticker: start idle
-    const saved = await $.store.get('symbols').catch(() => undefined)
-    if (saved === 'mixto' || saved === 'braille' || saved === 'tramado') await update($, symbols, () => saved)
     if (await hasProfile($)) {
       // Opened unasked it waits on a narrow terminal; /mep:panel opens it at any width.
       void $.ui.open({ id: PANE, title: 'mep' })
@@ -286,16 +280,15 @@ export const register: Register = on => {
     const item = id ? data.items.find(i => i.id === id) : undefined
     const open = await read($, expanded)
     const toggle = (key: string) => update($, expanded, list => (list.includes(key) ? list.filter(p => p !== key) : [...list, key]))
-    const set = await read($, symbols)
     const frame = await read($, spinner)
-    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>{SYMBOL_SETS[set].level[level]}</Text>
+    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>{LEVEL_GLYPH[level]}</Text>
     const cells = e.props.bodyColumns >= 48 ? 6 : 4
     /** Done / total required items, drawn as a bar. */
     const bar = (items: typeof data.items) => {
       const req = items.filter(i => i.level === 'required' && i.state === 'active')
       const done = req.filter(i => i.status === 'pass').length
-      const m = meter(set, done, req.length, cells)
-      const color = progressColor(done, req.length)
+      const m = meter(done, req.length, cells)
+      const color = progressColor(req.length ? done / req.length : 0)
       return { done, total: req.length, node: (<Text><Text color={color}>{m.filled}</Text><Text dimColor>{m.rest}</Text></Text>) }
     }
 
@@ -325,18 +318,6 @@ export const register: Register = on => {
             ← Volver
           </Button>
           {message ? <Text dimColor>{message}</Text> : null}
-          <Button
-            key="symbols"
-            plain
-            onPress={async () => {
-              const next = SYMBOL_ORDER[(SYMBOL_ORDER.indexOf(set) + 1) % SYMBOL_ORDER.length]!
-              await update($, symbols, () => next)
-              await $.store.set('symbols', next).catch(() => undefined)
-            }}
-          >
-            {'Símbolos: '}
-            <Text dimColor>{SYMBOL_SETS[set].label}</Text>
-          </Button>
           <Box flexDirection="column" marginTop={1}>
             <Text dimColor>Antes de deployar o abrir PR</Text>
             <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nada bloquea el deploy a producción.')}>
