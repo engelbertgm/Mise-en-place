@@ -8,6 +8,9 @@ import type { Catalog, Evaluated, Profile } from './types.ts'
 
 export const SCOPE_FILE = 'SCOPE.md'
 
+/** Facts about the code's languages and tools: shown under Tecnología, not as facts of the project. */
+const TECH_SIGNALS = new Set(['has_javascript', 'has_typescript', 'has_css', 'has_html', 'has_sql', 'has_react', 'has_tailwind', 'has_ci', 'has_shell', 'has_docker', 'has_python'])
+
 type Labels = Record<'type' | 'capabilities' | 'audience' | 'context' | 'signals' | 'markets', Record<string, string>>
 
 function labels(catalog: Catalog): Labels {
@@ -41,7 +44,9 @@ const OFTEN_ASSUMED: Record<string, string[]> = {
 export function renderScope(profile: Profile, evaluated: Evaluated[], catalog: Catalog): string {
   const l = labels(catalog)
   const app = applicability(profile, catalog)
-  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && k !== 'db_client_access' || (k === 'db_client_access' && v === true))
+  const isTech = (k: string) => TECH_SIGNALS.has(k)
+  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && !isTech(k))
+  const tech = Object.entries(profile.signals).filter(([k, v]) => v === true && isTech(k)).map(([k]) => l.signals?.[k] ?? k)
   const notIncluded = (OFTEN_ASSUMED[profile.type] ?? []).filter(c => !profile.capabilities.includes(c))
   const offered = evaluated.filter(e => e.state === 'offered').map(e => e.item.title)
   const chosen = evaluated.filter(e => e.state === 'active' && e.level === 'optional').map(e => e.item.title)
@@ -82,7 +87,7 @@ export function renderScope(profile: Profile, evaluated: Evaluated[], catalog: C
     ...(offered.length ? ['', `**Opcionales disponibles, no elegidos:** ${offered.length} (ver BRIEF.md).`] : []),
     '',
     '## Tecnología',
-    bullets(stackGroups(stack(profile, catalog)).map(g => `${g.decisions.map(d => `${d.key}: ${d.value}`).join(', ')} — ${g.why}`)),
+    bullets([...stackGroups(stack(profile, catalog)).map(g => `${g.decisions.map(d => `${d.key}: ${d.value}`).join(', ')} — ${g.why}`), ...(tech.length ? [`Lenguajes y herramientas: ${tech.join(', ')}`] : [])]),
     '',
     '## Lo que exige este scope',
     `Aplican **${app.applies} de ${app.total}** reglas de mep: 🔴 ${plural(app.byLevel.required, 'obligatoria', 'obligatorias')} · 🟡 ${plural(app.byLevel.recommended, 'recomendada', 'recomendadas')} · ⚪ ${plural(app.byLevel.optional, 'opcional', 'opcionales')}. ${app.notApplying.length === 1 ? 'La otra no aplica' : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qué). El detalle está en BRIEF.md.`,
@@ -90,6 +95,9 @@ export function renderScope(profile: Profile, evaluated: Evaluated[], catalog: C
     '',
     '## Fase actual',
     `${profile.phase.active}${profile.phase.closed.length ? ` (cerradas: ${profile.phase.closed.join(', ')})` : ''}`,
+    `Etapa: ${profile.stage === 'live' ? '**en vivo** (cada push a main es un deploy a producción)' : '**en construcción** (un push o PR solo se detiene por regresiones; `mep launch` pasa a en vivo)'}.`,
+    ...(profile.selections.domains_off.length ? ['', `**Dominios apagados:** ${profile.selections.domains_off.map(o => `${o.path} (${o.reason})`).join('; ')}`] : []),
+    ...(profile.selections.deferred.length ? ['', `**Diferidos hasta el go-live:** ${profile.selections.deferred.map(d => d.id).join(', ')}`] : []),
     ...(missing.length ? ['', '## Por definir', bullets(missing)] : []),
     '',
     '> Checklist orientativo, no sustituye asesoría legal.',

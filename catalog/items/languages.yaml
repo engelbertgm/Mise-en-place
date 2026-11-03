@@ -1,0 +1,348 @@
+# Calidad por lenguaje y ecosistema. Agregado en 2026.11.2.
+# Cada grupo se activa con lo que el proyecto usa (señales has_*); lo que no se usa no aplica.
+# Las garantías de JavaScript y Python ya existían (quality.yaml); aquí se completan TypeScript, CSS, HTML, SQL,
+# frameworks y la configuración de CI, scripts y contenedores.
+
+# ── JavaScript ──
+
+- id: js-eslint-security
+  title: "Reglas de seguridad en el lint: sin eval, new Function ni HTML dinámico"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_javascript: true } }
+  depends_on: [strict-lint]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "eval, new Function y el HTML armado con texto son la puerta de entrada de la mayoría de los XSS; el linter los atrapa antes de que lleguen a una revisión."
+  how: "no-eval, no-implied-eval, no-new-func y no-script-url en error, y eslint-plugin-security (o las reglas equivalentes de Biome) con sus reglas recomendadas."
+  verify:
+    - { type: grep, pattern: "eslint-plugin-security|no-eval|no-implied-eval|no-new-func|security/|noGlobalEval", glob: "{eslint.config.*,.eslintrc*,biome.json*,package.json}" }
+
+- id: js-error-handling
+  title: "Errores sin tragar: sin catch vacíos ni promesas sin manejar"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_javascript: true } }
+  depends_on: [strict-lint]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un catch vacío o una promesa sin await esconde el error hasta que un usuario lo encuentra; con la regla, el fallo se ve al escribir el código."
+  how: "no-empty (sin allowEmptyCatch), no-floating-promises y no-misused-promises en error. Un error que se captura se registra, se reintenta o se muestra; nunca se ignora."
+  verify:
+    - { type: grep, pattern: "no-empty|no-floating-promises|no-misused-promises|noFloatingPromises|noEmptyBlockStatements", glob: "{eslint.config.*,.eslintrc*,biome.json*}" }
+
+- id: js-package-hygiene
+  title: "package.json con engines, packageManager y los scripts estándar (lint, test, build)"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_javascript: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Quien clona el proyecto, el CI y el hosting deben usar la misma versión de Node y el mismo gestor de paquetes, y encontrar los mismos comandos."
+  how: "\"engines\": { \"node\": \">=22\" }, \"packageManager\": \"pnpm@x.y.z\" y scripts lint, test y build."
+  verify:
+    - { type: json_key, file: package.json, key: engines.node }
+    - { type: json_key, file: package.json, key: packageManager }
+    - { type: json_key, file: package.json, key: scripts.build }
+
+# ── TypeScript ──
+
+- id: ts-no-ignore
+  title: "@ts-expect-error solo con razón; sin @ts-ignore ni @ts-nocheck"
+  category: quality
+  level: required
+  phase: build.ux
+  since: "2026.11.2"
+  when: { signals: { has_typescript: true } }
+  depends_on: [strict-types]
+  effort: { size: S, hours: [1, 3] }
+  why: "@ts-ignore apaga el compilador en una línea y se queda ahí aunque el problema se arregle; @ts-expect-error avisa cuando ya no hace falta y obliga a explicar por qué existe."
+  how: "Reemplazar cada @ts-ignore por el tipo correcto o por @ts-expect-error con una descripción de al menos tres palabras; regla ban-ts-comment en error."
+  verify:
+    - { type: grep, pattern: "@ts-ignore|@ts-nocheck", glob: "**/*.{ts,tsx,mts,cts}", exclude: "**/*.d.ts", expect: absent }
+    - { type: grep, pattern: "@ts-expect-error\\s*$", glob: "**/*.{ts,tsx,mts,cts}", expect: absent }
+
+- id: ts-type-aware-lint
+  title: "Lint con tipos (typescript-eslint): sin promesas flotantes ni usos inseguros"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_typescript: true } }
+  depends_on: [strict-lint]
+  effort: { size: S, hours: [1, 2] }
+  why: "Las reglas que conocen los tipos atrapan lo que el lint común no ve: una promesa sin await, un any que se cuela por una función, una comparación que nunca es verdadera."
+  how: "typescript-eslint con recommendedTypeChecked (o strictTypeChecked) y projectService: true."
+  verify:
+    - { type: grep, pattern: "recommendedTypeChecked|strictTypeChecked|recommended-type-checked|strict-type-checked|projectService|parserOptions", glob: "{eslint.config.*,.eslintrc*}" }
+
+- id: ts-unchecked-index
+  title: "noUncheckedIndexedAccess activo: un índice puede devolver undefined"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_typescript: true } }
+  depends_on: [strict-types]
+  effort: { size: S, hours: [1, 3] }
+  why: "arr[0] y obj[key] son undefined más seguido de lo que parece; con la opción, el compilador obliga a manejarlo en vez de descubrirlo en producción."
+  how: "\"noUncheckedIndexedAccess\": true en tsconfig (y, si el equipo lo tolera, exactOptionalPropertyTypes)."
+  verify:
+    - { type: json_key, file: tsconfig.json, key: compilerOptions.noUncheckedIndexedAccess, value: true }
+
+- id: ts-boundary-validation
+  title: "Datos externos (API, formularios, variables de entorno) validados con un esquema antes de usarse"
+  category: quality
+  level: recommended
+  phase: build.features
+  since: "2026.11.2"
+  when: { signals: { has_typescript: true } }
+  depends_on: [strict-types]
+  effort: { size: M, hours: [2, 5] }
+  why: "TypeScript solo comprueba lo que se escribió, no lo que llega: un JSON de una API o un formulario puede traer cualquier cosa. Un esquema (Zod) convierte \"debería ser\" en \"es\"."
+  how: "Zod (o Valibot) en el borde: cuerpo de las rutas, acciones de servidor, respuestas de terceros y process.env; el tipo se infiere del esquema, no se escribe aparte."
+  verify:
+    - { type: grep, pattern: "\"(zod|valibot|arktype|@sinclair/typebox|yup|io-ts|@effect/schema)\"", glob: "package.json" }
+
+# ── CSS ──
+
+- id: css-lint
+  title: "Stylelint sin errores"
+  category: quality
+  level: recommended
+  phase: foundation.design
+  since: "2026.11.2"
+  when: { signals: { has_css: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Propiedades inválidas, colores duplicados y selectores vacíos pasan sin aviso en CSS; el linter los marca igual que ESLint lo hace con el código."
+  how: "stylelint con stylelint-config-standard (y la variante de Tailwind si aplica), en el script lint y en CI."
+  verify:
+    - { type: file_exists, path: ["{.stylelintrc,.stylelintrc.*,stylelint.config.*}"] }
+
+- id: css-specificity
+  title: "Sin !important ni selectores por id: la especificidad se mantiene baja"
+  category: quality
+  level: recommended
+  phase: build.ux
+  since: "2026.11.2"
+  when: { signals: { has_css: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Cada !important obliga a otro más fuerte después; el CSS termina en una guerra de especificidad que nadie puede cambiar sin romper algo."
+  how: "Clases de un solo nivel o utilidades; capas (@layer) para ordenar lo base, los componentes y las utilidades; !important solo para sobrescribir CSS de terceros, con comentario."
+  verify:
+    - { type: grep, pattern: "!important", glob: "**/*.{css,scss}", exclude: "**/*.min.css", expect: absent }
+
+- id: css-unused-size
+  title: "CSS sin uso eliminado y peso del CSS dentro de presupuesto"
+  category: quality
+  level: recommended
+  phase: launch.seo
+  since: "2026.11.2"
+  when: { signals: { has_css: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "El CSS bloquea el pintado: cada kilobyte sin uso retrasa todo lo demás, y en móvil el efecto se nota en el LCP."
+  how: "Tailwind con content/@source bien apuntado (o PurgeCSS en otros stacks); CSS crítico de la página ≤ 50 KB sin comprimir."
+  verify:
+    - { type: grep, pattern: "content:\\s*\\[|@source|@import [\"']tailwindcss|purgecss|uncss|lightningcss", glob: "{tailwind.config.*,postcss.config.*,package.json,**/*.css}" }
+
+- id: css-tailwind-conventions
+  title: "Tailwind: orden de clases automático y sin valores arbitrarios fuera de los tokens"
+  category: quality
+  level: recommended
+  phase: foundation.design
+  since: "2026.11.2"
+  when: { signals: { has_tailwind: true } }
+  depends_on: [no-hardcoded-colors]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Con el orden automático los diffs se leen y las clases duplicadas se ven; sin valores arbitrarios, el diseño sigue saliendo de los tokens y no de un número suelto."
+  how: "prettier-plugin-tailwindcss (o la regla useSortedClasses de Biome) y eslint-plugin-better-tailwindcss con no-arbitrary-value en aviso."
+  verify:
+    - { type: grep, pattern: "prettier-plugin-tailwindcss|eslint-plugin-tailwindcss|eslint-plugin-better-tailwindcss|useSortedClasses", glob: "{package.json,.prettierrc*,prettier.config.*,biome.json*}" }
+
+# ── HTML ──
+
+- id: html-valid
+  title: "HTML válido en la salida del build"
+  category: quality
+  level: recommended
+  phase: launch.seo
+  since: "2026.11.2"
+  when: { signals: { has_html: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "Etiquetas sin cerrar, ids repetidos y atributos inválidos hacen que cada navegador y cada lector de pantalla interprete la página a su manera."
+  how: "html-validate (o el validador Nu) sobre la salida del build, en CI."
+  verify:
+    - { type: grep, pattern: "\"(html-validate|vnu-jar|html-validator|htmlhint)\"", glob: "package.json" }
+
+- id: html-semantic
+  title: "Elementos semánticos: button y a para acciones, no div ni span con onClick"
+  category: quality
+  level: recommended
+  phase: build.ux
+  since: "2026.11.2"
+  when: { signals: { has_html: true } }
+  effort: { size: S, hours: [1, 3] }
+  why: "Un div con onClick no recibe foco, no responde a Enter ni lo anuncia el lector de pantalla; un button hace todo eso sin código extra."
+  how: "button para acciones, a para navegar, listas para listas, table solo para datos; los componentes del sistema ya lo traen resuelto."
+  verify:
+    - { type: grep, pattern: "<(div|span)\\b[^>]*\\sonClick=", glob: "**/*.{tsx,jsx}", exclude: "**/*.{test,spec,stories}.*", expect: absent }
+
+- id: html-no-inline-handlers
+  title: "Sin onclick= ni scripts o estilos inline en el HTML (compatible con una CSP estricta)"
+  category: quality
+  level: recommended
+  phase: build.ux
+  since: "2026.11.2"
+  when: { signals: { has_html: true } }
+  depends_on: [csp-strict]
+  effort: { size: S, hours: [1, 2] }
+  why: "La CSP estricta bloquea el código inline; si el HTML lo usa, hay que debilitar la política (unsafe-inline) y se pierde la defensa contra XSS."
+  how: "Los eventos se enlazan desde el JavaScript (addEventListener o el framework); los estilos, en clases; los scripts inline necesarios, con nonce."
+  verify:
+    - { type: grep, pattern: "\\son(click|load|submit|change|input|error|mouseover|focus|blur)\\s*=\\s*[\"']", glob: "**/*.{html,astro,vue,svelte}", flags: i, expect: absent }
+
+# ── SQL ──
+
+- id: sql-lint
+  title: "Migraciones y consultas con linter (sqlfluff o squawk) sin errores"
+  category: quality
+  level: recommended
+  phase: build.data
+  since: "2026.11.2"
+  when: { any: [ { signals: { has_sql: true } }, { signals: { has_db: true } } ] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un linter de SQL atrapa estilo inconsistente, ambigüedades y, con squawk, migraciones que bloquean tablas en producción."
+  how: "sqlfluff para estilo (dialecto postgres) y squawk para migraciones, en el script lint y en CI."
+  verify:
+    - { type: grep, pattern: "sqlfluff|squawk|sql-lint|pg_format", glob: "{package.json,pyproject.toml,.sqlfluff,.pre-commit-config.yaml,Makefile,.github/workflows/*.yml}" }
+
+- id: sql-migration-safety
+  title: "Migraciones seguras: sin bloqueos largos y con plan de vuelta atrás"
+  category: quality
+  level: recommended
+  phase: build.data
+  since: "2026.11.2"
+  when: { any: [ { signals: { has_sql: true } }, { signals: { has_db: true } } ] }
+  depends_on: [migrations-backups]
+  effort: { size: S, hours: [1, 3] }
+  why: "Una migración que bloquea una tabla con datos deja la app sin responder mientras corre; la mayoría de esos bloqueos se evita con otra forma de escribir el mismo cambio."
+  how: "Columnas nuevas nulables o con default constante; índices con CONCURRENTLY en migración propia (fuera de transacción); renombrar en pasos (agregar, copiar, cambiar lectura, quitar); cada migración con su reversa o su plan en el PR."
+  verify:
+    - { type: manual, prompt: "Las migraciones nuevas de este avance no bloquean tablas con datos y cada una tiene reversa o plan de vuelta atrás" }
+
+- id: sql-indexes-naming
+  title: "Cada clave foránea con índice, y nombres consistentes (snake_case, tablas en plural)"
+  category: quality
+  level: recommended
+  phase: build.data
+  since: "2026.11.2"
+  when: { any: [ { signals: { has_sql: true } }, { signals: { has_db: true } } ] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Una clave foránea sin índice vuelve lento cada join y cada borrado en cascada; los nombres sin patrón hacen que cada consulta nueva se escriba adivinando."
+  how: "Índice en cada columna *_id; snake_case; tablas en plural y columnas en singular; created_at y updated_at en todas."
+  verify:
+    - { type: manual, prompt: "Cada clave foránea tiene su índice y los nombres de tablas y columnas siguen la misma convención" }
+
+# ── Frameworks (React, Next) ──
+
+- id: react-hooks-lint
+  title: "Reglas de hooks de React en error"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_react: true } }
+  depends_on: [strict-lint]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un hook dentro de un if o con dependencias incompletas produce bugs que solo aparecen a veces; la regla los marca al escribirlos."
+  how: "eslint-plugin-react-hooks con rules-of-hooks y exhaustive-deps en error (eslint-config-next ya las incluye)."
+  verify:
+    - { type: grep, pattern: "react-hooks|eslint-config-next|next/core-web-vitals|@next/eslint-plugin-next", glob: "{eslint.config.*,.eslintrc*,package.json}" }
+
+- id: jsx-a11y-lint
+  title: "Lint de accesibilidad en JSX (jsx-a11y) sin errores"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  when: { signals: { has_react: true } }
+  depends_on: [strict-lint]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un img sin alt, un botón sin nombre o un click sin teclado se detectan al escribir, no en la auditoría final."
+  how: "eslint-plugin-jsx-a11y con su configuración recomendada (eslint-config-next incluye una parte)."
+  verify:
+    - { type: grep, pattern: "jsx-a11y|eslint-config-next|next/core-web-vitals", glob: "{eslint.config.*,.eslintrc*,package.json}" }
+
+- id: client-server-boundary
+  title: "\"use client\" solo donde hace falta; el código de servidor nunca llega al cliente"
+  category: quality
+  level: recommended
+  phase: build.features
+  since: "2026.11.2"
+  when: { signals: { has_react: true } }
+  depends_on: [server-only-keys]
+  effort: { size: S, hours: [1, 3] }
+  why: "Un componente marcado como cliente sube todo su árbol al navegador; un módulo de servidor importado desde el cliente filtra secretos o rompe el build."
+  how: "Los componentes son de servidor por defecto; \"use client\" en las hojas interactivas; los módulos con secretos o acceso a datos importan 'server-only'."
+  verify:
+    - { type: grep, pattern: "\"server-only\"|'server-only'", glob: "**/*.{ts,tsx,json}" }
+
+# ── Configuración, CI y contenedores ──
+
+- id: ci-actionlint
+  title: "Workflows de GitHub Actions validados (actionlint) y acciones fijadas por versión"
+  category: quality
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.2"
+  when: { signals: { has_ci: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un workflow con un error de sintaxis falla solo cuando alguien lo necesita; una acción en @main puede cambiar de un día para otro y romper el CI o robar secretos."
+  how: "actionlint en CI o en pre-commit; cada acción de terceros fijada a una versión (@v4) o a un SHA, nunca @main ni @master."
+  verify:
+    - { type: grep, pattern: "actionlint", glob: "{.github/workflows/*.{yml,yaml},.pre-commit-config.yaml,package.json,.husky/*}" }
+    - { type: grep, pattern: "uses:\\s*\\S+@(main|master|latest)\\b", glob: ".github/workflows/*.{yml,yaml}", expect: absent }
+
+- id: shell-shellcheck
+  title: "Scripts de shell sin errores de shellcheck"
+  category: quality
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.2"
+  when: { signals: { has_shell: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un script sin comillas o sin set -e falla en silencio o borra lo que no debe; shellcheck marca esos casos conocidos."
+  how: "shellcheck sobre cada .sh en CI o en pre-commit; set -euo pipefail al inicio."
+  verify:
+    - { type: grep, pattern: "shellcheck", glob: "{.github/workflows/*.{yml,yaml},.pre-commit-config.yaml,package.json,Makefile,.husky/*}" }
+
+- id: docker-hadolint
+  title: "Dockerfile sin errores (hadolint), con imagen fijada y usuario sin root"
+  category: quality
+  level: recommended
+  phase: launch.ops
+  since: "2026.11.2"
+  when: { signals: { has_docker: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "FROM node sin versión cambia con cada build, y un contenedor que corre como root convierte cualquier fallo de la app en acceso al sistema."
+  how: "hadolint en CI; FROM con versión (y mejor con digest); USER distinto de root; .dockerignore para no copiar .env ni node_modules."
+  verify:
+    - { type: grep, pattern: "hadolint", glob: "{.github/workflows/*.{yml,yaml},.pre-commit-config.yaml,package.json,Makefile}" }
+    - { type: grep, pattern: "^FROM\\s+(?!scratch\\b)([^:\\s@]+|\\S+:latest)(\\s|$)", glob: "**/Dockerfile*", flags: m, expect: absent }
+    - { type: grep, pattern: "^USER\\s+(?!root\\b)\\S+", glob: "**/Dockerfile*", flags: m }
+
+- id: editorconfig-eol
+  title: ".editorconfig y .gitattributes con finales de línea LF"
+  category: quality
+  level: recommended
+  phase: foundation.setup
+  since: "2026.11.2"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Con Windows y Linux en el mismo repo, los finales de línea CRLF hacen que cada archivo aparezca como cambiado entero y rompen los hashes y los scripts."
+  how: ".editorconfig con end_of_line = lf, charset utf-8 e indentación; .gitattributes con * text=auto eol=lf."
+  verify:
+    - { type: grep, pattern: "end_of_line\\s*=\\s*lf", glob: ".editorconfig" }
+    - { type: grep, pattern: "text=auto|eol=lf", glob: ".gitattributes" }

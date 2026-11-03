@@ -23,6 +23,26 @@ has_embeds:
   - { grep: "<iframe\\b", glob: "**/*.{tsx,jsx,astro,vue,svelte,html,mdx}" }
 has_python:
   - { file: "{pyproject.toml,requirements*.txt,uv.lock,setup.py}" }
+has_javascript:
+  - { file: "package.json" }
+has_typescript:
+  - { file: "{tsconfig.json,tsconfig.*.json}" }
+has_css:
+  - { file: "**/*.{css,scss,sass,less}" }
+has_html:
+  - { file: "**/*.{html,astro,vue,svelte,tsx,jsx}" }
+has_sql:
+  - { file: "**/*.sql" }
+has_react:
+  - { dependency: [react, next, "@remix-run/react", "react-router", gatsby, "@tanstack/react-start"] }
+has_tailwind:
+  - { dependency: [tailwindcss, "@tailwindcss/postcss", "@tailwindcss/vite"] }
+has_ci:
+  - { file: ".github/workflows/*.{yml,yaml}" }
+has_shell:
+  - { file: "**/*.sh" }
+has_docker:
+  - { file: "**/Dockerfile*" }
 has_nonessential_cookies:
   - { grep: "googletagmanager|gtag\\(|fbq\\(|connect\\.facebook\\.net|hotjar|clarity\\.ms|posthog|mixpanel|segment\\.com", glob: "**/*.{ts,tsx,js,jsx,astro,html}" }
   - { dependency: [posthog-js, mixpanel-browser, "@segment/analytics-next", react-ga4, "@next/third-parties"] }

@@ -7406,11 +7406,21 @@ function loadCatalog(dir = defaultCatalogDir()) {
     }
   }
   const sensitiveGroups = readYaml(join(dir, "sensitive.yaml")).groups;
+  const marketOf = /* @__PURE__ */ new Map();
+  const marketsDir = join(dir, "markets");
+  if (existsSync(marketsDir)) {
+    for (const f of readdirSync(marketsDir).filter((f2) => f2.endsWith(".yaml")).sort()) {
+      for (const item of readYaml(join(marketsDir, f)) ?? []) marketOf.set(item.id, f.replace(/\.yaml$/, ""));
+    }
+  }
+  const items = [...readYamlDir(join(dir, "items")), ...readYamlDir(marketsDir)];
+  const domains = loadDomains(dir, items, marketOf);
   const catalog = {
     version: readFileSync(join(dir, "VERSION"), "utf8").trim(),
     dir,
     dimensions: readYaml(join(dir, "dimensions.yaml")),
-    items: [...readYamlDir(join(dir, "items")), ...readYamlDir(join(dir, "markets"))],
+    items,
+    domains,
     stackRules: readYaml(join(dir, "stack-rules.yaml")) ?? [],
     presets,
     sensitiveGroups,
@@ -7420,6 +7430,42 @@ function loadCatalog(dir = defaultCatalogDir()) {
   if (errors.length) throw new Error(`mep: invalid catalog
 - ${errors.join("\n- ")}`);
   return catalog;
+}
+function loadDomains(dir, items, marketOf) {
+  const file = join(dir, "domains.yaml");
+  if (!existsSync(file)) return [];
+  const raw = readYaml(file);
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const domains = Object.entries(raw.domains).map(([key, d]) => ({
+    key,
+    label: d.label,
+    description: d.description,
+    subdomains: Object.entries(d.subdomains).map(([sub, s]) => ({ key: sub, label: s.label, description: s.description, activates_when: s.activates_when, items: s.items ?? [] }))
+  }));
+  for (const d of domains) {
+    for (const s of d.subdomains) {
+      for (const id of s.items) {
+        const item = byId.get(id);
+        if (item && !item.domain) item.domain = `${d.key}.${s.key}`;
+        else if (item) item.domain = `${item.domain},${d.key}.${s.key}`;
+      }
+    }
+  }
+  for (const item of items) {
+    const market2 = marketOf.get(item.id);
+    if (item.domain || !market2) continue;
+    let legal = domains.find((d) => d.key === "legal");
+    if (!legal) domains.push(legal = { key: "legal", label: "Legal", description: "", subdomains: [] });
+    let sub = legal.subdomains.find((s) => s.key === market2);
+    if (!sub) legal.subdomains.push(sub = { key: market2, label: market2.toUpperCase(), description: `Obligaciones de ${market2.toUpperCase()}.`, items: [] });
+    sub.items.push(item.id);
+    item.domain = `legal.${market2}`;
+  }
+  for (const [id, targets] of Object.entries(raw.links ?? {})) {
+    const item = byId.get(id);
+    if (item) item.links = targets;
+  }
+  return domains;
 }
 function dimensionValues(dims, key) {
   if (key === "markets") return [...dims.markets, ...Object.values(dims.market_sublevels).flat()];
@@ -7518,9 +7564,29 @@ function validateCatalog(catalog) {
       if (!ids.has(ref)) errors.push(`item ${item.id}: references unknown item ${ref}`);
     }
   }
+  if (catalog.domains.length) errors.push(...validateDomains(catalog));
   for (const rule of catalog.stackRules) {
     if (!rule.why) errors.push(`stack rule ${rule.id}: missing why`);
     if (rule.when) errors.push(...validateCondition(rule.when, dims, `stack rule ${rule.id}`));
+  }
+  return errors;
+}
+function validateDomains(catalog) {
+  const errors = [];
+  const paths = new Set(catalog.domains.flatMap((d) => d.subdomains.map((s) => `${d.key}.${s.key}`)));
+  const known = new Set(catalog.items.map((i) => i.id));
+  for (const d of catalog.domains) {
+    for (const s of d.subdomains) {
+      for (const id of s.items) if (!known.has(id)) errors.push(`domains.yaml: ${d.key}.${s.key} lists unknown item ${id}`);
+    }
+  }
+  for (const item of catalog.items) {
+    if (!item.domain) errors.push(`item ${item.id}: no home in domains.yaml`);
+    else if (item.domain.includes(",")) errors.push(`item ${item.id}: listed in more than one subdomain (${item.domain})`);
+    for (const t of item.links ?? []) {
+      if (!paths.has(t)) errors.push(`item ${item.id}: link to unknown subdomain ${t}`);
+      else if (t === item.domain) errors.push(`item ${item.id}: linked to its own home ${t}`);
+    }
   }
   return errors;
 }
@@ -7544,6 +7610,11 @@ function validateProfile(profile, catalog) {
   for (const p of [...profile.phase.closed, profile.phase.active]) {
     if (!dims.phases.includes(p)) errors.push(`phase "${p}" is not valid`);
   }
+  if (!["building", "live"].includes(profile.stage)) errors.push(`stage "${profile.stage}" is not valid`);
+  const paths = new Set(catalog.domains.flatMap((d) => [d.key, ...d.subdomains.map((s) => `${d.key}.${s.key}`)]));
+  for (const o of profile.selections.domains_off) {
+    if (catalog.domains.length && !paths.has(o.path)) errors.push(`domain "${o.path}" is not valid`);
+  }
   return errors;
 }
 
@@ -7553,7 +7624,6 @@ var PROD = [
   /\bvercel\s+(?:deploy\s+)?--prod\b/,
   /\bvercel\s+promote\b/,
   /\bnetlify\s+deploy\b(?=[^|;&]*\s--prod\b)/,
-  /\bgit\s+push\b[^|;&]*\s(?:\S+\s+)?(?:HEAD:)?(?:refs\/heads\/)?(?:main|master)\b/,
   // Cloudflare: a Worker deploy, or Pages without a branch or on main.
   /\bwrangler\s+deploy\b/,
   /\bwrangler\s+pages\s+deploy\b(?![^|;&]*--branch[\s=]+(?!(?:main|master)\b))/,
@@ -7562,19 +7632,22 @@ var PROD = [
   /\bfirebase\s+deploy\b/,
   /\bsupabase\s+(?:db\s+push|functions\s+deploy)\b/
 ];
+var PUSH_MAIN = /\bgit\s+push\b[^|;&]*\s(?:\S+\s+)?(?:HEAD:)?(?:refs\/heads\/)?(?:main|master)\b/;
 var PREVIEW = [
   /\bvercel(?:\s+deploy)?(?:\s|$)/,
   /\bnetlify\s+deploy\b/,
   /\bwrangler\s+(?:pages\s+deploy|versions\s+upload)\b/,
   /\bfirebase\s+hosting:channel:deploy\b/
 ];
-function deployKind(command, currentBranch2) {
+function deployKind(command, currentBranch2, stage = "building") {
   const cmd = command.trim();
+  const push = stage === "live" ? "prod" : "integrate";
   if (/\bfirebase\s+hosting:channel:deploy\b/.test(cmd)) return "preview";
   if (PROD.some((re) => re.test(cmd))) return "prod";
+  if (PUSH_MAIN.test(cmd)) return push;
   if (currentBranch2 && /^(main|master)$/.test(currentBranch2) && /\bgit\s+push\b(?![^|;&]*\s(?:-d|--delete)\b)/.test(cmd)) {
     const args = cmd.replace(/^.*?\bgit\s+push\b/, "").split(/[|;&]/)[0].trim().split(/\s+/).filter((a) => a && !a.startsWith("-"));
-    if (args.length <= 1) return "prod";
+    if (args.length <= 1) return push;
   }
   if (/\bvercel\s+(env|link|login|logout|pull|whoami|ls|list|logs|inspect|domains|dns|secrets|project|teams|--version|-v|help)\b/.test(cmd)) return void 0;
   if (PREVIEW.some((re) => re.test(cmd))) return "preview";
@@ -7647,18 +7720,26 @@ function effectiveLevel(item, profile) {
   }
   return level;
 }
+function inDomain(item, path) {
+  return item.domain === path || (item.domain?.startsWith(`${path}.`) ?? false);
+}
 function evaluate(profile, catalog) {
   const phaseOrder = catalog.dimensions.phases;
   const skipped = new Map(profile.selections.recommended_skipped.map((s) => [s.id, s.reason]));
   const overridden = new Map(profile.selections.overrides.map((s) => [s.id, s.reason]));
   const optional = new Set(profile.selections.optional_added);
+  const off = profile.selections.domains_off;
   const result2 = [];
   for (const item of catalog.items) {
     if (!matches(item.when, profile)) continue;
     const level = effectiveLevel(item, profile);
     let state = "active";
     let reason;
-    if (level === "optional" && !optional.has(item.id)) state = "offered";
+    const switchedOff = item.locked ? void 0 : off.find((o) => inDomain(item, o.path));
+    if (switchedOff) {
+      state = "off";
+      reason = `dominio apagado (${switchedOff.path}): ${switchedOff.reason}`;
+    } else if (level === "optional" && !optional.has(item.id)) state = "offered";
     else if (level === "recommended" && skipped.has(item.id)) {
       state = "skipped";
       reason = skipped.get(item.id);
@@ -7842,6 +7923,86 @@ function parseJsonc(text) {
   return JSON.parse(out.replace(/,(\s*[}\]])/g, "$1"));
 }
 
+// engine/src/domains.ts
+var BRAILLE_FILL = ["\u28C0", "\u28C4", "\u28E4", "\u28E6", "\u28F6", "\u28F7", "\u28FF"];
+function meter(done, total, cells) {
+  const steps = BRAILLE_FILL.length - 1;
+  const units = total ? Math.round(done / total * cells * steps) : 0;
+  const full = Math.floor(units / steps);
+  const part = units % steps;
+  const cell = (i) => i < full ? BRAILLE_FILL[steps] : i === full ? BRAILLE_FILL[part] : BRAILLE_FILL[0];
+  const all = Array.from({ length: cells }, (_, i) => cell(i));
+  const split = Math.min(cells, full + (part ? 1 : 0));
+  return { filled: all.slice(0, split).join(""), rest: all.slice(split).join("") };
+}
+function rowFor(path, label, results, deferred, offReason) {
+  const inside = results.filter((r) => r.item.domain === path || r.item.domain?.startsWith(`${path}.`));
+  const active = inside.filter((r) => r.state === "active");
+  const required = active.filter((r) => r.level === "required");
+  const pending = (level) => active.filter((r) => r.level === level && r.status !== "pass" && !deferred.has(r.item.id)).length;
+  return {
+    path,
+    label,
+    applies: active.length,
+    required: required.length,
+    done: required.filter((r) => r.status === "pass").length,
+    pendingRequired: pending("required"),
+    pendingRecommended: pending("recommended"),
+    deferred: required.filter((r) => r.status !== "pass" && deferred.has(r.item.id)).length,
+    off: offReason
+  };
+}
+function summarize(results, catalog, deferredIds, off) {
+  const deferred = new Set(deferredIds);
+  const reasonOf = (path) => off.find((o) => o.path === path || path.startsWith(`${o.path}.`))?.reason;
+  return catalog.domains.map((d) => ({
+    row: rowFor(d.key, d.label, results, deferred, reasonOf(d.key)),
+    subs: d.subdomains.map((s) => rowFor(`${d.key}.${s.key}`, s.label, results, deferred, reasonOf(`${d.key}.${s.key}`)))
+  }));
+}
+function formatDomains(tree, stage, only) {
+  const out = [`Dominios \xB7 stage: ${stage === "live" ? "live (en vivo)" : "building (en construcci\xF3n)"}`];
+  const rows = tree.filter((t) => !only || t.row.path === only || only.startsWith(`${t.row.path}.`));
+  const width = Math.max(...rows.flatMap((t) => [t.row.path.length, ...t.subs.map((s) => s.path.length - t.row.path.length - 1 + 2)]), 8);
+  const line3 = (r, indent, name) => {
+    if (r.off) return `${indent}${name.padEnd(width)}  apagado: ${r.off}`;
+    if (!r.applies) return `${indent}${name.padEnd(width)}  no aplica a este scope`;
+    const m = meter(r.done, r.required, 6);
+    const bar = r.required ? `${m.filled}${m.rest} ${r.done}/${r.required}` : "sin obligatorios";
+    const pend = `\u25CF ${r.pendingRequired}  \u25CF ${r.pendingRecommended}`;
+    return `${indent}${name.padEnd(width)}  ${bar} \xB7 ${pend}${r.deferred ? ` \xB7 \u23F3 ${r.deferred}` : ""}`;
+  };
+  for (const t of rows) {
+    out.push(line3(t.row, "", t.row.path));
+    if (only) {
+      for (const s of t.subs) if (!only.includes(".") || s.path === only) out.push(line3(s, "  ", s.path.slice(t.row.path.length + 1)));
+    }
+  }
+  if (!only) out.push("", "Detalle de un dominio: mep domains <dominio> \xB7 pendientes: mep focus <dominio[.subdominio]>");
+  return out.join("\n");
+}
+function formatFocus(path, results, deferredIds) {
+  const deferred = new Set(deferredIds);
+  const home = (r) => r.item.domain === path || r.item.domain?.startsWith(`${path}.`);
+  const linked = (r) => !home(r) && (r.item.links ?? []).some((l) => l === path || l.startsWith(`${path}.`));
+  const pending = (r) => r.state === "active" && r.status !== "pass" && r.level !== "optional";
+  const rank = { required: 0, recommended: 1, optional: 2 };
+  const mine = results.filter((r) => home(r) && pending(r)).sort((a, b) => rank[a.level] - rank[b.level]);
+  const also = results.filter((r) => linked(r) && pending(r)).sort((a, b) => rank[a.level] - rank[b.level]);
+  const dot = { required: "\u25CF", recommended: "\u25CF", optional: "\u25CB" };
+  const row = (r, from) => `  ${dot[r.level]} ${r.item.id}${r.status === "fail" ? " \u2717" : ""}${deferred.has(r.item.id) ? " \u23F3" : ""}${from ? `  \u2197 viene de ${from}` : ""} \u2014 ${r.item.title}`;
+  const out = [`${path}: ${mine.length} pendientes${also.length ? ` \xB7 ${also.length} enlazados` : ""}`];
+  out.push(...mine.map((r) => row(r)));
+  if (also.length) out.push("", "Tambi\xE9n aplican aqu\xED (su hogar est\xE1 en otro lado):", ...also.map((r) => row(r, r.item.domain)));
+  if (!mine.length && !also.length) out.push("  Nada pendiente.");
+  return out.join("\n");
+}
+function blockersByDomain(blockers) {
+  const by = /* @__PURE__ */ new Map();
+  for (const b of blockers) by.set((b.item.domain ?? b.item.category).split(".")[0], (by.get((b.item.domain ?? b.item.category).split(".")[0]) ?? 0) + 1);
+  return [...by.entries()].sort((a, b) => b[1] - a[1]).map(([d, n]) => `${d} ${n}`).join(" \xB7 ");
+}
+
 // engine/src/gate.ts
 import { execSync as execSync4 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
@@ -7963,7 +8124,8 @@ function emptyProfile(catalog) {
     context: "own-product",
     counts: {},
     signals,
-    selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [] },
+    selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [], domains_off: [], deferred: [] },
+    stage: "building",
     stack: { decided: {} }
   };
 }
@@ -7982,7 +8144,7 @@ function normalizeProfile(raw, catalog) {
     audience: [...raw.audience ?? []]
   };
   profile.phase.closed = [...profile.phase.closed ?? []];
-  for (const key of ["optional_added", "recommended_skipped", "overrides", "manual_confirmed", "grace"]) {
+  for (const key of ["optional_added", "recommended_skipped", "overrides", "manual_confirmed", "grace", "domains_off", "deferred"]) {
     profile.selections[key] = [...profile.selections[key] ?? []];
   }
   return applyImplications(profile, catalog);
@@ -9631,9 +9793,11 @@ function gate(root, catalog, kind, env = process.env) {
   const locked = results.filter((r) => r.item.locked && r.violation);
   const required = results.filter((r) => r.level === "required");
   const grace = new Set(profile.selections.grace);
-  const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail" && !grace.has(r.item.id));
+  const deferred = new Set(profile.selections.deferred.map((d) => d.id));
+  const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail" && !grace.has(r.item.id) && !deferred.has(r.item.id));
   const blockers = uniq([...locked, ...regressions]);
-  const info = kind === "prod" ? [] : required.filter((r) => r.item.phase === profile.phase.active && r.status !== "pass" && !blockers.includes(r));
+  const info = kind === "prod" ? [] : required.filter((r) => r.item.phase === profile.phase.active && r.status !== "pass" && !blockers.includes(r) && !deferred.has(r.item.id));
+  const postponed = kind === "prod" ? 0 : required.filter((r) => deferred.has(r.item.id) && r.status !== "pass").length;
   const bypassed = env.MEP_BYPASS === "1" && blockers.length > 0 && locked.length === 0;
   if (bypassed) log(root, "bypass", `${kind}: ${blockers.map((b) => b.item.id).join(",")}`);
   const block = blockers.length > 0 && !bypassed;
@@ -9641,11 +9805,14 @@ function gate(root, catalog, kind, env = process.env) {
   const parts = [];
   if (block) {
     parts.push(`mep bloquea ${label}: ${blockers.length} \u{1F534} pendiente(s).`);
+    if (blockers.length > 3) parts.push(`Por dominio: ${blockersByDomain(blockers)}`);
     if (locked.length) parts.push("\xCDtems locked violados (no aceptan MEP_BYPASS):");
     parts.push(formatItems(blockers, kind === "stop" ? 5 : 15));
+    if (kind === "prod" && profile.stage === "building") parts.push("Sigues en construcci\xF3n: un push o un PR no exige esto. `mep launch` hace esta misma revisi\xF3n y, si pasa, activa el modo en vivo.");
   } else if (bypassed) parts.push(`MEP_BYPASS=1: ${blockers.length} \u{1F534} omitidos para ${label} (registrado en .mep/log).`);
   if (info.length) parts.push(`Pendientes de ${profile.phase.active} (a\xFAn no bloquean):
 ${formatItems(info, 5)}`);
+  if (postponed) parts.push(`\u23F3 ${postponed} \u{1F534} diferidos hasta el go-live (mep defer).`);
   return { block, blockers, info, bypassed, message: parts.join("\n") };
 }
 function uniq(xs) {
@@ -9657,11 +9824,12 @@ function closePhase(root, catalog, sub, { review = true, env = process.env } = {
   if (!phases.includes(sub)) return { closed: false, message: `sub-etapa desconocida: ${sub}. V\xE1lidas: ${phases.join(", ")}`, pending: [], profile };
   if (profile.phase.closed.includes(sub)) return { closed: false, message: `${sub} ya est\xE1 cerrada`, pending: [], profile };
   const grace = new Set(profile.selections.grace);
+  const deferredIds = new Set(profile.selections.deferred.map((d) => d.id));
   const relevant = evaluate(profile, catalog).filter((e) => e.item.phase === sub || grace.has(e.item.id));
   const quality = review ? reviewState(root, sub, env) : { valid: true, detail: "" };
   const results = verifyItems(root, profile, relevant, "full");
   const pending = results.filter(
-    (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass"
+    (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass" && !deferredIds.has(r.item.id)
   );
   if (pending.length || !quality.valid) {
     const parts = [`No se puede cerrar ${sub}:`];
@@ -9704,6 +9872,16 @@ function prReviewGate(root, env = process.env) {
   if (!hasProfile(root)) return { block: false, message: "" };
   const state = reviewState(root, PR_REVIEW, env);
   return state.valid ? { block: false, message: "" } : { block: true, message: `mep: antes del PR a main, revisi\xF3n de calidad de la rama: ${state.detail}` };
+}
+function launch(root, catalog) {
+  const profile = loadProfile(root, catalog);
+  if (profile.stage === "live") return { ok: true, message: "Este proyecto ya est\xE1 en vivo (stage: live)." };
+  const result2 = gate(root, catalog, "prod", { ...process.env, MEP_BYPASS: "" });
+  if (result2.block) return { ok: false, message: result2.message };
+  profile.stage = "live";
+  saveProfile(root, profile);
+  log(root, "launch", profile.phase.active);
+  return { ok: true, message: "\u{1F680} En vivo. Desde ahora un push a main es un deploy a producci\xF3n: corre la barrera completa." };
 }
 
 // engine/src/render.ts
@@ -9773,6 +9951,24 @@ function stackSection(decisions) {
   if (!decisions.length) return "_Sin decisiones de stack._";
   return stackGroups(decisions).map((g) => `- ${g.decisions.map((d) => `**${d.key}:** ${d.value}${d.decided ? "" : " _(recomendado)_"}`).join(" \xB7 ")} \u2014 ${g.why}`).join("\n");
 }
+function domainSection(evaluated, catalog, byId) {
+  if (!catalog.domains.length) return [];
+  const rows = catalog.domains.map((d) => {
+    const mine = evaluated.filter((e) => e.item.domain === d.key || e.item.domain?.startsWith(`${d.key}.`));
+    const active = mine.filter((e) => e.state === "active");
+    const required = active.filter((e) => e.level === "required");
+    const done = required.filter((e) => byId?.get(e.item.id)?.status === "pass").length;
+    const off = mine.filter((e) => e.state === "off").length;
+    return { d, active: active.length, required: required.length, done, off };
+  }).filter((r) => r.active || r.off);
+  return [
+    "## Por dominio",
+    "| Dominio | Aplican | \u{1F534} | Hechos |",
+    "| --- | --- | --- | --- |",
+    ...rows.map((r) => `| ${r.d.label} (\`${r.d.key}\`) | ${r.active}${r.off ? ` (${r.off} apagados)` : ""} | ${r.required} | ${byId ? `${r.done}/${r.required}` : "\u2014"} |`),
+    ""
+  ];
+}
 function renderBrief(profile, evaluated, catalog, results) {
   const byId = results ? new Map(results.map((r) => [r.item.id, r])) : void 0;
   const out = [
@@ -9790,7 +9986,9 @@ function renderBrief(profile, evaluated, catalog, results) {
     "## Fase actual",
     `- **Cerradas:** ${profile.phase.closed.join(", ") || "\u2014"}`,
     `- **Activa:** ${profile.phase.active}`,
+    `- **Etapa:** ${profile.stage === "live" ? "en vivo: un push a main es un deploy a producci\xF3n" : "en construcci\xF3n: un push o PR solo se detiene por regresiones; `mep launch` pasa a en vivo"}`,
     "",
+    ...domainSection(evaluated, catalog, byId),
     "## Checklist"
   ];
   for (const phase of catalog.dimensions.phases) {
@@ -9811,6 +10009,10 @@ function renderBrief(profile, evaluated, catalog, results) {
   const relaxed = profile.selections.overrides.filter((o) => o.id.startsWith("threshold:"));
   const disabled = [...overridden.map((e) => `- \u26A0\uFE0F \`${e.item.id}\` \u2014 ${e.reason}`), ...relaxed.map((o) => `- \u26A0\uFE0F umbral \`${o.id.slice(10)}\` \u2014 ${o.reason}`)];
   out.push("", "### \u26A0\uFE0F Desactivados (\u{1F534} con override, con raz\xF3n)", disabled.length ? disabled.join("\n") : "\u2014");
+  const off = profile.selections.domains_off;
+  out.push("", "### \u{1F6AB} Dominios apagados (con raz\xF3n)", off.length ? off.map((o) => `- \u26A0\uFE0F \`${o.path}\` \u2014 ${o.reason}`).join("\n") : "\u2014");
+  const deferred = profile.selections.deferred;
+  out.push("", "### \u23F3 Diferidos hasta el go-live (\u{1F534} con raz\xF3n)", deferred.length ? deferred.map((d) => `- \`${d.id}\` \u2014 ${d.reason}`).join("\n") : "\u2014");
   const warns = warnings(evaluated);
   if (warns.length) out.push("", "### Avisos", ...warns.map((w) => `- ${w.message}`));
   out.push("", "## Costos recurrentes estimados", "_Se completan con /mep:quote (hosting, dominio, servicios)._");
@@ -9905,11 +10107,12 @@ ${LEVEL_ICON[level]} ${label} (${items.length})`);
 function stateIcon(r) {
   if (r.state === "skipped") return "\u23ED\uFE0F";
   if (r.state === "overridden") return "\u26A0\uFE0F";
+  if (r.state === "off") return "\u2298";
   return STATUS_ICON[r.status];
 }
 function formatCheck(results, profile, catalog, { verbose = false } = {}) {
   const out = [];
-  const shown = results.filter((r) => r.state !== "offered");
+  const shown = results.filter((r) => r.state !== "offered" && r.state !== "off");
   for (const phase of catalog.dimensions.phases) {
     const items = shown.filter((r) => r.item.phase === phase);
     if (!items.length) continue;
@@ -9924,6 +10127,14 @@ ${phase}  \u{1F534} ${done}/${req.length} ${mark}`.trimEnd());
       out.push(`  ${stateIcon(r)} ${LEVEL_ICON[r.level]} ${r.item.id}${detail ? ` \u2014 ${detail}` : ""}`);
     }
   }
+  for (const o of profile.selections.domains_off) {
+    const n = results.filter((r) => r.state === "off" && (r.item.domain === o.path || r.item.domain?.startsWith(`${o.path}.`))).length;
+    if (n) out.push(`
+\u2298 ${o.path} apagado (${n} \xEDtems): ${o.reason}`);
+  }
+  const deferred = profile.selections.deferred.filter((d) => results.some((r) => r.item.id === d.id && r.state === "active" && r.status !== "pass"));
+  if (deferred.length) out.push(`
+\u23F3 ${deferred.length} \u{1F534} diferidos hasta el go-live: ${deferred.map((d) => d.id).join(", ")}`);
   return out.join("\n").trim();
 }
 function counts(results) {
@@ -9935,12 +10146,17 @@ function counts(results) {
 }
 function panelData(results, profile, catalog) {
   return {
+    stage: profile.stage,
+    domains: summarize(results, catalog, profile.selections.deferred.map((d) => d.id), profile.selections.domains_off),
     phases: catalog.dimensions.phases,
     active: profile.phase.active,
     closed: profile.phase.closed,
     counts: counts(results),
-    items: results.filter((r) => r.state !== "offered").map((r) => ({
+    items: results.filter((r) => r.state !== "offered" && r.state !== "off").map((r) => ({
       id: r.item.id,
+      domain: r.item.domain ?? "",
+      links: r.item.links ?? [],
+      deferred: profile.selections.deferred.some((d) => d.id === r.item.id),
       title: r.item.title,
       level: r.level,
       phase: r.item.phase,
@@ -9964,15 +10180,15 @@ var WRITES = /\b(?:tee|cp|mv|rm|truncate|sed\s+-i|perl\s+-[a-z]*[ip]|git\s+(?:ch
 var REDIRECT_INTO_MEP = /(?:^|[^<])>{1,2}\s*["']?[^\s"']*\.mep[\\/]/;
 var ENGINE = String.raw`(?:mep\.mjs["']?|@engelbertgm\/mep\S*|(?:^|[;&|]\s*|\b(?:npx|bunx|pnpm(?:\s+dlx|\s+exec)?|yarn)\s+)mep)\s+`;
 var ENGINE_CALL = new RegExp(ENGINE);
-var HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`);
+var HUMAN_ACTION = new RegExp(`${ENGINE}(?:confirm|override|resync|defer|domain\\s+off|stage\\s+building)\\b|${ENGINE}threshold\\b[^|;&]*--yes\\b`);
 var STATE_HINT = "mep: el estado de mep (.mep/profile.yaml, log, security/, reviews/) solo cambia con la CLI de mep. Usa /mep:add, /mep:skip, /mep:phase o mep review/security record.";
 function guardFile(path) {
   return STATE_PATH.test(path) ? STATE_HINT : void 0;
 }
 function guardCommand(command) {
   if (/\bMEP_BYPASS\b/.test(command)) return "mep: MEP_BYPASS es una decisi\xF3n tuya, no del agente: ponla en tu entorno al abrir la sesi\xF3n.";
-  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return "mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:threshold, /mep:resync).";
-  if (HUMAN_ACTION.test(command)) return "mep: esta acci\xF3n es tuya. Escr\xEDbela t\xFA: /mep:confirm <id>, /mep:override <id> <raz\xF3n>, /mep:threshold <clave> <valor> <raz\xF3n> o /mep:resync.";
+  if (ENGINE_CALL.test(command) && /\s--human\b/.test(command)) return "mep: el canal humano lo usa solo el usuario (/mep:confirm, /mep:override, /mep:defer, /mep:domain, /mep:threshold, /mep:resync).";
+  if (HUMAN_ACTION.test(command)) return "mep: esta acci\xF3n es tuya. Escr\xEDbela t\xFA: /mep:confirm <id>, /mep:override <id> <raz\xF3n>, /mep:defer <id> <raz\xF3n>, /mep:domain off <ruta> <raz\xF3n>, /mep:threshold <clave> <valor> <raz\xF3n> o /mep:resync.";
   if (REDIRECT_INTO_MEP.test(command)) return STATE_HINT;
   if (ENGINE_CALL.test(command) && !/[;&|]/.test(command)) return void 0;
   return MENTIONS_MEP.test(command) && WRITES.test(command) ? STATE_HINT : void 0;
@@ -10007,7 +10223,7 @@ function readLine() {
   }
   return line3.trim();
 }
-var NOT_HUMAN = "esta acci\xF3n es tuya, no del agente. Escr\xEDbela t\xFA en Claude Code (/mep:confirm, /mep:override, /mep:threshold, /mep:resync) o c\xF3rrela en tu propia terminal.";
+var NOT_HUMAN = "esta acci\xF3n es tuya, no del agente. Escr\xEDbela t\xFA en Claude Code (/mep:confirm, /mep:override, /mep:defer, /mep:domain, /mep:threshold, /mep:resync) o c\xF3rrela en tu propia terminal.";
 function confirmHuman(flags, id) {
   if (flags.human === true) return true;
   if (!process.stdin.isTTY) return false;
@@ -10113,7 +10329,8 @@ function inferProfile(root, catalog) {
     project: (readText(root, "package.json") ?? "").match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? "proyecto",
     type,
     capabilities: [...capSet].filter((c) => catalog.dimensions.capabilities.includes(c)).sort(),
-    signals: Object.fromEntries(Object.keys(signals).map((k) => [k, true])),
+    // What the code shows is true; the languages that default to true (the stack's) are false when it shows none.
+    signals: { ...Object.fromEntries(DEFAULT_TRUE_TECH.map((k) => [k, false])), ...Object.fromEntries(Object.keys(signals).map((k) => [k, true])) },
     counts: { pages: Math.max(1, pageRoutes2.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
     stack: { decided: stack2 }
   };
@@ -10123,13 +10340,14 @@ function gapReport(root, profile, catalog) {
   return verifyItems(root, profile, evaluate(profile, catalog), "full").filter((r) => r.state === "active");
 }
 var SCOPE_ONLY_SIGNALS = /* @__PURE__ */ new Set(["high_traffic"]);
+var DEFAULT_TRUE_TECH = ["has_javascript", "has_typescript", "has_css", "has_html"];
 function compareScopeAndCode(scope, code) {
   const flags = (p) => /* @__PURE__ */ new Set([...p.capabilities.map((c2) => `capacidad ${c2}`), ...Object.entries(p.signals).filter(([k, v]) => v === true && !SCOPE_ONLY_SIGNALS.has(k)).map(([k]) => `se\xF1al ${k}`)]);
   const s = flags(scope);
   const c = flags(code);
   return {
     codeOnly: [...c].filter((x) => !s.has(x)).sort(),
-    scopeOnly: [...s].filter((x) => !c.has(x)).sort(),
+    scopeOnly: [...s].filter((x) => !c.has(x) && !DEFAULT_TRUE_TECH.some((t) => x === `se\xF1al ${t}`)).sort(),
     typeDiffers: scope.type !== code.type ? { scope: scope.type, code: code.type } : void 0
   };
 }
@@ -10184,6 +10402,7 @@ var import_yaml5 = __toESM(require_dist(), 1);
 import { existsSync as existsSync13, readFileSync as readFileSync12, writeFileSync as writeFileSync7 } from "node:fs";
 import { join as join14 } from "node:path";
 var SCOPE_FILE = "SCOPE.md";
+var TECH_SIGNALS = /* @__PURE__ */ new Set(["has_javascript", "has_typescript", "has_css", "has_html", "has_sql", "has_react", "has_tailwind", "has_ci", "has_shell", "has_docker", "has_python"]);
 function labels(catalog) {
   const file = join14(catalog.dir, "labels.yaml");
   return existsSync13(file) ? (0, import_yaml5.parse)(readFileSync12(file, "utf8")) : {};
@@ -10209,7 +10428,9 @@ var OFTEN_ASSUMED = {
 function renderScope(profile, evaluated, catalog) {
   const l = labels(catalog);
   const app = applicability(profile, catalog);
-  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && k !== "db_client_access" || k === "db_client_access" && v === true);
+  const isTech = (k) => TECH_SIGNALS.has(k);
+  const signals = Object.entries(profile.signals).filter(([k, v]) => v === true && !isTech(k));
+  const tech = Object.entries(profile.signals).filter(([k, v]) => v === true && isTech(k)).map(([k]) => l.signals?.[k] ?? k);
   const notIncluded = (OFTEN_ASSUMED[profile.type] ?? []).filter((c) => !profile.capabilities.includes(c));
   const offered = evaluated.filter((e) => e.state === "offered").map((e) => e.item.title);
   const chosen = evaluated.filter((e) => e.state === "active" && e.level === "optional").map((e) => e.item.title);
@@ -10251,7 +10472,7 @@ function renderScope(profile, evaluated, catalog) {
     ...offered.length ? ["", `**Opcionales disponibles, no elegidos:** ${offered.length} (ver BRIEF.md).`] : [],
     "",
     "## Tecnolog\xEDa",
-    bullets(stackGroups(stack(profile, catalog)).map((g) => `${g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ")} \u2014 ${g.why}`)),
+    bullets([...stackGroups(stack(profile, catalog)).map((g) => `${g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ")} \u2014 ${g.why}`), ...tech.length ? [`Lenguajes y herramientas: ${tech.join(", ")}`] : []]),
     "",
     "## Lo que exige este scope",
     `Aplican **${app.applies} de ${app.total}** reglas de mep: \u{1F534} ${plural(app.byLevel.required, "obligatoria", "obligatorias")} \xB7 \u{1F7E1} ${plural(app.byLevel.recommended, "recomendada", "recomendadas")} \xB7 \u26AA ${plural(app.byLevel.optional, "opcional", "opcionales")}. ${app.notApplying.length === 1 ? "La otra no aplica" : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qu\xE9). El detalle est\xE1 en BRIEF.md.`,
@@ -10259,6 +10480,9 @@ function renderScope(profile, evaluated, catalog) {
     "",
     "## Fase actual",
     `${profile.phase.active}${profile.phase.closed.length ? ` (cerradas: ${profile.phase.closed.join(", ")})` : ""}`,
+    `Etapa: ${profile.stage === "live" ? "**en vivo** (cada push a main es un deploy a producci\xF3n)" : "**en construcci\xF3n** (un push o PR solo se detiene por regresiones; `mep launch` pasa a en vivo)"}.`,
+    ...profile.selections.domains_off.length ? ["", `**Dominios apagados:** ${profile.selections.domains_off.map((o) => `${o.path} (${o.reason})`).join("; ")}`] : [],
+    ...profile.selections.deferred.length ? ["", `**Diferidos hasta el go-live:** ${profile.selections.deferred.map((d) => d.id).join(", ")}`] : [],
     ...missing.length ? ["", "## Por definir", bullets(missing)] : [],
     "",
     "> Checklist orientativo, no sustituye asesor\xEDa legal.",
@@ -10701,9 +10925,10 @@ function runHook(event, root, catalog) {
         if (review.block) json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: review.message } });
         return;
       }
-      const kind = deployKind(command, currentBranch(cwd));
+      const stage = hasProfile(cwd) ? loadProfile(cwd, catalog).stage : "building";
+      const kind = deployKind(command, currentBranch(cwd), stage);
       if (!kind) return;
-      const result2 = cachedGate(cwd, catalog, kind);
+      const result2 = cachedGate(cwd, catalog, kind === "integrate" ? "stop" : kind);
       if (result2.block) {
         json({ hookSpecificOutput: { hookEventName: "PreToolUse", permissionDecision: "deny", permissionDecisionReason: result2.message } });
       }
@@ -10822,7 +11047,7 @@ ${signals.map((s) => `  - ${s.signal} (${s.evidence})`).join("\n")}`);
     }
     case "verify": {
       if (!hasProfile(root)) return print("mep: sin .mep/profile.yaml, nada que verificar.");
-      const kind = args.flags.prod ? "prod" : "stop";
+      const kind = args.flags.prod || args.flags.ci && loadProfile(root, catalog).stage === "live" ? "prod" : "stop";
       const result2 = args.flags["no-cache"] ? gate(root, catalog, kind) : cachedGate(root, catalog, kind);
       const review = args.flags.pr ? prReviewGate(root) : { block: false, message: "" };
       print([result2.message, review.message].filter(Boolean).join("\n") || "\u2705 mep: sin \u{1F534} pendientes que bloqueen.");
@@ -10896,6 +11121,87 @@ ${formatItems(pending)}` : `
       regenerate(root, profile, catalog);
       return print(cmd === "skip" ? `\u23ED\uFE0F ${id} omitido: ${reason}` : `\u26A0\uFE0F ${id} desactivado: ${reason} (registrado en .mep/log)
 Riesgo aceptado: ${e.item.why}`);
+    }
+    case "launch": {
+      requireProfile(root, catalog);
+      const r = launch(root, catalog);
+      if (r.ok) regenerate(root, loadProfile(root, catalog), catalog);
+      print(r.message);
+      process.exitCode = r.ok ? 0 : 1;
+      return;
+    }
+    case "stage": {
+      const profile = requireProfile(root, catalog);
+      if (rest[0] === "building") {
+        if (profile.stage === "building") return print("Ya est\xE1 en construcci\xF3n.");
+        if (!confirmHuman(args.flags, "building")) fail(NOT_HUMAN, 3);
+        profile.stage = "building";
+        saveProfile(root, profile);
+        log(root, "stage", "building");
+        regenerate(root, profile, catalog);
+        return print("\u{1F6E0}\uFE0F De vuelta en construcci\xF3n: un push a main ya no corre la barrera de producci\xF3n.");
+      }
+      return print(`stage: ${profile.stage === "live" ? "live (en vivo): cada push a main es un deploy a producci\xF3n" : "building (en construcci\xF3n): un push o PR solo se detiene por regresiones; mep launch pasa a vivo"}`);
+    }
+    case "defer":
+    case "undefer": {
+      const [id, ...reasonParts] = rest;
+      const reason = reasonParts.join(" ").trim();
+      if (!id || cmd === "defer" && !reason) fail(cmd === "defer" ? "Uso: mep defer <id> <raz\xF3n>" : "Uso: mep undefer <id>");
+      const profile = requireProfile(root, catalog);
+      if (cmd === "undefer") {
+        profile.selections.deferred = profile.selections.deferred.filter((d) => d.id !== id);
+        saveProfile(root, profile);
+        log(root, "undefer", id);
+        regenerate(root, profile, catalog);
+        return print(`${id} vuelve a contar para cerrar la sub-etapa.`);
+      }
+      const e = evaluate(profile, catalog).find((x) => x.item.id === id);
+      if (!e || e.state !== "active") fail(`${id} no est\xE1 activo en este perfil`);
+      if (e.level !== "required") fail(`mep defer solo aplica a \u{1F534}; ${id} es ${e.level}.`);
+      if (e.item.locked) fail(`${id} es locked \u{1F512}: no se puede diferir.`);
+      if (!confirmHuman(args.flags, id)) fail(NOT_HUMAN, 3);
+      profile.selections.deferred = profile.selections.deferred.filter((d) => d.id !== id).concat({ id, reason, date: today() });
+      saveProfile(root, profile);
+      log(root, "defer", `${id} "${reason}"`);
+      regenerate(root, profile, catalog);
+      return print(`\u23F3 ${id} diferido hasta el go-live: no frena sub-etapas ni pushes, pero mep launch lo exige. (${reason})`);
+    }
+    case "domain": {
+      const [action, path, ...reasonParts] = rest;
+      const reason = reasonParts.join(" ").trim();
+      if (!["off", "on"].includes(action ?? "") || !path || action === "off" && !reason) fail("Uso: mep domain off <dominio[.subdominio]> <raz\xF3n> \xB7 mep domain on <dominio[.subdominio]>");
+      const profile = requireProfile(root, catalog);
+      const valid = new Set(catalog.domains.flatMap((d) => [d.key, ...d.subdomains.map((s) => `${d.key}.${s.key}`)]));
+      if (!valid.has(path)) fail(`${path} no es un dominio. Mira mep domains.`);
+      if (action === "on") {
+        profile.selections.domains_off = profile.selections.domains_off.filter((o) => o.path !== path);
+        saveProfile(root, profile);
+        log(root, "domain-on", path);
+        regenerate(root, profile, catalog);
+        return print(`${path} activo otra vez.`);
+      }
+      if (!confirmHuman(args.flags, path)) fail(NOT_HUMAN, 3);
+      profile.selections.domains_off = profile.selections.domains_off.filter((o) => o.path !== path).concat({ path, reason, date: today() });
+      saveProfile(root, profile);
+      log(root, "domain-off", `${path} "${reason}"`);
+      regenerate(root, profile, catalog);
+      return print(`\u26A0\uFE0F ${path} apagado: ${reason}. Sus \xEDtems no cuentan (los \u{1F512} siguen activos). Queda en .mep/log y en BRIEF.md.`);
+    }
+    case "domains": {
+      const profile = requireProfile(root, catalog);
+      const results = verifyItems(root, profile, evaluate(profile, catalog), "fast");
+      const tree = summarize(results, catalog, profile.selections.deferred.map((d) => d.id), profile.selections.domains_off);
+      if (args.flags.json) return json(tree);
+      return print(formatDomains(tree, profile.stage, rest[0]));
+    }
+    case "focus": {
+      const profile = requireProfile(root, catalog);
+      if (!rest[0]) fail("Uso: mep focus <dominio[.subdominio]>");
+      const valid = new Set(catalog.domains.flatMap((d) => [d.key, ...d.subdomains.map((s) => `${d.key}.${s.key}`)]));
+      if (!valid.has(rest[0])) fail(`${rest[0]} no es un dominio. Mira mep domains.`);
+      const results = verifyItems(root, profile, evaluate(profile, catalog), "fast");
+      return print(formatFocus(rest[0], results, profile.selections.deferred.map((d) => d.id)));
     }
     case "threshold": {
       const [key, valueText, ...reasonParts] = rest;
@@ -11144,7 +11450,10 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  init --from perfil.yaml [--preset x]                  crea perfil, BRIEF.md, ADRs, CLAUDE.md y CI",
           "  add --from cambio.yaml [--apply]                      diff del checklist",
           "  check [--fast] [--all] [--json [--detail]]            verificaci\xF3n por sub-etapa (--detail: datos del panel)",
-          "  verify [--prod] [--pr]                                gate para CI (sale con 1 si bloquea; --pr exige la revisi\xF3n de la rama)",
+          "  verify [--prod | --ci] [--pr]                         gate para CI (--ci: building \u2192 regresiones; live \u2192 barrera completa; --pr exige la revisi\xF3n)",
+          "  launch \xB7 stage [building]                             go-live: la barrera completa una vez; activa el modo en vivo",
+          "  defer <id> <raz\xF3n> \xB7 undefer <id>                     posponer un \u{1F534} hasta el go-live (no frena sub-etapas ni pushes)",
+          "  domains [ruta] \xB7 focus <ruta> \xB7 domain off|on <ruta> [raz\xF3n]   \xEDtems por dominio; apagar un dominio entero",
           "  changes [--base origin/main]                          cambios de estado de mep desde la base (resumen del PR)",
           "  phase [close <sub-etapa>]",
           "  skip <id> <raz\xF3n> \xB7 override <id> <raz\xF3n> --yes \xB7 select <id\u2026> \xB7 confirm <id> \xB7 resync   (override, confirm y resync: solo el usuario)",

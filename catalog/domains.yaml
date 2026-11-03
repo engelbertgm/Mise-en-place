@@ -1,6 +1,6 @@
-# Dominios y subdominios del catálogo (borrador de la rama restructure).
-# - items: cada ítem existente tiene UN solo subdominio "hogar"; ahí vive su estado, su nivel y su cierre.
-# - proposed: ítems nuevos propuestos para ese subdominio (aún no están en el catálogo).
+# Dominios y subdominios del catálogo: la única fuente del "hogar" de cada ítem.
+# Un ítem nuevo se agrega aquí; el catálogo no carga si algún ítem no tiene hogar.
+# - items: cada ítem tiene UN solo subdominio "hogar"; ahí vive su estado, su nivel y su cierre.
 # - links: otros subdominios donde el ítem también se muestra (solo vista; no duplica estado ni bloqueos).
 # - Un dominio o subdominio se puede apagar entero (con razón en el log). Lo que no aplica al scope ya queda fuera por su `when`.
 #   Los ítems 🔒 nunca se apagan.
@@ -433,66 +433,27 @@ domains:
         label: JavaScript
         description: 'Ecosistema JS/TS en ejecución: formato, lint, ciclos, código muerto y restos de depuración.'
         activates_when: has_javascript (package.json con código JS o TS)
-        items: [formatter, strict-lint, no-import-cycles, no-debug-leftovers, no-duplication-dead-code]
-        proposed:
-        - id: js-eslint-security
-          title: 'Reglas de seguridad en el lint: sin eval, new Function ni HTML dinámico'
-        - id: js-error-handling
-          title: 'Errores no tragados: sin catch vacíos ni promesas sin manejar'
-        - id: js-package-hygiene
-          title: package.json con engines, packageManager y scripts estándar (lint, test, build)
+        items: [formatter, strict-lint, no-import-cycles, no-debug-leftovers, no-duplication-dead-code, js-eslint-security, js-error-handling, js-package-hygiene]
       typescript:
         label: TypeScript
         description: Tipos estrictos y seguridad del compilador.
         activates_when: has_typescript (tsconfig.json)
-        items: [strict-types]
-        proposed:
-        - id: ts-no-ignore
-          title: '@ts-expect-error solo con razón; sin @ts-ignore ni @ts-nocheck'
-        - id: ts-type-aware-lint
-          title: 'Lint con tipos (typescript-eslint): sin promesas flotantes ni mal usadas'
-        - id: ts-unchecked-index
-          title: noUncheckedIndexedAccess y exactOptionalPropertyTypes activos
-        - id: ts-boundary-validation
-          title: Datos externos (API, formularios, env) validados con un esquema (Zod) antes de usarse
+        items: [strict-types, ts-no-ignore, ts-type-aware-lint, ts-unchecked-index, ts-boundary-validation]
       css:
         label: CSS
         description: Lint, especificidad y peso de los estilos.
         activates_when: has_css (archivos .css/.scss o Tailwind)
-        items: []
-        proposed:
-        - id: css-lint
-          title: Stylelint sin errores
-        - id: css-specificity
-          title: Sin !important ni selectores por id; especificidad baja
-        - id: css-unused-size
-          title: CSS sin uso eliminado y peso del CSS dentro de presupuesto
-        - id: css-tailwind-conventions
-          title: Orden de clases automático y sin valores arbitrarios fuera de los tokens (Tailwind)
+        items: [css-lint, css-specificity, css-unused-size, css-tailwind-conventions]
       html:
         label: HTML
         description: HTML válido, semántico y sin código inline.
         activates_when: has_html (HTML, JSX, Astro o plantillas)
-        items: []
-        proposed:
-        - id: html-valid
-          title: HTML válido en la salida del build (html-validate o Nu validator)
-        - id: html-semantic
-          title: 'Elementos semánticos: button y a para acciones, listas para listas, tablas solo para datos'
-        - id: html-no-inline-handlers
-          title: Sin onclick= ni scripts o estilos inline en el HTML (compatible con CSP estricta)
+        items: [html-valid, html-semantic, html-no-inline-handlers]
       sql:
         label: SQL
         description: Migraciones y consultas seguras y con linter.
         activates_when: has_sql (archivos .sql o migraciones)
-        items: []
-        proposed:
-        - id: sql-lint
-          title: Migraciones y consultas con linter (sqlfluff o squawk) sin errores
-        - id: sql-migration-safety
-          title: 'Migraciones seguras: índices concurrentes, sin bloqueos largos, con vuelta atrás o plan'
-        - id: sql-indexes-naming
-          title: Claves foráneas con índice y nombres consistentes
+        items: [sql-lint, sql-migration-safety, sql-indexes-naming]
       python:
         label: Python
         description: Ruff, mypy, pytest, pip-audit y vulture.
@@ -502,28 +463,12 @@ domains:
         label: Frameworks (React, Next, Astro…)
         description: 'Reglas propias del framework: hooks, accesibilidad en JSX y frontera cliente/servidor.'
         activates_when: has_react / Next / Astro / Vue (dependencia detectada)
-        items: []
-        proposed:
-        - id: react-hooks-lint
-          title: Reglas de hooks de React en error
-        - id: jsx-a11y-lint
-          title: Lint de accesibilidad en JSX (jsx-a11y) sin errores
-        - id: client-server-boundary
-          title: '''use client'' solo donde hace falta; el código de servidor nunca lo importa el cliente'
+        items: [react-hooks-lint, jsx-a11y-lint, client-server-boundary]
       config-ci:
         label: Configuración, CI y contenedores
         description: Workflows, scripts de shell, Dockerfile y finales de línea.
         activates_when: workflows de Actions, scripts .sh o Dockerfile presentes
-        items: []
-        proposed:
-        - id: ci-actionlint
-          title: Workflows de GitHub Actions validados (actionlint) y acciones fijadas por versión
-        - id: shell-shellcheck
-          title: Scripts de shell sin errores de shellcheck
-        - id: docker-hadolint
-          title: Dockerfile sin errores (hadolint), usuario sin root e imagen fijada
-        - id: editorconfig-eol
-          title: .editorconfig y .gitattributes con finales de línea LF (evita diferencias Windows/Linux)
+        items: [ci-actionlint, shell-shellcheck, docker-hadolint, editorconfig-eol]
       testing:
         label: Pruebas y build
         description: Unitarias, end-to-end y build limpio.
@@ -631,3 +576,20 @@ links:
   no-hardcoded-colors: [quality.css]
   no-inline-styles: [quality.css]
   spacing-scale: [quality.css]
+  html-no-inline-handlers: [security.web-hardening]
+  ts-boundary-validation: [security.input]
+  js-eslint-security: [security.input]
+  html-semantic: [accessibility.operable]
+  jsx-a11y-lint: [accessibility.compliance]
+  client-server-boundary: [security.secrets]
+  sql-migration-safety: [database.operations]
+  sql-indexes-naming: [database.model]
+  css-specificity: [ui.design-system]
+  css-tailwind-conventions: [ui.design-system]
+  css-unused-size: [frontend.performance]
+  editorconfig-eol: [quality.git-docs]
+  ci-actionlint: [security.supply-chain]
+  docker-hadolint: [security.supply-chain, infra.deploy]
+  html-valid: [seo.technical]
+  js-package-hygiene: [infra.deploy]
+  js-error-handling: [infra.observability]

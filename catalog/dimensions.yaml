@@ -24,6 +24,17 @@ signals:
   has_embeds: { values: [true, false], default: false }
   has_nonessential_cookies: { values: [true, false], default: false }
   has_python: { values: [true, false], default: false }
+  # El stack por defecto (Next.js) usa JS, TS, CSS y HTML: por eso valen true salvo que el scope diga lo contrario.
+  has_javascript: { values: [true, false], default: true }
+  has_typescript: { values: [true, false], default: true }
+  has_css: { values: [true, false], default: true }
+  has_html: { values: [true, false], default: true }
+  has_sql: { values: [true, false], default: false }
+  has_react: { values: [true, false], default: false }
+  has_tailwind: { values: [true, false], default: false }
+  has_ci: { values: [true, false], default: false }
+  has_shell: { values: [true, false], default: false }
+  has_docker: { values: [true, false], default: false }
   team: { values: [solo, team], default: solo }
   # Solo del scope (el código no la delata): activa los ítems de diseño de sistemas para escala.
   high_traffic: { values: [true, false], default: false }

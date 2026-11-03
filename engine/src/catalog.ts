@@ -41,8 +41,15 @@ export function loadCatalog(dir = defaultCatalogDir()): Catalog {
     }
   }
   const sensitiveGroups = readYaml<{ groups: Record<string, string[]> }>(join(dir, 'sensitive.yaml')).groups
-  const items = [...readYamlDir<Item>(join(dir, 'items')), ...readYamlDir<Item>(join(dir, 'markets'))]
-  const domains = loadDomains(dir, items)
+  const marketOf = new Map<string, string>()
+  const marketsDir = join(dir, 'markets')
+  if (existsSync(marketsDir)) {
+    for (const f of readdirSync(marketsDir).filter(f => f.endsWith('.yaml')).sort()) {
+      for (const item of readYaml<Item[]>(join(marketsDir, f)) ?? []) marketOf.set(item.id, f.replace(/\.yaml$/, ''))
+    }
+  }
+  const items = [...readYamlDir<Item>(join(dir, 'items')), ...readYamlDir<Item>(marketsDir)]
+  const domains = loadDomains(dir, items, marketOf)
   const catalog: Catalog = {
     version: readFileSync(join(dir, 'VERSION'), 'utf8').trim(),
     dir,
@@ -65,7 +72,7 @@ type DomainsFile = {
 }
 
 /** catalog/domains.yaml is the one source: it gives each item its home (`domain.subdomain`) and its links. */
-function loadDomains(dir: string, items: Item[]): Domain[] {
+function loadDomains(dir: string, items: Item[], marketOf: Map<string, string>): Domain[] {
   const file = join(dir, 'domains.yaml')
   if (!existsSync(file)) return []
   const raw = readYaml<DomainsFile>(file)
@@ -84,6 +91,17 @@ function loadDomains(dir: string, items: Item[]): Domain[] {
         else if (item) item.domain = `${item.domain},${d.key}.${s.key}` // duplicate: validateCatalog reports it
       }
     }
+  }
+  // A new market is only catalog files: its items, without a home of their own, go to legal.<market>.
+  for (const item of items) {
+    const market = marketOf.get(item.id)
+    if (item.domain || !market) continue
+    let legal = domains.find(d => d.key === 'legal')
+    if (!legal) domains.push((legal = { key: 'legal', label: 'Legal', description: '', subdomains: [] }))
+    let sub = legal.subdomains.find(s => s.key === market)
+    if (!sub) legal.subdomains.push((sub = { key: market, label: market.toUpperCase(), description: `Obligaciones de ${market.toUpperCase()}.`, items: [] }))
+    sub.items.push(item.id)
+    item.domain = `legal.${market}`
   }
   for (const [id, targets] of Object.entries(raw.links ?? {})) {
     const item = byId.get(id)

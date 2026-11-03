@@ -69,7 +69,8 @@ export function inferProfile(root: string, catalog: Catalog): Inference {
     project: (readText(root, 'package.json') ?? '').match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?? 'proyecto',
     type,
     capabilities: [...capSet].filter(c => catalog.dimensions.capabilities.includes(c)).sort(),
-    signals: Object.fromEntries(Object.keys(signals).map(k => [k, true])),
+    // What the code shows is true; the languages that default to true (the stack's) are false when it shows none.
+    signals: { ...Object.fromEntries(DEFAULT_TRUE_TECH.map(k => [k, false])), ...Object.fromEntries(Object.keys(signals).map(k => [k, true])) },
     counts: { pages: Math.max(1, pageRoutes.length), entities: countEntities(root), languages: countLanguages(root), integrations: integrations.length },
     stack: { decided: stack },
   }
@@ -92,6 +93,9 @@ export type ScopeVsCode = {
 /** Facts only the scope can state: the code cannot show them, so they are never compared. */
 const SCOPE_ONLY_SIGNALS = new Set(['high_traffic'])
 
+/** Languages that default to true in a profile: an empty repo does not show them yet, which is not a gap. */
+const DEFAULT_TRUE_TECH = ['has_javascript', 'has_typescript', 'has_css', 'has_html']
+
 /** The scope decides what applies; the code is evidence. This lists where they disagree. */
 export function compareScopeAndCode(scope: Profile, code: Profile): ScopeVsCode {
   const flags = (p: Profile) => new Set([...p.capabilities.map(c => `capacidad ${c}`), ...Object.entries(p.signals).filter(([k, v]) => v === true && !SCOPE_ONLY_SIGNALS.has(k)).map(([k]) => `señal ${k}`)])
@@ -99,7 +103,7 @@ export function compareScopeAndCode(scope: Profile, code: Profile): ScopeVsCode 
   const c = flags(code)
   return {
     codeOnly: [...c].filter(x => !s.has(x)).sort(),
-    scopeOnly: [...s].filter(x => !c.has(x)).sort(),
+    scopeOnly: [...s].filter(x => !c.has(x) && !DEFAULT_TRUE_TECH.some(t => x === `señal ${t}`)).sort(),
     typeDiffers: scope.type !== code.type ? { scope: scope.type, code: code.type } : undefined,
   }
 }

@@ -30,6 +30,7 @@
   level: required
   phase: foundation.setup
   since: "2026.10.2"
+  when: { signals: { has_javascript: true } }
   effort: { size: XS, hours: [0.5, 1] }
   why: "Nadie discute formato en los PR; los diffs muestran solo cambios reales."
   how: "Prettier (o Biome) con check en CI."
@@ -43,6 +44,7 @@
   phase: foundation.setup
   since: "2026.10.2"
   updated: "2026.10.3"
+  when: { signals: { has_javascript: true } }
   effort: { size: S, hours: [1, 2] }
   why: "Los umbrales mantienen el código legible; el lint atrapa errores antes de producción."
   how: "ESLint (o Biome) con complexity, max-lines y max-lines-per-function en los umbrales del perfil (quality en profile.yaml). Relajarlos requiere razón: mep threshold <clave> <valor> <razón> --yes."
@@ -56,6 +58,7 @@
   level: required
   phase: foundation.setup
   since: "2026.10.2"
+  when: { signals: { has_typescript: true } }
   effort: { size: XS, hours: [0.5, 1] }
   why: "Los tipos estrictos atrapan una clase entera de errores sin escribir tests."
   how: "\"strict\": true en tsconfig; regla no-explicit-any."
@@ -70,6 +73,7 @@
   phase: foundation.setup
   since: "2026.10.2"
   updated: "2026.10.8"
+  when: { signals: { has_javascript: true } }
   effort: { size: S, hours: [1, 2] }
   why: "El duplicado se desincroniza (DRY); el código, los exports y las dependencias sin uso confunden y pesan (YAGNI)."
   how: "Scripts knip (archivos, exports y dependencias sin uso o sin declarar) y jscpd (\"jscpd --threshold 3 --gitignore .\") en package.json, corridos en CI."
@@ -84,6 +88,7 @@
   level: required
   phase: foundation.setup
   since: "2026.10.2"
+  when: { signals: { has_javascript: true } }
   effort: { size: XS, hours: [0.5, 1] }
   why: "Los restos de depuración ensucian la consola de producción y esconden trabajo pendiente."
   how: "Regla no-console; cada TODO con referencia (#123, ABC-12 o URL); los comentarios shortcut: los recolecta Ponytail."
@@ -410,6 +415,7 @@
   level: required
   phase: foundation.setup
   since: "2026.10.8"
+  when: { signals: { has_javascript: true } }
   effort: { size: XS, hours: [0.5, 1] }
   why: "Un ciclo de imports amarra módulos que deberían poder cambiar solos (SOLID) y produce valores undefined al cargar."
   how: "Regla import/no-cycle (eslint-plugin-import o import-x) en error; junto con max-params ≤ 4 de los umbrales, mantiene módulos de una responsabilidad e interfaces pequeñas."

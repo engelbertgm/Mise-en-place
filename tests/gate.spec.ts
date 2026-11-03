@@ -100,12 +100,20 @@ describe('phase close', () => {
 })
 
 describe('deploy detection', () => {
-  test('production', () => {
-    for (const cmd of ['vercel deploy --prod', 'vercel --prod', 'npx vercel --prod --yes', 'git push origin main', 'git push origin HEAD:main', 'netlify deploy --prod', 'vercel promote https://x.vercel.app']) {
+  test('production: explicit deploys always; a push to main only once the project is live', () => {
+    for (const cmd of ['vercel deploy --prod', 'vercel --prod', 'npx vercel --prod --yes', 'netlify deploy --prod', 'vercel promote https://x.vercel.app']) {
       assert.equal(deployKind(cmd), 'prod', cmd)
+      assert.equal(deployKind(cmd, 'feature', 'building'), 'prod', cmd)
     }
-    assert.equal(deployKind('git push', 'main'), 'prod')
-    assert.equal(deployKind('git push -u origin', 'main'), 'prod')
+    for (const cmd of ['git push origin main', 'git push origin HEAD:main']) assert.equal(deployKind(cmd, undefined, 'live'), 'prod', cmd)
+    assert.equal(deployKind('git push', 'main', 'live'), 'prod')
+    assert.equal(deployKind('git push -u origin', 'main', 'live'), 'prod')
+  })
+  test('integrate: while building, a push to main only stops on regressions', () => {
+    for (const cmd of ['git push origin main', 'git push origin HEAD:main']) assert.equal(deployKind(cmd), 'integrate', cmd)
+    assert.equal(deployKind('git push', 'main'), 'integrate')
+    assert.equal(deployKind('git push -u origin', 'main', 'building'), 'integrate')
+    assert.equal(deployKind('git push', 'feature'), undefined)
   })
   test('preview and non-deploys', () => {
     assert.equal(deployKind('vercel deploy'), 'preview')
