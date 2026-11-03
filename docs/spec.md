@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.11.1). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.11.2). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -253,15 +253,45 @@ Evitan bloqueos agresivos: al inicio todo está pendiente, así que solo se exig
 - Una sub-etapa se cierra con `/mep:phase close <sub-etapa>`, y solo si sus 🔴 están cumplidos.
 - Al cerrarse, sus 🔴 quedan **protegidos contra regresiones**: si algo se rompe después, el hook bloquea.
 - Se pueden trabajar ítems de sub-etapas futuras; simplemente aún no bloquean.
+- **Cerrar es opcional.** Nunca hace falta cerrar una sub-etapa para subir un push o un PR (ver *Etapa del proyecto*).
+
+### Etapa del proyecto (`stage`)
+
+El perfil lleva `stage: building | live` (por defecto `building`). Separa tres momentos con barreras distintas, para poder avanzar sin cumplir todo de golpe:
+
+| Momento | Qué bloquea |
+|---|---|
+| Integrar: push o PR a `main` mientras `building`, preview, fin de turno | Secretos, violaciones `locked` y regresiones en sub-etapas cerradas. Los 🔴 pendientes no bloquean |
+| Go-live: `mep launch`, un deploy explícito a producción (`vercel --prod`…), o cualquier push a `main` ya `live` | Todos los 🔴 de los dominios activos, en todas las sub-etapas (los diferidos incluidos) |
+
+- `mep launch` (`/mep:launch`) corre la barrera completa una vez; si pasa, `stage` pasa a `live`. Los bloqueos se agrupan por dominio. Volver a `building` es del usuario (`mep stage building`).
+- `mep verify --ci` (el workflow): `building` → integrar; `live` → barrera completa. `--prod` fuerza la completa.
+- `deployKind(comando, rama, stage)` devuelve `prod`, `preview` o `integrate`.
+
+### Diferir y apagar
+
+- `mep defer <id> <razón>` (`/mep:defer`, solo el usuario): pospone un 🔴 hasta el go-live. No cuenta para cerrar una sub-etapa ni para integrar; `launch` lo exige. `defer undo <id>` lo devuelve.
+- `mep domain off|on <dominio[.subdominio]> [razón]` (`/mep:domain`; apagar es solo del usuario): apaga un dominio o subdominio entero. Sus ítems pasan al estado `off`, no cuentan, y los `locked` siguen activos. Queda en el log, en `BRIEF.md` y en el resumen del PR.
+
+### Dominios y subdominios
+
+`catalog/domains.yaml` es la única fuente del **hogar** de cada ítem (`domain.subdomain`, ej. `security.abuse`) y de sus **enlaces**:
+
+- Dominios: `ui`, `ux`, `accessibility`, `frontend`, `i18n`, `backend`, `auth`, `payments`, `database`, `security`, `privacy`, `legal`, `seo`, `content`, `product`, `analytics`, `infra`, `quality`. `quality` tiene un subdominio por lenguaje o ecosistema (`javascript`, `typescript`, `css`, `html`, `sql`, `python`, `frameworks`, `config-ci`).
+- Cada ítem tiene exactamente un hogar; el catálogo no carga si falta. Un mercado nuevo cae solo en `legal.<mercado>`.
+- Un **enlace** hace que el ítem se muestre también en otro subdominio como sugerencia (↗). Solo es vista: el estado, el nivel y el cierre viven en el hogar. `depends_on` sigue siendo el requisito duro.
+- `mep domains [ruta]` y `mep focus <ruta>` muestran el avance y lo pendiente. El panel agrupa por sub-etapa o por dominio.
+- La categoría (`category`) del ítem se mantiene por compatibilidad; el orden y la agrupación nuevos salen del dominio.
 
 ### Hooks
 
 1. **Stop**: bloquea solo por 🔴 de sub-etapas **cerradas** (regresiones) y por **violaciones** de ítems `locked` (ej. un secreto expuesto o una tabla sin RLS bloquean en cualquier momento). Un `locked` al que solo le falta algo aún no construido (ej. HSTS antes del deploy) sigue la regla normal de fases. Los 🔴 de la sub-etapa activa se muestran como información. Si Claude ya continúa por un bloqueo (`stop_hook_active`), el hook avisa sin volver a bloquear, para no entrar en bucle.
 2. **PreToolUse (Bash)** sobre comandos de despliegue:
    - Deploy de **preview**: misma regla que Stop.
-   - Deploy a **producción** (`vercel deploy --prod`, push a `main`): bloquea por **cualquier** 🔴 pendiente de todas las sub-etapas.
+   - Push a `main` **en construcción** (`stage: building`): misma regla que Stop (integrar).
+   - Deploy a **producción** (`vercel deploy --prod`, o un push a `main` ya en vivo): bloquea por **cualquier** 🔴 pendiente de todas las sub-etapas de los dominios activos.
 3. **SessionStart**: muestra la sub-etapa activa y sus pendientes, en pocas líneas.
-4. **Check de CI** (fuera de Claude Code): un paso `pnpm dlx @engelbertgm/mep verify --prod` (después del build) como check obligatorio del PR a `main`. `/mep:scope` instala `.github/workflows/mep.yml`. Es la barrera real, porque el deploy a producción suele dispararse al hacer merge en GitHub, donde los hooks de Claude Code no corren.
+4. **Check de CI** (fuera de Claude Code): un paso `pnpm dlx @engelbertgm/mep verify --ci` (después del build; `building` → regresiones, `live` → barrera completa) como check obligatorio del PR a `main`. `/mep:scope` instala `.github/workflows/mep.yml`. Es la barrera real, porque el deploy a producción suele dispararse al hacer merge en GitHub, donde los hooks de Claude Code no corren.
 
 ### Ítems de seguridad y `mep-security`
 

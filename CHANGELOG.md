@@ -2,6 +2,18 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.4.0
+
+Avanzar sin que cerrar sub-etapas bloquee un push, y el catálogo por dominios.
+
+- **Etapa del proyecto (`stage`).** `building` (por defecto): un push o PR a `main` solo se detiene por secretos, 🔒 violados y regresiones en sub-etapas ya cerradas; los 🔴 pendientes no bloquean. `live`: cada push a `main` es un deploy a producción con la barrera completa. `deployKind` distingue `integrate` (push a `main` en construcción) de `prod` (`vercel --prod` y similares, o push a `main` en vivo). Antes, cualquier push a `main` exigía todos los 🔴 de todas las sub-etapas.
+- **`mep launch`** (`/mep:launch`): corre la barrera completa una vez; si pasa, el proyecto queda en vivo. Los bloqueos salen agrupados por dominio. `mep stage building` (solo el usuario) lo regresa.
+- **`mep verify --ci`**: el workflow decide según la etapa (en construcción solo regresiones; en vivo, la barrera completa). La plantilla del CI usa `--ci` y apunta a `@engelbertgm/mep@0.4.0`: publica esa versión antes de usar el workflow.
+- **`mep defer <id> <razón>`** (`/mep:defer`, solo el usuario): pospone un 🔴 hasta el go-live; no cuenta para cerrar una sub-etapa ni para un push, pero `launch` lo exige. `defer undo <id>` lo devuelve.
+- **Dominios** (catálogo 2026.11.2): `mep domains [ruta]`, `mep focus <ruta>` (con los ítems enlazados desde otros dominios, ↗) y `mep domain off|on <ruta> [razón]` (apagar es solo del usuario; los 🔒 no se apagan). `BRIEF.md` y `SCOPE.md` muestran la etapa, la tabla por dominio, los dominios apagados y los diferidos; `mep check` colapsa un dominio apagado en una línea.
+- **Panel:** círculos de color por nivel (● rojo, ● amarillo, ○ blanco), barras de avance en braille que pasan de rojo a verde, un spinner de braille mientras el motor trabaja, listas con tope y "ver más", vista **por sub-etapa o por dominio**, la etapa a la vista y diferir desde el detalle de un ítem.
+- La guía del agente aclara que no debe pedir cerrar sub-etapas para poder subir avance.
+
 ## 0.3.2
 
 - Catalog 2026.11.1: 33 new rules — interaction patterns (command menu, shortcut hints, stale-while-revalidate, view transitions, swipe sheets, interruptible motion, predictive back, OTP autofill), typography (tabular numbers, balanced headlines, continuous corners), image placeholders and pre-rendering, privacy (form notices, data minimization, third-party SDK audit, business identity), consumer honesty (fake reviews, unsubstantiated claims) and systems design (idempotency keys, load balancing, caching, CDN, queues, rate limit responses, sharding, replication, consistent hashing, consistency model, circuit breaker, structured logs, metrics and traces).

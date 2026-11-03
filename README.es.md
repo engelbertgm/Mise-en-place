@@ -6,8 +6,8 @@
 Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
-[![Versión](https://img.shields.io/badge/versión-0.3.2-informational.svg)](.claude-plugin/plugin.json)
-[![Catálogo](https://img.shields.io/badge/catálogo-2026.11.1-informational.svg)](catalog/CHANGELOG.md)
+[![Versión](https://img.shields.io/badge/versión-0.4.0-informational.svg)](.claude-plugin/plugin.json)
+[![Catálogo](https://img.shields.io/badge/catálogo-2026.11.2-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Funciona con baladero](https://img.shields.io/badge/funciona_con-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
@@ -33,15 +33,19 @@ flowchart TD
     C -->|"🔴 pendientes"| W
     C -->|"todos los 🔴 cumplen +<br/>auditoría de mep-security"| L["Sub-etapa protegida<br/>contra regresiones"]
     L --> W
-    W --> D{"Deploy"}
-    D -->|"preview"| G1["Bloquea por regresiones<br/>y violaciones de locked"]
-    D -->|"producción"| G2["Bloquea por cualquier<br/>🔴 pendiente"]
-    G2 --> CI["CI: mep verify --prod<br/>check obligatorio en main"]
+    W --> D{"Push · PR · deploy"}
+    D -->|"en construcción: push,<br/>PR, preview"| G1["Bloquea por regresiones<br/>y violaciones de locked"]
+    W --> LA{"/mep:launch"}
+    LA -->|"todos los 🔴 de los<br/>dominios activos cumplen"| LIVE["en vivo: un push a main<br/>es un deploy a producción"]
+    LIVE --> G2["Bloquea por cualquier<br/>🔴 pendiente"]
+    G2 --> CI["CI: mep verify --ci<br/>check obligatorio en main"]
 ```
+
+Nunca hace falta cerrar una sub-etapa para subir un push. Un proyecto empieza **en construcción**: un push o PR a `main` solo se detiene por secretos, violaciones 🔒 y regresiones en sub-etapas que ya cerraste. `/mep:launch` corre la barrera completa una vez; si pasa, el proyecto queda **en vivo** y cada push a `main` es un deploy a producción.
 
 | Nivel | Efecto |
 | --- | --- |
-| 🔴 obligatorio | Bloquea según la sub-etapa. Siempre bloquea el deploy a producción. Solo se desactiva con `/mep:override`, razón escrita y confirmación explícita |
+| 🔴 obligatorio | Bloquea una sub-etapa solo si la cierras. Bloquea el go-live y, ya en vivo, cada deploy. Se puede posponer con `/mep:defer` (el go-live lo sigue exigiendo) o desactivar con `/mep:override`, razón escrita y confirmación explícita |
 | 🟡 recomendado | Alerta. Solo se omite con `/mep:skip` y razón escrita |
 | ⚪ opcional | Informa. Se elige en `/mep:scope` |
 | 🔒 locked | No se desactiva nunca: secretos, RLS, hashing de contraseñas, autorización por recurso, datos de tarjeta, HTTPS. Una violación detectada bloquea en cualquier momento |
@@ -82,6 +86,15 @@ mep mantiene un plan escrito en `docs/plan/`, así cada sesión construye contra
 Cada uno tiene secciones fijas y diagramas hechos con [diagram-design](https://github.com/cathrynlavery/diagram-design). El motor comprueba que existan y que coincidan con el código: una ruta de página que falta en `FLOWS.md`, o una tabla de las migraciones que falta en `SCHEMA.md`, regresa el ítem a pendiente. En proyectos para clientes, `/mep:export` genera además versiones sin jerga del PRD, los flujos y la implementación, con los diagramas aptos para el cliente. Cualquiera se convierte a .docx y .pdf con `mep export --in docs/plan/<DOC>.md`.
 
 No tienen un comando propio: `/mep:scope` escribe los tres primeros, la skill `mep` escribe FLOWS y SCHEMA al empezar su sub-etapa, `/mep:add` los actualiza cuando cambia el scope, `/mep:update` escribe los que falten en proyectos ya avanzados, y los ítems `plan-*` del checklist dicen cuáles faltan o están desactualizados.
+
+### Dominios
+
+Cada ítem vive en un **dominio** y un **subdominio** (`ui.motion`, `security.abuse`, `payments.checkout`, `quality.typescript`…): UI, UX, accesibilidad, frontend, idiomas, backend, cuentas y acceso, pagos, base de datos, seguridad, privacidad, legal, SEO, contenido, producto por tipo, analítica, infraestructura y calidad por lenguaje. [`catalog/domains.yaml`](catalog/domains.yaml) es la única fuente del hogar de cada ítem y guarda los **enlaces**: un ítem puede aparecer en otros subdominios como sugerencia (↗), mientras su estado y su nivel siguen donde vive.
+
+- `/mep:domains` muestra el avance por dominio con una barra de braille; `/mep:focus <dominio[.subdominio]>` lista lo pendiente ahí, con los ítems enlazados.
+- Trabaja por área si lo prefieres: el panel agrupa por sub-etapa o por dominio.
+- Un dominio o subdominio se apaga entero (`/mep:domain off backend.queues "lo lleva otro equipo"`): sus ítems dejan de contar, los 🔒 siguen activos, y queda marcado ⚠️ en `BRIEF.md` y en el resumen del PR.
+- Lo que no aplica al scope ya queda fuera por la condición del propio ítem. Los lenguajes siguen lo que usa el código: `has_typescript`, `has_css`, `has_sql`, `has_python`, `has_react`… encienden o apagan sus reglas de calidad.
 
 ### Guías y controles de calidad
 
@@ -137,7 +150,10 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:scope [--preset <nombre>] <descripción>` | Pregunta solo lo que cambia ítems 🔴 y escribe `.mep/profile.yaml`, `SCOPE.md` (el scope en palabras simples: qué incluye y qué no), `BRIEF.md`, los ADRs de stack, el bloque de `CLAUDE.md`, el workflow de CI, y el PRD, el TRD y el plan de implementación con sus diagramas |
 | `/mep:add <cambio>` | Actualiza el scope y muestra **solo el diff**: ítems nuevos, ítems que suben de nivel e ítems que dejan de aplicar. Actualiza los documentos de planeación afectados |
 | `/mep:check` | Estado por sub-etapa: ✅ cumplido · ❌ pendiente · ⏭️ omitido · ⚠️ desactivado. Avisa si el código muestra señales que el perfil no tiene |
-| `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` corre la auditoría de seguridad y la revisión de calidad, y la cierra |
+| `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` (opcional) corre la auditoría de seguridad y la revisión de calidad, y la cierra |
+| `/mep:domains [dominio]` · `/mep:focus <ruta>` | Avance por dominio y subdominio; lo pendiente en uno, con los ítems enlazados desde otros dominios (↗) |
+| `/mep:launch` | Go-live: corre la barrera completa una vez. Si pasa, el proyecto queda en vivo y un push a `main` es un deploy a producción |
+| `/mep:defer <id> <razón>` · `/mep:domain off <ruta> <razón>` | Acciones tuyas: posponer un 🔴 hasta el go-live (`defer undo <id>` lo devuelve); apagar un dominio entero |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
 | `/mep:override <id> <razón>` | Desactiva un ítem 🔴; rechaza ítems 🔒. Solo lo escribes tú: el agente no puede |
 | `/mep:panel` | Panel junto al chat: pendientes por sub-etapa; un clic en uno muestra qué pide, por qué y todo lo que falla, y permite confirmarlo, omitirlo o desactivarlo |
@@ -221,10 +237,12 @@ Tipos de verificación: `file_exists`, `route_exists` (Next.js, Astro, Vite/Reac
 | Momento | Bloquea por |
 | --- | --- |
 | Terminar un turno (Stop) | 🔴 de sub-etapas **cerradas** (regresiones) y violaciones 🔒. Los 🔴 pendientes de la sub-etapa activa se muestran como información |
+| Push a `main` **en construcción** | Igual que Stop: regresiones, 🔒 y secretos. Los 🔴 pendientes no bloquean |
 | Deploy de preview (`vercel`, `netlify deploy`) | Lo mismo que Stop |
-| Deploy a producción (`vercel --prod`, push a `main`) | Cualquier 🔴 pendiente, en todas las sub-etapas |
+| Deploy explícito a producción (`vercel --prod`…), o cualquier push a `main` ya **en vivo** | Cualquier 🔴 pendiente, en todas las sub-etapas de los dominios activos (los pospuestos incluidos) |
+| `/mep:launch` | La misma barrera completa; si pasa, el proyecto queda en vivo |
 | Abrir o fusionar un PR a `main` | Una vez por commit: primero una revisión de calidad (`/ponytail-review branch`, o la revisión propia de mep) |
-| Pull request a `main` | `mep verify --prod` en CI. Es la barrera real: el deploy a producción suele correr al hacer merge, donde los hooks de Claude Code no corren |
+| Pull request a `main` | `mep verify --ci` en CI (en construcción: regresiones; en vivo: la barrera completa). Es la barrera real: el deploy a producción suele correr al hacer merge, donde los hooks de Claude Code no corren |
 | Escribir un archivo | Se rechaza escribir un secreto en un archivo versionado |
 
 Nada corre en un repo sin `.mep/profile.yaml`. Escape de emergencia: `MEP_BYPASS=1` (nunca para ítems 🔒; queda registrado en `.mep/log`).
@@ -254,7 +272,8 @@ Mise-en-place/
 ├── skills/                    # cada carpeta es un comando /mep:<nombre>
 │   ├── mep/                   # guía: interpretar un scope, usar el catálogo, respetar el brief
 │   ├── scope/  add/  check/  phase/  skip/  panel/
-│   ├── override/  confirm/  threshold/  resync/   # solo tuyas (disable-model-invocation)
+│   ├── domains/  focus/  launch/                  # avance por dominio, lo pendiente en uno, go-live
+│   ├── override/  confirm/  threshold/  resync/  defer/  domain/   # solo tuyas (disable-model-invocation)
 │   ├── audit/  update/
 │   └── quote/  export/  log-time/
 ├── agents/
@@ -276,6 +295,7 @@ Mise-en-place/
 │   │   ├── live.ts            # verificaciones contra el sitio desplegado y su DNS
 │   │   ├── render.ts          # BRIEF.md, ADRs, bloque de CLAUDE.md
 │   │   ├── scope.ts           # SCOPE.md: el scope en palabras simples
+│   │   ├── domains.ts         # dominios, barras y resúmenes por dominio
 │   │   ├── audit.ts           # infiere el perfil de un repo existente
 │   │   ├── update.ts          # ítems nuevos del catálogo, periodo de gracia
 │   │   ├── quote.ts           # cotización, horas reales, calibración
@@ -287,7 +307,8 @@ Mise-en-place/
 ├── catalog/
 │   ├── dimensions.yaml        # valores válidos: tipos, capacidades, mercados, señales, fases
 │   ├── guidelines.md          # principios de diseño, UX, copy y código, leídos por sub-etapa
-│   ├── items/                 # un archivo por categoría (base, seo, security, ux, legal…)
+│   ├── domains.yaml           # dominios y subdominios: el hogar de cada ítem y sus enlaces a otros subdominios
+│   ├── items/                 # archivos de ítems por tema (base, seo, security, ux, legal, languages…)
 │   ├── markets/               # un archivo por mercado (mx, usa, ca, eu, uk, br, in)
 │   ├── presets/               # landing, corporate, ecommerce, saas, marketplace
 │   ├── stack-rules.yaml       # recomendaciones de stack con su porqué
@@ -327,7 +348,7 @@ tu-proyecto/
 │   ├── plan/                  # PRD, TRD, FLOWS, SCHEMA, IMPLEMENTATION + diagrams/
 │   └── client/                # brief y documentos de plan para el cliente (.md, .docx, .pdf)
 ├── tests/responsive.spec.ts   # 360–2560 px, sin scroll horizontal ni elementos encimados (Playwright)
-└── .github/workflows/mep.yml  # mep verify --prod como check obligatorio
+└── .github/workflows/mep.yml  # mep verify --ci como check obligatorio
 
 ~/.config/mep-check/           # fuera del repo: nunca se entrega al cliente
 ├── rates.yaml                 # tus tarifas
@@ -340,7 +361,7 @@ tu-proyecto/
 - **Motor** ([`engine/src`](engine/src)): TypeScript, sin LLM. Mismo perfil, mismos ítems, mismo resultado. Se empaqueta en [`engine/dist/mep.mjs`](engine/dist/mep.mjs) sin dependencias en tiempo de ejecución y se publica como `@engelbertgm/mep` para el CI.
 - **Mods** ([`mods/register.tsx`](mods/register.tsx)): corren dentro de Claude Code. El chat solo oye a mep cuando algo bloquea; la línea de estado muestra la sub-etapa activa y los 🔴/🟡 pendientes; el panel (`/mep:panel`) muestra el porqué, el cómo y todo lo que falla de cada ítem, con tus acciones (confirmar, omitir, desactivar con un diálogo). `/mep:check` y `/mep:phase` responden al instante; los deploys (Vercel, Netlify, Cloudflare, Fly, Railway, Firebase, Supabase, `git push` a main) esperan al gate del motor; se niegan las ediciones al estado de mep y los secretos en archivos versionados.
 - **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse (gate y guardia) y PostToolUse, como respaldo donde no hay mods.
-- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --prod` (con `--pr` en los pull requests, y contra `MEP_URL` para las verificaciones en vivo), y escribe los cambios de estado del PR en el resumen del job.
+- **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): lo instala `/mep:scope`. Corre gitleaks, `pnpm audit`, el build y `mep verify --ci` (con `--pr` en los pull requests, y contra `MEP_URL` para las verificaciones en vivo), y escribe los cambios de estado del PR en el resumen del job.
 - **Mapas**: `mep codemap` y `mep registry` generan `CODEMAP.md` y `REGISTRY.md` desde el código. "Para qué" y "No usar para" se escriben en el comentario de cada export; un export sin entrada bloquea cuando su sub-etapa está cerrada.
 - **Export**: un subconjunto simple de Markdown, con imágenes PNG, se convierte en .docx y .pdf sin dependencias, así funciona en cualquier máquina.
 - **Catálogo** ([`catalog/`](catalog)): 415 ítems de accesibilidad, sistema de diseño, UX, contenido, formularios, datos, responsive, seguridad, privacidad, legal, performance, i18n, calidad de código, despliegue y operación; reglas por tipo de proyecto (SaaS, ecommerce, marketplace, reservas, blog, directorio, portafolio, app interna), cobro por uso, datos de salud y financieros, y los mercados MX, USA, CA, EU, UK, BR e IN, cada ítem legal con su fuente oficial o tu confirmación.

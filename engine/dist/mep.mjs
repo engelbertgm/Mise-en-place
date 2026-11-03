@@ -10137,8 +10137,8 @@ ${phase}  \u{1F534} ${done}/${req.length} ${mark}`.trimEnd());
 \u23F3 ${deferred.length} \u{1F534} diferidos hasta el go-live: ${deferred.map((d) => d.id).join(", ")}`);
   return out.join("\n").trim();
 }
-function counts(results) {
-  const pending = results.filter((r) => r.state === "active" && r.status !== "pass");
+function counts(results, deferred = /* @__PURE__ */ new Set()) {
+  const pending = results.filter((r) => r.state === "active" && r.status !== "pass" && !deferred.has(r.item.id));
   return {
     required: pending.filter((r) => r.level === "required").length,
     recommended: pending.filter((r) => r.level === "recommended").length
@@ -10151,7 +10151,7 @@ function panelData(results, profile, catalog) {
     phases: catalog.dimensions.phases,
     active: profile.phase.active,
     closed: profile.phase.closed,
-    counts: counts(results),
+    counts: counts(results, new Set(profile.selections.deferred.map((d) => d.id))),
     items: results.filter((r) => r.state !== "offered" && r.state !== "off").map((r) => ({
       id: r.item.id,
       domain: r.item.domain ?? "",
@@ -11074,7 +11074,7 @@ ${signals.map((s) => `  - ${s.signal} (${s.evidence})`).join("\n")}`);
     case "status": {
       if (!hasProfile(root)) return args.flags.json ? json(null) : void 0;
       const profile = loadProfile(root, catalog);
-      const c = counts(verifyItems(root, profile, evaluate(profile, catalog), "fast"));
+      const c = counts(verifyItems(root, profile, evaluate(profile, catalog), "fast"), new Set(profile.selections.deferred.map((d) => d.id)));
       if (args.flags.json) return json({ phase: profile.phase.active, ...c });
       return print(`mep \xB7 ${profile.phase.active} \xB7 \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended}`);
     }
@@ -11145,11 +11145,12 @@ Riesgo aceptado: ${e.item.why}`);
     }
     case "defer":
     case "undefer": {
-      const [id, ...reasonParts] = rest;
+      const undo = cmd === "undefer" || rest[0] === "undo";
+      const [id, ...reasonParts] = cmd === "defer" && rest[0] === "undo" ? rest.slice(1) : rest;
       const reason = reasonParts.join(" ").trim();
-      if (!id || cmd === "defer" && !reason) fail(cmd === "defer" ? "Uso: mep defer <id> <raz\xF3n>" : "Uso: mep undefer <id>");
+      if (!id || !undo && !reason) fail(undo ? "Uso: mep defer undo <id>" : "Uso: mep defer <id> <raz\xF3n>");
       const profile = requireProfile(root, catalog);
-      if (cmd === "undefer") {
+      if (undo) {
         profile.selections.deferred = profile.selections.deferred.filter((d) => d.id !== id);
         saveProfile(root, profile);
         log(root, "undefer", id);

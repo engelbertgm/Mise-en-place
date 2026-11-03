@@ -2,6 +2,22 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.11.2
+
+Dominios, subdominios y calidad por lenguaje:
+
+- **Dominios** (`catalog/domains.yaml`): los 448 ítems anteriores y los nuevos viven en 18 dominios y ~100 subdominios (`ui.motion`, `security.abuse`, `payments.checkout`, `quality.typescript`…). El archivo es la única fuente del hogar de cada ítem y guarda los **enlaces** (113+) a otros subdominios, que solo se muestran: el estado y el nivel siguen en el hogar. El catálogo no carga si algún ítem no tiene hogar. Un mercado nuevo cae solo en `legal.<mercado>`.
+- **24 ítems de calidad por lenguaje** (`items/languages.yaml`), cada grupo con su señal:
+  - **JavaScript** (`has_javascript`): `js-eslint-security`, `js-error-handling`, `js-package-hygiene`.
+  - **TypeScript** (`has_typescript`): `ts-no-ignore` 🔴, `ts-type-aware-lint`, `ts-unchecked-index`, `ts-boundary-validation`.
+  - **CSS** (`has_css`): `css-lint`, `css-specificity`, `css-unused-size`; `css-tailwind-conventions` (`has_tailwind`).
+  - **HTML** (`has_html`): `html-valid`, `html-semantic`, `html-no-inline-handlers`.
+  - **SQL** (`has_sql` o `has_db`): `sql-lint`, `sql-migration-safety`, `sql-indexes-naming`.
+  - **React/Next** (`has_react`): `react-hooks-lint`, `jsx-a11y-lint`, `client-server-boundary`.
+  - **CI y contenedores**: `ci-actionlint` (`has_ci`), `shell-shellcheck` (`has_shell`), `docker-hadolint` (`has_docker`), `editorconfig-eol`.
+- **Señales nuevas:** `has_javascript`, `has_typescript`, `has_css` y `has_html` valen `true` por defecto (el stack es Next.js); `has_sql`, `has_react`, `has_tailwind`, `has_ci`, `has_shell` y `has_docker` valen `false` y se detectan en el código. Los ítems de JavaScript y TypeScript que ya existían (`formatter`, `strict-lint`, `strict-types`, `no-import-cycles`, `no-debug-leftovers`, `no-duplication-dead-code`) ahora aplican solo con su señal.
+- Lenguajes como PHP, Ruby, Go o Rust no están: se agregan con la misma plantilla de Python cuando alguien los use.
+
 ## 2026.11.1
 
 33 reglas nuevas, todas según el scope. Se revisó lo que ya existía y no se repite (touch-targets, no-dark-patterns, ecommerce-all-in-price, uptime-monitor, health-endpoint, twelve-factor, api-rate-limit):
