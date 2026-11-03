@@ -149,7 +149,11 @@ describe('panel', () => {
       await ui.press({ key: 'first-required' })
       expect((await ui.find({ type: 'Text', text: /Saber dónde está cada cosa/ }))?.text).toMatch(/Saber dónde está cada cosa/)
       expect((await ui.find({ type: 'Text', text: /Todo lo que falla \(61\)/ }))?.text).toMatch(/Todo lo que falla \(61\)/)
+      // Six lines first, the rest behind "más": a long list does not bury the page.
+      expect(await ui.find({ type: 'Text', text: /export60 no está en REGISTRY\.md/ })).toBeFalsy()
+      await ui.press({ key: 'more-findings' })
       expect((await ui.find({ type: 'Text', text: /export60 no está en REGISTRY\.md/ }))?.text).toMatch(/export60 no está en REGISTRY\.md/)
+      await ui.press({ key: 'more-findings' }) // the fold is session state: fold it back for the next surface
       await ui.press({ key: 'back' })
       await ui.unmount()
     }

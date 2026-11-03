@@ -34,8 +34,12 @@ const WITH_TEXT = [
   ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
 ] as const
 
-const LEVEL = { required: '🔴', recommended: '🟡', optional: '⚪' } as const
-const STATUS = { pass: '✅', fail: '❌', unknown: '❔' } as const
+// The panel marks levels with a colored dot (theme colors, so it follows light and dark themes); emoji stay in the status line.
+const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'inactive' } as const
+const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
+/** Rows shown per sub-phase and lines of findings before a "ver más". */
+const CAP = 8
+const FINDINGS_CAP = 6
 
 async function runEngine($: EngineInterface, args: string[], timeoutMs = 600_000) {
   return $.process.run(['node', `${$.plugin.root}/engine/dist/mep.mjs`, ...args], { timeoutMs })
@@ -182,9 +186,9 @@ export const register: Register = on => {
         <Text bold>¿Desactivar {item.id}?</Text>
         <Text>{item.title}</Text>
         <Text> </Text>
-        <Text bold>Riesgo que aceptas</Text>
+        <Text dimColor>Riesgo que aceptas</Text>
         <Text>{item.why}</Text>
-        <Text bold>Tu razón</Text>
+        <Text dimColor>Tu razón</Text>
         <Text>{ask.reason}</Text>
         <Text dimColor>Queda en .mep/log, marcado ⚠️ en BRIEF.md y en el resumen del PR.</Text>
         <Text> </Text>
@@ -222,6 +226,9 @@ export const register: Register = on => {
     if (!data) return <Text dimColor>mep: verificando…</Text>
     const id = await read($, selected)
     const item = id ? data.items.find(i => i.id === id) : undefined
+    const open = await read($, expanded)
+    const toggle = (key: string) => update($, expanded, list => (list.includes(key) ? list.filter(p => p !== key) : [...list, key]))
+    const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>●</Text>
 
     if (await read($, tools)) {
       const run = async (command: string, args = '') => {
@@ -237,7 +244,7 @@ export const register: Register = on => {
       const recent = (await $.fs.read('.mep/log').catch(() => ''))
         .split('\n')
         .filter(l => l && l.split(' ')[1] !== 'state')
-        .slice(-5)
+        .slice(-3)
         .map(l => `${l.slice(0, 10)} ${l.slice(l.indexOf(' ') + 1)}`)
       return (
         <Box flexDirection="column">
@@ -245,33 +252,41 @@ export const register: Register = on => {
             ← Volver
           </Button>
           {message ? <Text dimColor>{message}</Text> : null}
-          <Text bold>Antes de deployar o abrir PR</Text>
-          <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nada bloquea el deploy a producción.')}>
-            {'  ¿Puedo deployar a producción?'}
-          </Button>
-          <Button key="t-pr" plain onPress={() => ask(['pr-gate'], '✅ Nada detiene el PR a main.')}>
-            {'  ¿Puedo abrir PR a main?'}
-          </Button>
-          <Text bold>Al instante</Text>
-          {INSTANT.map(([command, label]) => (
-            <Button key={`t-${command}`} plain onPress={() => run(command)}>
-              {`  ${label} `}
-              <Text dimColor>{`/${command}`}</Text>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Antes de deployar o abrir PR</Text>
+            <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nada bloquea el deploy a producción.')}>
+              {'  ¿Puedo deployar a producción?'}
             </Button>
-          ))}
-          <Text bold>Con un turno de Claude</Text>
-          {WITH_TURN.map(([command, label, args]) => (
-            <Button key={`t-${command}${args ? `-${args}` : ''}`} plain onPress={() => run(command, args)}>
-              {`  ${label} `}
-              <Text dimColor>{`/${command}${args ? ` ${args}` : ''}`}</Text>
+            <Button key="t-pr" plain onPress={() => ask(['pr-gate'], '✅ Nada detiene el PR a main.')}>
+              {'  ¿Puedo abrir PR a main?'}
             </Button>
-          ))}
-          {Input &&
-            WITH_TEXT.map(([command, label, submitLabel]) => (
-              <Input key={`t-${command}`} label={label} submitLabel={submitLabel} onSubmit={v => (v.trim() ? run(command, v.trim()) : undefined)} />
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Al instante</Text>
+            {INSTANT.map(([command, label]) => (
+              <Button key={`t-${command}`} plain onPress={() => run(command)}>
+                {`  ${label} `}
+                <Text dimColor>{`/${command}`}</Text>
+              </Button>
             ))}
-          <Text bold>Actividad reciente</Text>
-          {recent.length ? recent.map(l => <Text dimColor>{`  ${l}`}</Text>) : <Text dimColor>  Sin eventos en .mep/log.</Text>}
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Con un turno de Claude</Text>
+            {WITH_TURN.map(([command, label, args]) => (
+              <Button key={`t-${command}${args ? `-${args}` : ''}`} plain onPress={() => run(command, args)}>
+                {`  ${label} `}
+                <Text dimColor>{`/${command}${args ? ` ${args}` : ''}`}</Text>
+              </Button>
+            ))}
+            {Input &&
+              WITH_TEXT.map(([command, label, submitLabel]) => (
+                <Input key={`t-${command}`} label={label} submitLabel={submitLabel} onSubmit={v => (v.trim() ? run(command, v.trim()) : undefined)} />
+              ))}
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Actividad reciente</Text>
+            {recent.length ? recent.map(l => <Text dimColor>{`  ${l}`}</Text>) : <Text dimColor>  Sin eventos en .mep/log.</Text>}
+          </Box>
         </Box>
       )
     }
@@ -279,20 +294,30 @@ export const register: Register = on => {
     if (item) {
       const confirming = await read($, pending)
       const canConfirm = item.manual && item.category !== 'security' && isPending(item)
+      const verdict =
+        item.state === 'skipped' ? <Text dimColor>omitido</Text>
+        : item.state !== 'active' ? <Text color="warning">desactivado</Text>
+        : item.status === 'pass' ? <Text color="success">✓ cumple</Text>
+        : item.status === 'fail' ? <Text color="error">✗ falla</Text>
+        : <Text dimColor>sin verificar</Text>
+      const allFindings = open.includes(`findings:${item.id}`)
+      const shownFindings = allFindings ? item.all : item.all.slice(0, FINDINGS_CAP)
       return (
         <Box flexDirection="column">
           <Button key="back" plain onPress={() => update($, selected, () => null)}>
             ← Volver
           </Button>
-          <Text bold>
-            {LEVEL[item.level]} {item.id} {item.state === 'active' ? STATUS[item.status] : item.state === 'skipped' ? '⏭️' : '⚠️'}
-          </Text>
+          <Box flexDirection="row" gap={1}>
+            {dot(item.level)}
+            <Text bold>{item.id}</Text>
+            {verdict}
+          </Box>
           <Text dimColor>
             {item.phase}
             {item.locked ? ' · 🔒 locked' : ''}
           </Text>
           <Text>{item.title}</Text>
-          {/* Actions sit above the long list, so they stay in the frame; the rest scrolls. */}
+          {/* Actions sit above the long text, so they stay in the frame; the rest scrolls. */}
           {!e.props.isFocused && <Text dimColor>ctrl+x tab y flechas para desplazar.</Text>}
           {message ? <Text dimColor>{message}</Text> : null}
           {item.locked && <Text dimColor>🔒 No se puede desactivar.</Text>}
@@ -309,76 +334,114 @@ export const register: Register = on => {
             <Input key={`override-${item.id}`} label="Desactivar, razón:" submitLabel="siguiente" onSubmit={v => (v.trim() ? askOverride($, item.id, v.trim()) : undefined)} />
           )}
           {confirming && confirming.id === item.id && <Text dimColor>Confirma o cancela en el diálogo.</Text>}
-          <Text> </Text>
-          <Text bold>Por qué</Text>
-          <Text>{item.why}</Text>
-          <Text bold>Cómo</Text>
-          <Text>{item.how}</Text>
-          {item.detail ? <Text bold>{item.state === 'active' ? 'Qué falta' : 'Razón'}</Text> : null}
-          {item.detail ? <Text>{item.detail}</Text> : null}
-          {item.all.length > 0 && <Text dimColor>Todo lo que falla ({item.all.length}):</Text>}
-          {item.all.map(f => (
-            <Text>  · {f}</Text>
-          ))}
+          {/* What to do first, then how, then why. */}
+          {item.detail ? (
+            <Box flexDirection="column" marginTop={1}>
+              <Text dimColor>{item.state === 'active' ? 'Qué falta' : 'Razón'}</Text>
+              <Text>{item.detail}</Text>
+            </Box>
+          ) : null}
+          {item.all.length > 0 && (
+            <Box flexDirection="column" marginTop={1}>
+              <Text dimColor>Todo lo que falla ({item.all.length})</Text>
+              {shownFindings.map(f => (
+                <Text>  · {f}</Text>
+              ))}
+              {item.all.length > FINDINGS_CAP && (
+                <Button key="more-findings" plain onPress={() => toggle(`findings:${item.id}`)}>
+                  {allFindings ? '  ver menos' : `  … ${item.all.length - FINDINGS_CAP} más`}
+                </Button>
+              )}
+            </Box>
+          )}
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Cómo</Text>
+            <Text>{item.how}</Text>
+          </Box>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Por qué</Text>
+            <Text>{item.why}</Text>
+          </Box>
         </Box>
       )
     }
 
-    const open = await read($, expanded)
-    const toggle = (phase: string) => update($, expanded, list => (list.includes(phase) ? list.filter(p => p !== phase) : [...list, phase]))
     // A count opens its first pending item; a zero count is not a button.
     const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i))
     const count = (level: 'required' | 'recommended') => {
-      const label = `${LEVEL[level]} ${data.counts[level]}`
       const target = first(level)
+      const label = <Text dimColor>{` ${data.counts[level]}`}</Text>
       return target ? (
         <Button key={`first-${level}`} plain onPress={() => update($, selected, () => target.id)}>
+          {dot(level)}
           {label}
         </Button>
       ) : (
-        <Text>{label}</Text>
+        <Text>
+          {dot(level)}
+          {label}
+        </Text>
       )
     }
+    // Sub-phases with nothing pending fold into one line; the others show a header and, open, up to CAP rows.
+    const pendingOf = (phase: string) => data.items.filter(i => i.phase === phase && isPending(i)).sort((a, b) => LEVEL_RANK[a.level] - LEVEL_RANK[b.level])
+    const clean = data.phases.filter(p => (data.closed.includes(p) || p === data.active) && !pendingOf(p).length)
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row">
+        <Box flexDirection="row" gap={1}>
           <Text bold>{`${data.active} · `}</Text>
           {count('required')}
-          <Text>{' · '}</Text>
           {count('recommended')}
         </Box>
-        <Button key="full" plain onPress={() => refresh($, true)}>
-          {data.full ? '↻ Verificar todo' : '↻ Verificar todo (❔ = comando o build sin correr)'}
-        </Button>
-        <Button key="tools" plain onPress={() => update($, tools, () => true)}>
-          ⚙ Herramientas
-        </Button>
+        <Box flexDirection="row" gap={2}>
+          <Button key="full" plain onPress={() => refresh($, true)}>
+            ↻ Verificar todo
+          </Button>
+          <Button key="tools" plain onPress={() => update($, tools, () => true)}>
+            ⚙ Herramientas
+          </Button>
+        </Box>
+        {!data.full && <Text dimColor>Comandos y build se verifican con ↻.</Text>}
         {message ? <Text dimColor>{message}</Text> : null}
-        {data.phases.map(phase => {
-          const items = data.items.filter(i => i.phase === phase && isPending(i))
-          const closed = data.closed.includes(phase)
-          // Open by default: the active sub-phase and regressions in closed ones. Later ones fold to a count.
-          const shown = phase === data.active || closed || open.includes(phase)
-          const mark = closed ? '🔒' : phase === data.active ? '▶' : '·'
-          if (!items.length) return closed || phase === data.active ? <Text dimColor>{`${mark} ${phase} ✅`}</Text> : null
-          const req = items.filter(i => i.level === 'required').length
-          return (
-            <Box flexDirection="column">
-              <Button key={`phase-${phase}`} plain onPress={() => toggle(phase)}>
-                {`${mark} ${phase} `}
-                <Text dimColor>{`🔴 ${req} · 🟡 ${items.length - req}`}</Text>
-              </Button>
-              {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
-              {shown &&
-                items.map(i => (
-                  <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
-                    {`  ${LEVEL[i.level]} ${i.id} `}
-                    <Text dimColor>{STATUS[i.status]}</Text>
+        <Box flexDirection="column" marginTop={1}>
+          {data.phases.map(phase => {
+            const items = pendingOf(phase)
+            if (!items.length) return null
+            const closed = data.closed.includes(phase)
+            // Open by default: the active sub-phase and regressions in closed ones. Later ones fold to a count.
+            const shown = phase === data.active || closed || open.includes(phase)
+            const req = items.filter(i => i.level === 'required').length
+            const all = open.includes(`all:${phase}`)
+            const rows = all ? items : items.slice(0, CAP)
+            return (
+              <Box flexDirection="column">
+                <Button key={`phase-${phase}`} plain onPress={() => toggle(phase)}>
+                  {`${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}  `}
+                  {dot('required')}
+                  <Text dimColor>{` ${req}  `}</Text>
+                  {dot('recommended')}
+                  <Text dimColor>{` ${items.length - req}`}</Text>
+                </Button>
+                {/* No hover card: an absolute card covers the rows under it and takes their pointer. */}
+                {shown &&
+                  rows.map(i => (
+                    <Button key={i.id} plain onPress={() => update($, selected, () => i.id)}>
+                      {'   '}
+                      {dot(i.level)}
+                      {` ${i.id}`}
+                      {i.status === 'fail' ? <Text color="error">{' ✗'}</Text> : null}
+                    </Button>
+                  ))}
+                {shown && items.length > CAP && (
+                  <Button key={`more-${phase}`} plain onPress={() => toggle(`all:${phase}`)}>
+                    {all ? '     ver menos' : `     … ${items.length - CAP} más`}
                   </Button>
-                ))}
-            </Box>
-          )
-        })}
+                )}
+              </Box>
+            )
+          })}
+        </Box>
+        {clean.length > 0 && <Text dimColor>{`✓ ${clean.join(' · ')}`}</Text>}
       </Box>
     )
   })
