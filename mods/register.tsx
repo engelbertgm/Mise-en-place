@@ -15,7 +15,9 @@ const expanded = atom({ plugin: 'mep', key: 'expanded' } as const, [], { shape: 
 const pending = atom({ plugin: 'mep', key: 'pending' } as const, null, { shape: 'pending-1' })
 const flash = atom({ plugin: 'mep', key: 'flash' } as const, '', { shape: 'flash-1' })
 const tools = atom({ plugin: 'mep', key: 'tools' } as const, false, { shape: 'tools-1' })
-const symbols = atom({ plugin: 'mep', key: 'symbols' } as const, 'braille', { shape: 'symbols-1' })
+const symbols = atom({ plugin: 'mep', key: 'symbols' } as const, 'mixto', { shape: 'symbols-2' })
+// Frame of the braille spinner while the engine works; -1 when idle.
+const spinner = atom({ plugin: 'mep', key: 'spinner' } as const, -1, { shape: 'spinner-1' })
 
 /** The panel's tools: each runs the slash command as if typed. The human-only ones stay out (the engine refuses a plugin's). */
 const INSTANT = [
@@ -35,17 +37,22 @@ const WITH_TEXT = [
   ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
 ] as const
 
-// The panel marks levels with a glyph that also reads as a fill (density = weight) and takes a theme color, so it
-// follows light and dark themes. The person picks the set in Herramientas; emoji stay in the status line.
-type Symbols = 'braille' | 'dither' | 'dots'
+// Level glyphs read as a fill (density = weight) and take a theme color, so they follow light and dark themes; progress
+// bars fill in braille and take their color from how far along they are. The person picks the set in Herramientas.
+type Symbols = 'mixto' | 'braille' | 'tramado'
+const DITHER = { required: '▓', recommended: '▒', optional: '░' } as const
+const BRAILLE = { required: '⣿', recommended: '⣤', optional: '⣀' } as const
+const BRAILLE_FILL = ['⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿']
+const DITHER_FILL = ['░', '▒', '▓', '█']
 const SYMBOL_SETS: Record<Symbols, { label: string; level: Record<'required' | 'recommended' | 'optional', string>; fill: string[] }> = {
-  braille: { label: 'braille ⣿⣤⣀', level: { required: '⣿', recommended: '⣤', optional: '⣀' }, fill: ['⣀', '⣄', '⣤', '⣦', '⣶', '⣷', '⣿'] },
-  dither: { label: 'tramado ▓▒░', level: { required: '▓', recommended: '▒', optional: '░' }, fill: ['░', '▒', '▓', '█'] },
-  dots: { label: 'círculos ●●○', level: { required: '●', recommended: '●', optional: '○' }, fill: ['○', '●'] },
+  mixto: { label: 'mixto ▓▒░ + ⣿ en barras', level: DITHER, fill: BRAILLE_FILL },
+  braille: { label: 'braille ⣿⣤⣀', level: BRAILLE, fill: BRAILLE_FILL },
+  tramado: { label: 'tramado ▓▒░', level: DITHER, fill: DITHER_FILL },
 }
-const SYMBOL_ORDER: Symbols[] = ['braille', 'dither', 'dots']
+const SYMBOL_ORDER: Symbols[] = ['mixto', 'braille', 'tramado']
 const LEVEL_COLOR = { required: 'error', recommended: 'warning', optional: 'inactive' } as const
 const LEVEL_RANK = { required: 0, recommended: 1, optional: 2 } as const
+const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
 
 /** A fill bar of `cells` cells: the done part and the rest, each drawn in its own color by the caller. */
 function meter(set: Symbols, done: number, total: number, cells: number): { filled: string; rest: string } {
@@ -59,6 +66,30 @@ function meter(set: Symbols, done: number, total: number, cells: number): { fill
   const split = Math.min(cells, full + (part ? 1 : 0))
   return { filled: all.slice(0, split).join(''), rest: all.slice(split).join('') }
 }
+
+/** Red below a third, yellow below two thirds, green after. */
+const progressColor = (done: number, total: number) => (done / total < 1 / 3 ? 'error' : done / total < 2 / 3 ? 'warning' : 'success')
+
+// While the engine works the spinner turns: one ticker for all overlapping jobs, cancelled with the last one.
+let jobs = 0
+let ticker: { cancel: () => void } | undefined
+async function busy<T>($: EngineInterface, job: () => Promise<T>): Promise<T> {
+  if (jobs++ === 0) {
+    await update($, spinner, () => 0)
+    ticker = $.clock.every(110, () => void update($, spinner, n => (n + 1) % SPINNER_FRAMES.length))
+  }
+  try {
+    return await job()
+  } finally {
+    if (--jobs === 0) {
+      ticker?.cancel()
+      ticker = undefined
+      await update($, spinner, () => -1)
+    }
+  }
+}
+// The log lines of the tools view, read only while idle: a turning spinner redraws the panel ten times a second.
+let recentLog: string[] = []
 /** Rows shown per sub-phase and lines of findings before a "ver más". */
 const CAP = 8
 const FINDINGS_CAP = 6
@@ -83,7 +114,9 @@ function secretIn(path: string, text: string): string | undefined {
  * One engine run per refresh feeds both the status line and the panel. The quick check (every turn) leaves
  * commands and build checks as ❔; "Verificar todo" in the panel runs them.
  */
-async function refresh($: EngineInterface, full = false) {
+const refresh = ($: EngineInterface, full = false) => busy($, () => check($, full))
+
+async function check($: EngineInterface, full: boolean) {
   if (!(await hasProfile($))) return $.ui.status(undefined)
   const r = await runEngine($, ['check', '--json', '--detail', ...(full ? [] : ['--fast'])], full ? 600_000 : 60_000)
   if (r.exitCode !== 0) return
@@ -184,8 +217,9 @@ export const register: Register = on => {
   // ── status and panel: kept current every turn; the chat only hears from mep when something blocks ──
   on('session.start', async ($, e, next) => {
     const result = await next(e)
+    await update($, spinner, () => -1) // a hot reload cancels the ticker: start idle
     const saved = await $.store.get('symbols').catch(() => undefined)
-    if (saved === 'braille' || saved === 'dither' || saved === 'dots') await update($, symbols, () => saved)
+    if (saved === 'mixto' || saved === 'braille' || saved === 'tramado') await update($, symbols, () => saved)
     if (await hasProfile($)) {
       // Opened unasked it waits on a narrow terminal; /mep:panel opens it at any width.
       void $.ui.open({ id: PANE, title: 'mep' })
@@ -253,6 +287,7 @@ export const register: Register = on => {
     const open = await read($, expanded)
     const toggle = (key: string) => update($, expanded, list => (list.includes(key) ? list.filter(p => p !== key) : [...list, key]))
     const set = await read($, symbols)
+    const frame = await read($, spinner)
     const dot = (level: keyof typeof LEVEL_COLOR) => <Text color={LEVEL_COLOR[level]}>{SYMBOL_SETS[set].level[level]}</Text>
     const cells = e.props.bodyColumns >= 48 ? 6 : 4
     /** Done / total required items, drawn as a bar. */
@@ -260,7 +295,8 @@ export const register: Register = on => {
       const req = items.filter(i => i.level === 'required' && i.state === 'active')
       const done = req.filter(i => i.status === 'pass').length
       const m = meter(set, done, req.length, cells)
-      return { done, total: req.length, node: (<Text><Text color="success">{m.filled}</Text><Text dimColor>{m.rest}</Text></Text>) }
+      const color = progressColor(done, req.length)
+      return { done, total: req.length, node: (<Text><Text color={color}>{m.filled}</Text><Text dimColor>{m.rest}</Text></Text>) }
     }
 
     if (await read($, tools)) {
@@ -269,16 +305,20 @@ export const register: Register = on => {
         void $.command.run({ command, args }).catch(err => update($, flash, () => `/${command}: ${String(err)}`))
       }
       // The same checks the gate runs on a deploy or a PR into main, asked ahead; the whole answer shows.
-      const ask = async (args: string[], clear: string) => {
-        await update($, flash, () => 'verificando…')
-        const r = await runEngine($, args)
-        await update($, flash, () => r.stdout.trim() || (r.exitCode === 0 ? clear : r.stderr.trim()))
+      const ask = (args: string[], clear: string) =>
+        busy($, async () => {
+          await update($, flash, () => 'verificando…')
+          const r = await runEngine($, args)
+          await update($, flash, () => r.stdout.trim() || (r.exitCode === 0 ? clear : r.stderr.trim()))
+        })
+      if (frame < 0) {
+        recentLog = (await $.fs.read('.mep/log').catch(() => ''))
+          .split('\n')
+          .filter(l => l && l.split(' ')[1] !== 'state')
+          .slice(-3)
+          .map(l => `${l.slice(0, 10)} ${l.slice(l.indexOf(' ') + 1)}`)
       }
-      const recent = (await $.fs.read('.mep/log').catch(() => ''))
-        .split('\n')
-        .filter(l => l && l.split(' ')[1] !== 'state')
-        .slice(-3)
-        .map(l => `${l.slice(0, 10)} ${l.slice(l.indexOf(' ') + 1)}`)
+      const recent = recentLog
       return (
         <Box flexDirection="column">
           <Button key="tools-back" plain onPress={() => update($, tools, () => false)}>
@@ -437,6 +477,7 @@ export const register: Register = on => {
           <Text bold>{`${data.active} · `}</Text>
           {count('required')}
           {count('recommended')}
+          <Text color="claude">{frame >= 0 ? SPINNER_FRAMES[frame % SPINNER_FRAMES.length] : ' '}</Text>
         </Box>
         <Box flexDirection="row" gap={2}>
           <Button key="full" plain onPress={() => refresh($, true)}>

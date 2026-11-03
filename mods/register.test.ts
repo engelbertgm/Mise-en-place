@@ -223,15 +223,28 @@ describe('panel', () => {
     on('store.set', (_, e) => (saved.push(e.value), { value: undefined }))
     await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-    expect(await ui.find({ type: 'Text', text: /⣿/ })).toBeTruthy()
+    // Mixed by default: dither blocks for the levels, braille for the bar.
+    expect(await ui.find({ type: 'Text', text: /▓/ })).toBeTruthy()
+    expect(await ui.find({ type: 'Text', text: /⣀/ })).toBeTruthy()
     await ui.press({ key: 'tools' })
+    expect((await ui.find({ type: 'Text', text: /mixto/ }))?.text).toMatch(/mixto/)
+    await ui.press({ key: 'symbols' })
     expect((await ui.find({ type: 'Text', text: /braille/ }))?.text).toMatch(/braille/)
     await ui.press({ key: 'symbols' })
     expect((await ui.find({ type: 'Text', text: /tramado/ }))?.text).toMatch(/tramado/)
-    expect(saved).toEqual(['dither'])
     await ui.press({ key: 'symbols' })
-    await ui.press({ key: 'symbols' })
+    expect(saved).toEqual(['braille', 'tramado', 'mixto'])
     await ui.press({ key: 'tools-back' })
+    await ui.unmount()
+  })
+
+  test('the spinner turns while the engine works and the ticker is asked for once', async ($, on) => {
+    let asked = 0
+    on('clock.every', () => (asked++, { deny: 'test: one period is enough' }))
+    await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
+    await ui.press({ key: 'full' })
+    expect(asked).toBeGreaterThan(0)
     await ui.unmount()
   })
 

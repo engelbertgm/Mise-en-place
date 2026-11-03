@@ -38,7 +38,8 @@ declare module 'claude-code' {
       pending: Shaped<PendingOverride | null>
       flash: Shaped<string>
       tools: Shaped<boolean>
-      symbols: Shaped<'braille' | 'dither' | 'dots'>
+      symbols: Shaped<'mixto' | 'braille' | 'tramado'>
+      spinner: Shaped<number>
     }
   }
 }
