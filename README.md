@@ -35,7 +35,8 @@ flowchart TD
     L --> W
     W --> D{"Push · PR · deploy"}
     D -->|"building: push, PR,<br/>preview"| G1["Blocks on regressions<br/>and locked violations"]
-    W --> LA{"/mep:launch"}
+    W --> PL["/mep:prelaunch<br/>security review, any time"]
+    PL --> LA{"/mep:launch"}
     LA -->|"all 🔴 of the<br/>active domains pass"| LIVE["live: a push to main<br/>is a production deploy"]
     LIVE --> G2["Blocks on any<br/>pending 🔴"]
     G2 --> CI["CI: mep verify --ci<br/>required check on main"]
@@ -50,7 +51,7 @@ You never have to close a sub-phase to push. A project starts **building**: a pu
 | ⚪ optional | Informs. Chosen during `/mep:scope` |
 | 🔒 locked | Never turned off: secrets, RLS, password hashing, per-resource authorization, card data, HTTPS. A detected violation blocks at any time |
 
-Sub-phases run in order: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Required items only block once their sub-phase is closed, so early work is not stuck behind launch checks.
+Sub-phases run in order: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. They are a suggested order, not a gate: closing one is optional and only protects what you did against regressions, so early work is never stuck behind launch checks.
 
 | Agent | Model | Effort | Role |
 | --- | --- | --- | --- |
@@ -65,7 +66,7 @@ Sub-phases run in order: `foundation.setup → foundation.design → build.data 
 mep's blocks hold against the agent's own shortcuts, not just honest mistakes:
 
 - **State changes only through the CLI.** `.mep/profile.yaml`, the log, reports and reviews are sealed with a hash after every write. An edit from outside the CLI blocks `mep verify` (locally and in CI, `MEP_BYPASS` included) until you run `/mep:resync`.
-- **Your actions stay yours.** `/mep:confirm`, `/mep:override`, `/mep:threshold` (relaxing) and `/mep:resync` run only when you type them or press them in the panel; from the agent's Bash they are denied. Confirmations record your git user.
+- **Your actions stay yours.** `/mep:confirm`, `/mep:override`, `/mep:defer`, `/mep:domain off`, `/mep:threshold` (relaxing), `/mep:resync` and going back to building (`mep stage building`) run only when you type them or press them in the panel; from the agent's Bash they are denied. Confirmations record your git user.
 - **PRs need a real review.** The branch review is recorded (`mep review record --pr`) and tied to the code; retrying without it does not get through, and CI asks for it too.
 - **Nothing is silent.** CI writes every state change of the PR (overrides, confirmations, phase closes, bypasses, re-seals) to the job summary, so you see it before merging.
 
@@ -96,6 +97,44 @@ Every item lives in one **domain** and **subdomain** (`ui.motion`, `security.abu
 - A domain or subdomain can be switched off whole (`/mep:domain off backend.queues "another team owns it"`): its items stop counting, 🔒 stay on, and it is marked ⚠️ in `BRIEF.md` and the PR summary.
 - What does not apply to the scope is already out by the item's own condition. Languages follow what the code uses: `has_typescript`, `has_css`, `has_sql`, `has_python`, `has_react`… turn their quality rules on or off.
 
+### Security review before going live
+
+`/mep:prelaunch` is your own security checklist, line by line, in plain words. Each line is made of catalog items, and a line whose items do not apply to the scope shows as "not applicable" (no uploads, no admin, no payments…). It changes nothing and runs any time, so you can fix things early; `/mep:launch` asks for the same items together with everything else.
+
+| # | Line | Items behind it |
+| --- | --- | --- |
+| 1 | Passwords stored hashed (argon2 or bcrypt) | `password-hashing` 🔒 |
+| 2 | API keys only on the server, never in the browser | `server-only-keys`, `public-env-prefix` |
+| 3 | The database shows each person only their own data | `rls-all-tables`, `rls-policies-per-operation`, `resource-authorization`, `db-least-privilege` |
+| 4 | HTTPS forced everywhere | `https-hsts` |
+| 5 | Every form checked on the server, not only on the page | `form-server-validation` |
+| 6 | XSS blocked and safe queries, so nobody sneaks in SQL | `no-raw-html`, `csp-strict`, `no-sql-injection` |
+| 7 | Rate limits on login and submissions | `auth-rate-limit`, `form-rate-limit` |
+| 8 | CSRF protection | `csrf-protection` |
+| 9 | Secure session cookies | `secure-session-cookies` |
+| 10 | Password-reset links expire (≤ 1 hour, single use) | `password-reset-expiry`, `password-recovery` |
+| 11 | Uploads under control: allowed formats only, size caps, content checked, served safely | `upload-validation`, `upload-type-allowlist`, `upload-size-limits`, `upload-content-hardening`, `upload-antivirus`, `upload-served-safely` |
+| 12 | Admin pages locked | `admin-roles`, `admin-mfa` |
+| 13 | Every price rechecked on the server | `server-side-prices` 🔒 |
+| 14 | Debug mode off: details go to private logs, users only see a message | `production-errors-hidden`, `debug-mode-off` |
+| 15 | Risky packages updated and unused ones removed | `no-critical-vulnerabilities`, `dependency-scan-ci`, `unused-dependencies` |
+| 16 | Git history scanned for leaked keys; any found are rotated | `secrets-scan-ci`, `secrets-history-clean`, `key-rotation-procedure` |
+
+Each line shows ✅ done · ❌ something is missing (and what) · ❔ needs commands or the build to run (`--full`) · ⊘ not applicable. Security items only count with a current `mep-security` report. `--full` runs `gitleaks` and `knip`, which need to be installed on your machine.
+
+The lines live in [`catalog/prelaunch.yaml`](catalog/prelaunch.yaml). The checks on uploads go beyond the type: a short allowlist per use (extension, real type and declared Content-Type must agree), images re-encoded, SVG and PDF without active code, archives with caps, and files served from another origin with `nosniff`.
+
+### The panel
+
+`/mep:panel` opens a panel beside the chat (it also opens by itself when a project has mep). Each line is `NAME … braille bar  red yellow white`: the bar fills as required items pass and moves from red to green, and the three numbers are the pending 🔴, 🟡 and chosen ⚪ items in their own colors. Inside a category, items sit under a heading per level (`Obligatorios (12)` in red, `Recomendados (4)` in yellow), each with its circle: ● red required, ● yellow recommended, ○ white optional. The heading names the level, so it reads even where a surface does not show color.
+
+- **By sub-phase or by domain:** a toggle switches the grouping; in the domain view, items linked from other domains appear with ↗.
+- **Stage at a glance:** whether a push is only an integration (building) or a production deploy (live).
+- **An item:** why, how, what is missing (first six findings, the rest behind "more"), and your actions: confirm, skip, postpone until go-live, or turn off through a dialog.
+- **⇢ Flow:** which command to run and when, as a line of steps (define the scope → work → decisions only you take → push → before going live → go live → after). It lists every `/mep:` command, marks where you are (✓ done, ▶ here, ○ ahead), and a click writes the command in the chat box with its arguments left to type; you press Enter. Where the surface draws its own chat (VS Code), it is copied to the clipboard instead.
+- **⚙ Tools:** instant commands, the ones that take a turn from Claude, text inputs for `/mep:scope`, `/mep:add` and `/mep:log-time`, and the questions "can I deploy to production?" and "can I open a PR to main?".
+- **A braille spinner** turns while the engine works. Colors sit outside the buttons and, off the terminal, use fixed colors, because some surfaces restyle a button's label.
+
 ### Guidelines and quality gates
 
 [`catalog/guidelines.md`](catalog/guidelines.md) holds the design, UX, copy and code principles mep works by: Nielsen, Norman, Shneiderman, the laws of UX, Maeda and Rams, Cialdini and positioning, KISS, YAGNI, DRY, SOLID, Gall, Conway and Twelve-Factor. Claude reads only the section of the active sub-phase (visual design in `foundation.design`, interaction and usability in `build.ux`, copy and conversion in `launch.content` for landing, ecommerce, marketplace and SaaS), and the close review checks key screens against it.
@@ -106,8 +145,15 @@ What can be measured is a check, not a principle:
 | --- | --- |
 | Interface | touch targets ≥ 44×44 px and one primary CTA per view (responsive test), contrast, focus, spacing scale, 2 font families, 45–75 characters per line, every async state, no dark patterns |
 | Code (JS/TS) | complexity ≤ 10, files ≤ 300 lines, functions ≤ 50 lines, ≤ 4 parameters, no import cycles, strict types, no duplicated or dead code (jscpd and knip actually run) |
+| Code (TypeScript) | no `@ts-ignore`, type-aware lint (no floating promises), `noUncheckedIndexedAccess`, external data validated with a schema |
 | Code (Python) | Ruff with the same limits plus its security rules, mypy --strict, pytest, a lockfile with pip-audit, vulture; only in projects with `pyproject.toml`, `requirements*.txt` or `uv.lock` |
+| CSS · HTML · SQL | Stylelint, no `!important`, CSS size; valid, semantic HTML without inline handlers; SQL lint, safe migrations, indexed foreign keys |
+| Frameworks · CI | React hooks and jsx-a11y lint, `"use client"` only where needed; actionlint, shellcheck, hadolint, `.editorconfig` with LF line endings |
 | Architecture | Twelve-Factor (config validated from env, stateless server, logs to stdout, pinned runtime) and a walking skeleton deployed before features (Gall's law) |
+| Systems design | idempotency keys, caching and CDN, message queues, a shared-store rate limit with 429, circuit breakers and timeouts, structured logs, metrics and traces; with `high_traffic` also load balancing, replicas and recovery, a consistency (CAP) model, sharding and consistent hashing |
+| Honesty and privacy | no fake reviews, claims with evidence, a notice beside every form, data minimization, an audit of third-party SDKs, business identity on the page |
+
+The languages are not hard-coded: each group turns on with a signal the code reveals (`has_typescript`, `has_css`, `has_html`, `has_sql`, `has_python`, `has_react`, `has_tailwind`, `has_ci`, `has_shell`, `has_docker`). PHP, Ruby, Go and Rust can be added with the same template as Python when someone uses them.
 
 ## Works with
 
@@ -126,6 +172,7 @@ ponytail and baladero are optional. diagram-design is required for the planning 
 - Projects in a git repository
 - The [diagram-design](https://github.com/cathrynlavery/diagram-design) plugin (2.6.136 or later), with Python and Playwright for its PNG export, to write the planning documents
 - Recommended: the [ponytail](https://github.com/DietrichGebert/ponytail) plugin. mep works without it and uses its own quality review instead
+- Optional, for `mep prelaunch --full`: `gitleaks` and `knip` installed locally
 
 ## Install
 
@@ -139,6 +186,8 @@ Then, in a new or existing project folder:
 ```
 /mep:scope --preset saas "booking app for dance studios, Mexico and California, monthly plans"
 ```
+
+To update later: `claude plugin marketplace update mise-en-place`, then `claude plugin update mep@mise-en-place`, and restart Claude Code (`/exit`, then `claude --continue`). `claude plugin list` shows the version.
 
 > [!TIP]
 > Try it without installing: `claude --plugin-dir <path-to-this-repo>`, then run `/mep:scope` in an empty folder.
@@ -196,11 +245,17 @@ signals:
   has_db: true
   db_client_access: true
   has_dates: true
+  has_typescript: true    # also has_javascript, has_css, has_html (default true), has_sql, has_react…
+  high_traffic: false     # only the scope can say it: turns on the scale rules
 selections:
   optional_added: []
   recommended_skipped:
     - { id: csp-strict, reason: "MVP; added after launch", date: 2026-10-12 }
   overrides: []
+stage: building           # building | live (mep launch)
+selections:
+  domains_off: []         # { path: backend.queues, reason, date }: whole domains switched off
+  deferred: []            # { id, reason, date }: 🔴 postponed until go-live
 stack:
   decided: { framework: nextjs, hosting: vercel, db: postgresql }
 ```
@@ -228,7 +283,9 @@ Only values from [`catalog/dimensions.yaml`](catalog/dimensions.yaml) are accept
     - { type: sql, rule: rls_enabled }
 ```
 
-Verify types: `file_exists`, `route_exists` (Next.js, Astro, Vite/React, static), `grep` (present or absent), `json_key`, `command`, `html` (rules on the build output: unique titles, one `h1`, heading order, meta tags…), `sql` (RLS in migrations) and `manual`. The engine runs them all, never the model.
+The item has no `domain` of its own: its home (`database.access`…) and its links to other subdomains are in [`catalog/domains.yaml`](catalog/domains.yaml), and the catalog does not load if an item has none.
+
+Verify types: `file_exists`, `route_exists` (Next.js, Astro, Vite/React, static), `grep` (present or absent), `json_key`, `command`, `html` (rules on the build output: unique titles, one `h1`, heading order, meta tags…), `sql` (RLS in migrations), `maps`, `quality`, `design`, `build` (server-rendered HTML, bundle size, source maps), `robots`, `live` and `dns` (the deployed site), `plan` (planning documents) and `manual`. The engine runs them all, never the model.
 
 </details>
 
@@ -273,7 +330,7 @@ Mise-en-place/
 ├── skills/                    # each folder is a /mep:<name> command
 │   ├── mep/                   # guide: read a scope, use the catalog, respect the brief
 │   ├── scope/  add/  check/  phase/  skip/  panel/  audit/  update/
-│   ├── domains/  focus/  launch/                  # progress by domain, what is pending in one, go-live
+│   ├── domains/  focus/  prelaunch/  launch/       # progress by domain, what is pending in one, security review, go-live
 │   ├── override/  confirm/  threshold/  resync/  defer/  domain/   # yours only (disable-model-invocation)
 │   └── quote/  export/  log-time/
 ├── agents/
@@ -282,7 +339,7 @@ Mise-en-place/
 ├── hooks/
 │   └── hooks.json             # mods module + fallback hooks (SessionStart, Stop, PreToolUse, PostToolUse)
 ├── mods/
-│   ├── register.tsx           # gate, guard, panel, instant commands and status line
+│   ├── register.tsx           # gate, guard, panel (by sub-phase or domain, flow line), instant commands, status line
 │   └── register.test.ts       # mod tests (claude plugin test .)
 ├── types/index.d.ts           # the mod's state contract (panel)
 ├── engine/
@@ -295,7 +352,8 @@ Mise-en-place/
 │   │   ├── live.ts            # checks against the deployed site and its DNS
 │   │   ├── render.ts          # BRIEF.md, ADRs, CLAUDE.md block
 │   │   ├── scope.ts           # SCOPE.md: the scope in plain words
-│   │   ├── domains.ts         # domains, bars and summaries by domain
+│   │   ├── domains.ts         # domains, braille bars, summaries by domain, focus
+│   │   ├── prelaunch.ts       # the security review before going live
 │   │   ├── audit.ts           # infers a profile from an existing repo
 │   │   ├── update.ts          # new catalog items, grace period
 │   │   ├── quote.ts           # quote, log-time, calibration
@@ -308,6 +366,7 @@ Mise-en-place/
 │   ├── dimensions.yaml        # valid values: types, capabilities, markets, signals, phases
 │   ├── guidelines.md          # design, UX, copy and code principles, read per sub-phase
 │   ├── domains.yaml           # domains and subdomains: each item's home, and its links to other subdomains
+│   ├── prelaunch.yaml         # the 16 lines of the security review before going live
 │   ├── items/                 # item files by theme (base, seo, security, ux, legal, languages…)
 │   ├── markets/               # one file per market (mx, usa, ca, eu, uk, br, in)
 │   ├── presets/               # landing, corporate, ecommerce, saas, marketplace
@@ -324,7 +383,7 @@ Mise-en-place/
 │   ├── plan/                  # PRD, TRD, FLOWS, SCHEMA, IMPLEMENTATION templates
 │   └── client-plan/           # client versions of PRD, FLOWS, IMPLEMENTATION (es, en)
 ├── examples/estudio-saas/     # test project used by tests/e2e.spec.ts
-├── tests/                     # engine, CLI and end-to-end tests (node:test)
+├── tests/                     # engine, CLI, domains, prelaunch, flow and end-to-end tests (node:test)
 └── docs/spec.md               # full specification (Spanish)
 ```
 
@@ -359,12 +418,12 @@ your-project/
 ## Under the hood
 
 - **Engine** ([`engine/src`](engine/src)): TypeScript, no LLM. Same profile, same items, same result. Bundled to [`engine/dist/mep.mjs`](engine/dist/mep.mjs) with no runtime dependencies, and published as `@engelbertgm/mep` for CI.
-- **Mods** ([`mods/register.tsx`](mods/register.tsx)): run inside Claude Code. The chat only hears from mep when something blocks; the status line shows the active sub-phase and pending 🔴/🟡; the panel (`/mep:panel`) shows each item's why, how and every finding, with your actions (confirm, skip, turn off through a dialog). `/mep:check` and `/mep:phase` answer instantly; deploys (Vercel, Netlify, Cloudflare, Fly, Railway, Firebase, Supabase, `git push` to main) wait for the engine's gate; edits to mep's state and secrets in versioned files are denied.
+- **Mods** ([`mods/register.tsx`](mods/register.tsx)): run inside Claude Code. The chat only hears from mep when something blocks; the status line shows the active sub-phase and pending 🔴/🟡; the panel (`/mep:panel`) shows each item's why, how and every finding, grouped by sub-phase or by domain, with your actions (confirm, skip, postpone, turn off through a dialog) and the flow line. `/mep:check`, `/mep:phase`, `/mep:domains`, `/mep:focus`, `/mep:prelaunch` and `/mep:launch` answer instantly; deploys (Vercel, Netlify, Cloudflare, Fly, Railway, Firebase, Supabase) wait for the engine's gate, and a `git push` to main waits for it as an integration while building and as a production deploy once live; edits to mep's state and secrets in versioned files are denied.
 - **Hooks** ([`hooks/hooks.json`](hooks/hooks.json)): SessionStart, Stop, PreToolUse (gate and guard) and PostToolUse, as the fallback where mods are not available.
 - **CI** ([`templates/ci/mep.yml`](templates/ci/mep.yml)): installed by `/mep:scope`. Runs gitleaks, `pnpm audit`, the build and `mep verify --ci` (with `--pr` on pull requests, and against `MEP_URL` for the live checks), and writes the PR's state changes to the job summary.
 - **Maps**: `mep codemap` and `mep registry` generate `CODEMAP.md` and `REGISTRY.md` from the code. "What for" and "Do not use for" are written in each export's doc comment; an export without an entry blocks once its sub-phase is closed.
 - **Export**: a small Markdown subset, PNG images included, becomes .docx and .pdf with no dependencies, so it works on any machine.
-- **Catalog** ([`catalog/`](catalog)): 415 items across accessibility, design system, UX, content, forms, data, responsive, security, privacy, legal, performance, i18n, code quality (JS/TS and Python), planning documents, deploy and operations; rules per project type (SaaS, ecommerce, marketplace, booking, blog, directory, portfolio, internal app), usage-based billing, health and finance data, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source or a confirmation from you.
+- **Catalog** ([`catalog/`](catalog)): 479 items in 18 domains and 100 subdomains (UI, UX, accessibility, frontend, languages, backend, accounts & access, payments, database, security, privacy, legal, SEO, content, product, analytics, infrastructure, quality), with 138 links between subdomains. 353 are required, 116 recommended and 10 optional; 10 are locked. It covers interaction patterns (command menu, view transitions, optimistic UI, stale-while-revalidate…), typography, performance, privacy, consumer honesty, systems design, planning documents, deploy and operations, and code quality by language (JS, TS, CSS, HTML, SQL, Python, React/Next, CI and containers); rules per project type (SaaS, ecommerce, marketplace, booking, blog, directory, portfolio, internal app), usage-based billing, health and finance data, and the MX, USA, CA, EU, UK, BR and IN markets, each legal item with its official source or a confirmation from you.
 
 ### Test project
 
@@ -382,6 +441,10 @@ your-project/
 - The guard and the seal stop the obvious shortcuts; a deliberate workaround on the same machine is not prevented, only shown in the PR summary.
 - Planning documents need diagram-design with Python and Playwright for the PNG export; `/mep:scope` stops and says what to install when they are missing.
 - Python checks run through `uv run`, so Python projects are expected to use uv.
+- Quality rules exist for JS, TS, CSS, HTML, SQL and Python. Other languages (PHP, Ruby, Go, Rust) are not covered yet.
+- Colors in the panel depend on the surface. If a surface shows none, the level headings and the numbers still say which is which.
+- Projects created before a release keep working: they start as `building`, and `/mep:update` brings the new items (with a grace period in closed sub-phases).
+- The CI template pins `@engelbertgm/mep@<version>`: publish that version to npm before relying on the workflow.
 - Prices in `catalog/costs.yaml` and effort ranges are estimates; check current prices and calibrate with `/mep:log-time`.
 
 The full design is in [docs/spec.md](docs/spec.md) (Spanish).
