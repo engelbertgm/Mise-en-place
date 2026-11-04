@@ -7,6 +7,7 @@ Cada ítem registra `since` con la versión en que entró. `/mep:update` usa est
 Revisión de seguridad antes de salir en vivo (`mep prelaunch`), con cuatro ítems nuevos:
 
 - **`catalog/prelaunch.yaml`:** la lista de 16 líneas (hash de contraseñas, llaves solo en el servidor, la base de datos solo muestra lo propio, HTTPS, formularios validados en el servidor, XSS y SQL, rate limit, CSRF, cookies de sesión, enlaces de recuperación que expiran, subidas limitadas, admin bajo llave, precios revisados en el servidor, debug apagado, paquetes al día y sin sobrantes, historial de git sin llaves). Cada línea junta los ítems que ya existían; una línea sin ítems que apliquen al scope sale "no aplica".
+- **3 ítems 🔴 de subidas** (con la capacidad `uploads`): `upload-type-allowlist` (lista corta de formatos por uso; extensión, tipo real y Content-Type deben coincidir; sin ejecutables, scripts ni HTML), `upload-content-hardening` (imágenes re-codificadas, SVG y PDF sin código activo, comprimidos con tope) y `upload-served-safely` (otro origen, Content-Type propio, nosniff, descarga forzada). `upload-antivirus` pasa a 🔴 con contenido de usuarios o en marketplaces.
 - **4 ítems 🔴 nuevos** (`security`, `launch.ops`), los que faltaban:
   - `password-reset-expiry`: el enlace de recuperación expira en una hora o menos, sirve una vez y se invalida al cambiar la contraseña.
   - `debug-mode-off`: sin `NODE_ENV=development` ni `DEBUG=true` en la configuración de producción; el detalle de un error queda en logs privados.

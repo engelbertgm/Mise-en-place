@@ -1,6 +1,6 @@
 ---
 name: prelaunch
-description: Revisión de seguridad antes de salir en vivo, línea por línea (hashing de contraseñas, llaves, RLS, HTTPS, XSS/SQL, rate limit, CSRF, cookies, subidas, admin, precios, debug, paquetes, historial de git). Se puede correr a cualquier hora.
+description: Revisión de seguridad antes de salir en vivo, línea por línea (hashing de contraseñas, llaves, RLS, HTTPS, XSS/SQL, rate limit, CSRF, cookies, subidas —formatos permitidos y contenido revisado—, admin, precios, debug, paquetes, historial de git). Se puede correr a cualquier hora.
 argument-hint: "[--full]"
 allowed-tools: Bash(node *)
 ---

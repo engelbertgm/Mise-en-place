@@ -660,9 +660,12 @@
   level: recommended
   phase: build.features
   since: "2026.10.1"
+  updated: "2026.11.3"
   when: { capabilities: [uploads] }
+  level_overrides:
+    - { when: { any: [ { capabilities: [ugc] }, { type: marketplace } ] }, level: required }
   effort: { size: M, hours: [3, 6] }
-  why: "Evita que la app distribuya malware entre usuarios."
+  why: "Evita que la app distribuya malware entre usuarios. Cuando los archivos los suben personas que no conoces (contenido de usuarios, vendedores), el escaneo deja de ser opcional."
   how: "Escaneo asíncrono (ClamAV o servicio) antes de publicar el archivo."
   verify:
     - { type: manual, prompt: "Uploads escaneados antes de estar disponibles" }
@@ -816,3 +819,50 @@
     - { type: command, run: "gitleaks detect --source . --redact --no-banner", timeout: 300 }
     - { type: manual, prompt: "Si el historial tuvo llaves, cada una se rotó en su proveedor (borrarla del repo no basta) y la fecha de rotación quedó anotada en SECURITY.md" }
   references: ["https://github.com/gitleaks/gitleaks"]
+
+- id: upload-type-allowlist
+  title: "Solo los formatos permitidos se pueden subir: lista corta por uso, y nada de ejecutables, scripts ni HTML"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  when: { capabilities: [uploads] }
+  depends_on: [upload-validation]
+  effort: { size: S, hours: [1, 3] }
+  why: "Un campo que acepta cualquier archivo acepta un .html con scripts, un .exe, un .svg con JavaScript o un .php disfrazado de foto. Decidir de antemano qué formatos entran es la defensa más barata."
+  how: "Lista permitida (no lista de prohibidos) por tipo de uso: fotos = jpg, png, webp; documentos = pdf. Se comparan las tres cosas: la extensión, el tipo real por contenido (file-type) y el Content-Type declarado, y las tres deben coincidir con la lista. Se rechazan extensiones dobles (foto.php.jpg), nombres con rutas (../) y todo lo que no esté en la lista; el SVG, el HTML, los ejecutables y los comprimidos solo entran si el producto los necesita, y entonces con las reglas de upload-content-hardening. El mismo filtro en el cliente (accept) solo ayuda al usuario: la barrera es la del servidor."
+  verify:
+    - { type: grep, pattern: "allowedMimeTypes|allowed_mime_types|ALLOWED_(MIME|TYPES|EXTENSIONS)|acceptedFileTypes|allowedFileTypes|fileFilter|mimeTypes\\s*:", glob: "**/*.{ts,tsx,js,jsx,sql,toml}" }
+    - { type: grep, pattern: "[\"']\\*/\\*[\"']|allowedMimeTypes\\s*[:=]\\s*\\[\\s*[\"']\\*", glob: "**/*.{ts,tsx,js,jsx,sql,toml}", expect: absent }
+    - { type: manual, prompt: "Los formatos permitidos son una lista corta por tipo de uso; ejecutables, scripts, HTML y comprimidos no están, y extensión, tipo real y Content-Type deben coincidir" }
+  references: ["https://cheatsheetseries.owasp.org/cheatsheets/File_Upload_Cheat_Sheet.html"]
+
+- id: upload-content-hardening
+  title: "El contenido de lo subido se trata como hostil: imágenes re-codificadas, SVG y PDF sin código activo, comprimidos con tope"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  when: { capabilities: [uploads] }
+  depends_on: [upload-type-allowlist]
+  effort: { size: M, hours: [2, 5] }
+  why: "Un archivo puede tener el tipo correcto y llevar dentro algo más: una imagen que también es un script (políglota), un SVG con JavaScript, un PDF con acciones activas, un .zip que al abrirse ocupa gigas. La extensión y el tipo no lo dicen; el contenido sí."
+  how: "Imágenes: decodificar y volver a codificar (sharp, Cloudinary) para descartar lo que no sea píxeles, con tope de ancho y alto. SVG: no aceptarlo o limpiarlo con DOMPurify/svgo y servirlo como descarga. PDF y Office: sin JavaScript ni macros, o solo como descarga. Comprimidos: tope de tamaño descomprimido, de número de archivos y de profundidad. Todo lo nuevo se escanea (antivirus) antes de publicarlo."
+  verify:
+    - { type: grep, pattern: "sharp\\(|jimp|cloudinary|imagemagick|libvips|from PIL|import PIL|pillow", glob: "**/*.{ts,tsx,js,jsx,py}", flags: i }
+    - { type: manual, prompt: "Las imágenes se re-codifican, el SVG se rechaza o se limpia, los PDF y comprimidos tienen tope, y nada de esto se publica sin escanear" }
+
+- id: upload-served-safely
+  title: "Lo subido se sirve sin riesgo: otro origen, Content-Type propio, nosniff y descarga forzada si no es imagen"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  when: { capabilities: [uploads] }
+  depends_on: [upload-validation]
+  effort: { size: S, hours: [1, 2] }
+  why: "Un archivo subido que el navegador abre desde tu propio dominio puede ejecutar código con los permisos de tu sitio (XSS almacenado). Servirlo desde otro origen y con el tipo correcto lo vuelve inofensivo."
+  how: "Bucket o dominio aparte del sitio; el Content-Type sale del tipo validado, nunca del que mandó el usuario; X-Content-Type-Options: nosniff; Content-Disposition: attachment para todo lo que no sea imagen; nada de listar el bucket."
+  verify:
+    - { type: grep, pattern: "nosniff|Content-Disposition|contentDisposition|ResponseContentDisposition|download:\\s*true", glob: "**/*.{ts,tsx,js,jsx,json,toml}" }
+    - { type: manual, prompt: "Lo subido se sirve desde un origen distinto al del sitio, con el Content-Type validado y nosniff, y como descarga si no es una imagen" }

@@ -22,8 +22,8 @@ checks:
     items: [secure-session-cookies]
   - label: "Los enlaces de recuperación de contraseña expiran"
     items: [password-reset-expiry, password-recovery]
-  - label: "Límites en lo que se puede subir (tipo, tamaño)"
-    items: [upload-validation, upload-size-limits]
+  - label: "Subidas controladas: solo los formatos permitidos, con tope de tamaño, contenido revisado y servidas sin riesgo"
+    items: [upload-validation, upload-type-allowlist, upload-size-limits, upload-content-hardening, upload-antivirus, upload-served-safely]
   - label: "Las páginas de admin, bajo llave"
     items: [admin-roles, admin-mfa]
   - label: "Cada precio se vuelve a revisar en el servidor"

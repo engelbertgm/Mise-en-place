@@ -152,7 +152,7 @@ domains:
       uploads:
         label: Archivos
         description: Validación, tamaño, URL firmadas y antivirus.
-        items: [upload-size-limits, upload-private-signed-urls, upload-validation, upload-antivirus, upload-strip-metadata]
+        items: [upload-size-limits, upload-private-signed-urls, upload-validation, upload-antivirus, upload-strip-metadata, upload-type-allowlist, upload-content-hardening, upload-served-safely]
       integrations:
         label: Integraciones
         description: Mapas y servicios externos.
@@ -486,6 +486,9 @@ domains:
         description: Traspaso y manual.
         items: [client-handover, client-manual]
 links:
+  upload-type-allowlist: [security.input]
+  upload-content-hardening: [security.abuse]
+  upload-served-safely: [security.web-hardening]
   unused-dependencies: [quality.javascript]
   debug-mode-off: [infra.observability]
   password-reset-expiry: [privacy.data-governance]

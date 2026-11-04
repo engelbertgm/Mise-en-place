@@ -35,6 +35,34 @@ describe('the checklist', () => {
     }
   })
 
+  test('uploads: the allowlist, the content hardening and the safe serving are required, and the review line holds all six', () => {
+    for (const id of ['upload-type-allowlist', 'upload-content-hardening', 'upload-served-safely']) {
+      const item = real.items.find(i => i.id === id)!
+      assert.equal(item.level, 'required', id)
+      assert.deepEqual(item.when, { capabilities: ['uploads'] }, id)
+      assert.equal(item.domain, 'backend.uploads', id)
+    }
+    const line = checks.find(c => c.label.includes('Subidas'))!
+    for (const id of ['upload-validation', 'upload-type-allowlist', 'upload-size-limits', 'upload-content-hardening', 'upload-antivirus', 'upload-served-safely']) assert.ok(line.items.includes(id), id)
+  })
+
+  test('uploads: user-generated content or a marketplace makes the antivirus required; a plain site keeps it recommended', () => {
+    const level = (p: ReturnType<typeof profile>) => evaluate(p, real).find(e => e.item.id === 'upload-antivirus')!.level
+    assert.equal(level(profile(real, { type: 'corporate', capabilities: ['uploads'] })), 'recommended')
+    assert.equal(level(profile(real, { type: 'saas', capabilities: ['uploads', 'ugc'] })), 'required')
+    assert.equal(level(profile(real, { type: 'marketplace', capabilities: ['uploads'] })), 'required')
+  })
+
+  test('uploads: a wide-open accept or an allowlist with a wildcard is caught; a real allowlist is not', () => {
+    const grep = real.items.find(i => i.id === 'upload-type-allowlist')!.verify.filter(v => v.type === 'grep') as { pattern: string }[]
+    const allow = new RegExp(grep[0]!.pattern)
+    const open = new RegExp(grep[1]!.pattern)
+    assert.match("const allowedMimeTypes = ['image/png', 'image/jpeg']", allow)
+    assert.match('<input type="file" accept="*/*" />', open)
+    assert.match("allowedMimeTypes: ['*']", open)
+    assert.doesNotMatch("const allowedMimeTypes = ['image/png', 'image/webp']", open)
+  })
+
   test('debug mode: a development NODE_ENV or DEBUG=true in the production config is found', () => {
     const item = real.items.find(i => i.id === 'debug-mode-off')!
     const grep = item.verify.find(v => v.type === 'grep') as { pattern: string; flags?: string }
@@ -51,7 +79,7 @@ describe('the review, line by line', () => {
     const rows = prelaunch(checks, results, () => 'falta')
     const by = (needle: string) => rows.find(r => r.label.includes(needle))!
     assert.equal(by('Contraseñas').state, 'na') // no accounts
-    assert.equal(by('subir').state, 'na') // no uploads
+    assert.equal(by('Subidas').state, 'na') // no uploads
     assert.equal(by('admin').state, 'na') // no admin panel
     assert.equal(by('precio').state, 'na') // no payments
     assert.notEqual(by('HTTPS').state, 'na')
@@ -63,7 +91,7 @@ describe('the review, line by line', () => {
     const p = profile(real, { type: 'saas', capabilities: ['auth', 'uploads', 'payments', 'admin-panel'] })
     const results = verifyItems(makeRepo(), p, evaluate(p, real), 'fast')
     const rows = prelaunch(checks, results, () => 'falta')
-    for (const needle of ['Contraseñas', 'subir', 'admin', 'precio', 'recuperación']) assert.notEqual(rows.find(r => r.label.includes(needle))!.state, 'na', needle)
+    for (const needle of ['Contraseñas', 'Subidas', 'admin', 'precio', 'recuperación']) assert.notEqual(rows.find(r => r.label.includes(needle))!.state, 'na', needle)
     const open = rows.find(r => r.label.includes('recuperación'))!
     assert.match(open.detail, /password-reset-expiry|password-recovery/)
   })
