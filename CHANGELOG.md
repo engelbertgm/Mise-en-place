@@ -5,7 +5,7 @@ The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md
 ## 0.4.2
 
 - **`mep prelaunch [--full]`** (`/mep:prelaunch`): la revisión de seguridad antes de salir en vivo, línea por línea (✅ lista · ❌ falta algo, y qué · ❔ falta correr comandos o el build · ⊘ no aplica a este scope). No cambia nada y se puede correr a cualquier hora; `mep launch` exige esos mismos ítems junto con el resto. Catálogo 2026.11.3: cuatro ítems nuevos (`password-reset-expiry`, `debug-mode-off`, `unused-dependencies`, `secrets-history-clean`) y tres de subidas (`upload-type-allowlist`, `upload-content-hardening`, `upload-served-safely`); `upload-antivirus` pasa a 🔴 con contenido de usuarios o en marketplaces.
-- El panel tiene "Seguridad antes de salir" en Herramientas y un botón **⇢ Flujo**: una línea de pasos (definir el scope → trabajar → si algo no aplica o puede esperar → subir avance → antes de salir → salir en vivo → ya en vivo) con el comando de cada momento. Marca dónde estás (✓ hecho, ▶ aquí, ○ falta) y un clic escribe el comando en el chat (con sus argumentos por completar); tú le das Enter. Donde la superficie dibuja su propio chat, lo copia al portapapeles.
+- El panel tiene "Seguridad antes de salir" en Herramientas y un botón **⇢ Flujo**: una línea de pasos (definir el scope → trabajar → si algo no aplica o puede esperar → subir avance → antes de salir → salir en vivo → ya en vivo) con el comando de cada momento. Trae todos los comandos de mep (una prueba lo vigila). Marca dónde estás (✓ hecho, ▶ aquí, ○ falta) y un clic escribe el comando en el chat (con sus argumentos por completar); tú le das Enter. Donde la superficie dibuja su propio chat, lo copia al portapapeles.
 
 ## 0.4.1
 

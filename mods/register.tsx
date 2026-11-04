@@ -58,13 +58,20 @@ const FLOW = [
     ['/mep:focus <dominio>', '/mep:focus ', 'qué falta en uno'],
     ['/mep:check', '/mep:check', 'estado por sub-etapa'],
     ['/mep:add <cambio>', '/mep:add ', 'el scope cambió'],
+    ['/mep:phase', '/mep:phase', 'sub-etapa activa y qué falta'],
+    ['/mep:log-time <id> <horas>', '/mep:log-time ', 'horas reales: afinan la cotización'],
+    ['/mep:panel', '/mep:panel', 'abrir este panel'],
   ] },
-  { id: 'decide', title: 'Si algo no aplica o puede esperar', when: 'solo tú lo escribes', cmds: [
+  { id: 'decide', title: 'Decisiones que solo tú tomas', when: 'cuando algo no aplica o puede esperar', cmds: [
     ['/mep:defer <id> <razón>', '/mep:defer ', 'esperar hasta salir en vivo'],
     ['/mep:skip <id> <razón>', '/mep:skip ', 'omitir un recomendado'],
     ['/mep:override <id> <razón>', '/mep:override ', 'apagar un obligatorio'],
     ['/mep:domain off <ruta> <razón>', '/mep:domain off ', 'apagar un dominio'],
     ['/mep:confirm <id>', '/mep:confirm ', 'ya verifiqué un ítem manual'],
+    ['/mep:defer undo <id>', '/mep:defer undo ', 'devolver un diferido'],
+    ['/mep:domain on <ruta>', '/mep:domain on ', 'encender un dominio'],
+    ['/mep:threshold <clave> <valor> <razón>', '/mep:threshold ', 'cambiar un umbral de calidad'],
+    ['/mep:resync', '/mep:resync', 're-sellar si el estado cambió fuera de mep'],
   ] },
   { id: 'push', title: 'Subir avance', when: 'cuando quieras', note: 'git push o PR a main: no exige cerrar nada', cmds: [
     ['/mep:phase close <sub-etapa>', '/mep:phase close ', 'opcional: proteger lo hecho'],
