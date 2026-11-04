@@ -1,0 +1,36 @@
+# Revisión de seguridad antes de salir en vivo (`mep prelaunch`). Cada línea junta los ítems del catálogo que la
+# cumplen; un ítem que no aplica al scope (sin subidas, sin admin, sin cobros…) hace que la línea no aplique.
+# Se puede correr en cualquier momento: `mep launch` exige estos mismos ítems junto con todo lo demás.
+checks:
+  - label: "Contraseñas guardadas con hash (argon2 o bcrypt)"
+    items: [password-hashing]
+  - label: "Llaves de API solo en el servidor, nunca en el navegador"
+    items: [server-only-keys, public-env-prefix]
+  - label: "La base de datos solo deja ver a cada persona sus propios datos"
+    items: [rls-all-tables, rls-policies-per-operation, resource-authorization, db-least-privilege]
+  - label: "HTTPS forzado en todos lados"
+    items: [https-hsts]
+  - label: "Cada formulario se revisa en el servidor, no solo en la página"
+    items: [form-server-validation]
+  - label: "XSS bloqueado y consultas seguras: nadie cuela SQL"
+    items: [no-raw-html, csp-strict, no-sql-injection]
+  - label: "Límite de intentos en el login y en los envíos"
+    items: [auth-rate-limit, form-rate-limit]
+  - label: "Protección CSRF"
+    items: [csrf-protection]
+  - label: "Cookies de sesión seguras"
+    items: [secure-session-cookies]
+  - label: "Los enlaces de recuperación de contraseña expiran"
+    items: [password-reset-expiry, password-recovery]
+  - label: "Límites en lo que se puede subir (tipo, tamaño)"
+    items: [upload-validation, upload-size-limits]
+  - label: "Las páginas de admin, bajo llave"
+    items: [admin-roles, admin-mfa]
+  - label: "Cada precio se vuelve a revisar en el servidor"
+    items: [server-side-prices]
+  - label: "Modo debug apagado: el detalle va a logs privados y el usuario solo ve un mensaje"
+    items: [production-errors-hidden, debug-mode-off]
+  - label: "Paquetes riesgosos actualizados y los que no usas, eliminados"
+    items: [no-critical-vulnerabilities, dependency-scan-ci, unused-dependencies]
+  - label: "Historial de git revisado en busca de llaves filtradas; las que aparezcan, reemplazadas"
+    items: [secrets-scan-ci, secrets-history-clean, key-rotation-procedure]

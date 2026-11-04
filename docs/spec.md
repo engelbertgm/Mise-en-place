@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.11.2). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.11.3). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -267,6 +267,10 @@ El perfil lleva `stage: building | live` (por defecto `building`). Separa tres m
 - `mep launch` (`/mep:launch`) corre la barrera completa una vez; si pasa, `stage` pasa a `live`. Los bloqueos se agrupan por dominio. Volver a `building` es del usuario (`mep stage building`).
 - `mep verify --ci` (el workflow): `building` → integrar; `live` → barrera completa. `--prod` fuerza la completa.
 - `deployKind(comando, rama, stage)` devuelve `prod`, `preview` o `integrate`.
+
+### Revisión de seguridad antes de salir (`mep prelaunch`)
+
+`catalog/prelaunch.yaml` define 16 líneas en lenguaje claro, cada una hecha de ítems del catálogo (ej. "Cada precio se vuelve a revisar en el servidor" → `server-side-prices`). `mep prelaunch [--full]` las muestra con ✅ lista, ❌ falta algo (y qué), ❔ falta correr comandos o el build, o ⊘ no aplica a este scope. No cambia nada ni exige nada por sí sola y se puede correr a cualquier hora; `mep launch` exige los mismos ítems junto con el resto. Los ítems de seguridad siguen necesitando su auditoría de `mep-security`.
 
 ### Diferir y apagar
 

@@ -12,5 +12,6 @@ Mientras el proyecto está **en construcción** (`stage: building`), un push o u
 Con mods, el mod responde este comando sin turno de Claude. Si llegaste aquí (sin mods), corre
 `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" launch` y muestra la salida tal cual.
 
+- Antes, a cualquier hora: `/mep:prelaunch` revisa la seguridad línea por línea sin exigir nada.
 - Si faltan 🔴, el motor los lista agrupados por dominio (`Por dominio: seguridad 8 · pagos 5`). Arréglalos, difiérelos con `/mep:defer` solo si de verdad pueden esperar (igual los exige el go-live), o apaga un dominio con `/mep:domain off` si no es del proyecto.
 - Ya en vivo, volver a construcción lo decide el usuario: `mep stage building`.

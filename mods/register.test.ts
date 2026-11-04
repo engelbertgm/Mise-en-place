@@ -122,8 +122,9 @@ describe('human actions', () => {
     calls.length = 0
     await $.command.run(cmd('mep:domains'))
     await $.command.run(cmd('mep:focus', 'ux.principles'))
+    await $.command.run(cmd('mep:prelaunch'))
     await $.command.run(cmd('mep:launch'))
-    expect(calls.map(a => a[2])).toEqual(expect.arrayContaining(['domains', 'focus', 'launch']))
+    expect(calls.map(a => a[2])).toEqual(expect.arrayContaining(['domains', 'focus', 'prelaunch', 'launch']))
     expect(calls.some(a => a.includes('--human'))).toBe(false)
   })
 

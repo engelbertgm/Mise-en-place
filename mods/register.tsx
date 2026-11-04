@@ -25,6 +25,7 @@ const spinner = atom({ plugin: 'mep', key: 'spinner' } as const, -1, { shape: 's
 const INSTANT = [
   ['mep:check', 'Estado del checklist'],
   ['mep:domains', 'Avance por dominio'],
+  ['mep:prelaunch', 'Seguridad antes de salir (a cualquier hora)'],
   ['mep:launch', 'Pasar a en vivo (corre la barrera completa)'],
   ['mep:phase', 'Sub-etapa activa'],
   ['mep:quote', 'Cotización interna'],
@@ -183,7 +184,7 @@ export const register: Register = on => {
   })
 
   // Where things are by domain, what to do in one, and go-live: instant. Launch only ever makes the gates stricter.
-  for (const [command, engineCmd] of [['mep:domains', 'domains'], ['mep:focus', 'focus'], ['mep:launch', 'launch']] as const) {
+  for (const [command, engineCmd] of [['mep:domains', 'domains'], ['mep:focus', 'focus'], ['mep:prelaunch', 'prelaunch'], ['mep:launch', 'launch']] as const) {
     on('command.run', { command }, async ($, e, next) => {
       if (!(await hasProfile($))) return next(e)
       const r = await runEngine($, [engineCmd, ...e.args.split(/\s+/).filter(Boolean)])

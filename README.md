@@ -6,8 +6,8 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.1-informational.svg)](.claude-plugin/plugin.json)
-[![Catalog](https://img.shields.io/badge/catalog-2026.11.2-informational.svg)](catalog/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.2-informational.svg)](.claude-plugin/plugin.json)
+[![Catalog](https://img.shields.io/badge/catalog-2026.11.3-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Works with baladero](https://img.shields.io/badge/works_with-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
@@ -152,6 +152,7 @@ Then, in a new or existing project folder:
 | `/mep:check` | Status by sub-phase: ✅ done · ❌ pending · ⏭️ skipped · ⚠️ overridden. Warns about signals in the code the profile does not have |
 | `/mep:phase [close <sub-phase>]` | Active sub-phase and what is missing; `close` (optional) runs the security audit and quality review, then closes it |
 | `/mep:domains [domain]` · `/mep:focus <path>` | Progress by domain and subdomain; what is pending in one, with the items linked from other domains (↗) |
+| `/mep:prelaunch [--full]` | Security review before going live, line by line (password hashing, keys on the server, database access, HTTPS, XSS/SQL, rate limits, CSRF, cookies, uploads, admin, prices, debug, packages, git history). Changes nothing; run it any time |
 | `/mep:launch` | Go-live: runs the full gate once. If it passes, the project is live and a push to `main` is a production deploy |
 | `/mep:defer <id> <reason>` · `/mep:domain off <path> <reason>` | Your actions: postpone a 🔴 until go-live (`defer undo <id>` brings it back); switch a whole domain off |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |

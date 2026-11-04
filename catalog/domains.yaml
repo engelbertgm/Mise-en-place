@@ -164,7 +164,7 @@ domains:
       credentials:
         label: Credenciales
         description: Contraseñas, verificación, MFA y avisos de inicio de sesión.
-        items: [password-hashing, password-recovery, email-verification, mfa-optional, admin-mfa, new-login-alert, auth-rate-limit, no-user-enumeration]
+        items: [password-hashing, password-recovery, email-verification, mfa-optional, admin-mfa, new-login-alert, auth-rate-limit, no-user-enumeration, password-reset-expiry]
       sessions:
         label: Sesiones
         description: Cookies seguras, expiración y CSRF.
@@ -232,7 +232,7 @@ domains:
       secrets:
         label: Secretos
         description: Llaves fuera del repo, por entorno y con rotación.
-        items: [no-secrets-in-repo, env-gitignored, public-env-prefix, server-only-keys, secrets-scan-ci, keys-per-environment, key-rotation-procedure, logs-without-secrets]
+        items: [no-secrets-in-repo, env-gitignored, public-env-prefix, server-only-keys, secrets-scan-ci, keys-per-environment, key-rotation-procedure, logs-without-secrets, secrets-history-clean]
       input:
         label: Entradas y salidas
         description: Validación, SQL, HTML, redirecciones y SSRF.
@@ -240,11 +240,11 @@ domains:
       web-hardening:
         label: Endurecimiento web
         description: HTTPS, cabeceras, CSP y errores ocultos.
-        items: [https-hsts, security-headers, csp-strict, security-txt, production-errors-hidden]
+        items: [https-hsts, security-headers, csp-strict, security-txt, production-errors-hidden, debug-mode-off]
       supply-chain:
         label: Dependencias y análisis
         description: Lockfile, vulnerabilidades y análisis estático.
-        items: [lockfile-committed, no-critical-vulnerabilities, dependency-scan-ci, dependency-updates-bot, static-analysis-ci]
+        items: [lockfile-committed, no-critical-vulnerabilities, dependency-scan-ci, dependency-updates-bot, static-analysis-ci, unused-dependencies]
       abuse:
         label: Abuso y bots
         description: Anti-spam, límite en formularios y WAF.
@@ -486,6 +486,10 @@ domains:
         description: Traspaso y manual.
         items: [client-handover, client-manual]
 links:
+  unused-dependencies: [quality.javascript]
+  debug-mode-off: [infra.observability]
+  password-reset-expiry: [privacy.data-governance]
+  secrets-history-clean: [infra.operations]
   touch-targets: [ux.principles, ui.responsive]
   a11y-contrast: [ui.color-theme, ui.design-system]
   a11y-reduced-motion: [ui.motion]

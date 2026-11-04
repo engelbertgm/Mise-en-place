@@ -8,6 +8,8 @@ import { deployKind, mayDeploy, prToMain } from './deploy.ts'
 import { diff, evaluate, warnings } from './evaluate.ts'
 import { matchFiles } from './files.ts'
 import { formatDomains, formatFocus, summarize } from './domains.ts'
+import { formatPrelaunch, prelaunch } from './prelaunch.ts'
+import type { PrelaunchCheck } from './prelaunch.ts'
 import { cachedGate, closePhase, formatItems, gate, launch, prReviewGate } from './gate.ts'
 import { hasProfile, loadProfile, log, normalizeProfile, saveProfile, today } from './profile.ts'
 import { linkClaudeMd, renderBrief, writeBrief, writeStackAdrs } from './render.ts'
@@ -20,7 +22,7 @@ import { confirmHuman, gitUser, NOT_HUMAN } from './human.ts'
 import { checkSeal, resync, SealBroken, stateChanges } from './seal.ts'
 import { missingSignals } from './signals.ts'
 import { globToRegExp } from './files.ts'
-import { verifyItems } from './verify.ts'
+import { failingDetail, verifyItems } from './verify.ts'
 import { compareScopeAndCode, gapReport, inferProfile } from './audit.ts'
 import { applicability, explainItem } from './explain.ts'
 import { renderScope, writeScope } from './scope.ts'
@@ -398,6 +400,17 @@ function main(): void {
       regenerate(root, profile, catalog)
       return print(cmd === 'skip' ? `⏭️ ${id} omitido: ${reason}` : `⚠️ ${id} desactivado: ${reason} (registrado en .mep/log)\nRiesgo aceptado: ${e.item.why}`)
     }
+    case 'prelaunch': {
+      // The security review before going live, line by line. It changes nothing and runs at any time.
+      const profile = requireProfile(root, catalog)
+      const file = join(catalog.dir, 'prelaunch.yaml')
+      const checks = existsSync(file) ? ((parse(readFileSync(file, 'utf8')) as { checks?: PrelaunchCheck[] }).checks ?? []) : []
+      const results = verifyItems(root, profile, evaluate(profile, catalog), args.flags.full ? 'full' : 'fast')
+      const rows = prelaunch(checks, results, failingDetail)
+      if (args.flags.json) return json(rows)
+      process.exitCode = rows.some(r => r.state === 'fail') ? 1 : 0
+      return print(formatPrelaunch(rows, Boolean(args.flags.full)))
+    }
     case 'launch': {
       requireProfile(root, catalog)
       const r = launch(root, catalog)
@@ -726,6 +739,7 @@ function main(): void {
           '  add --from cambio.yaml [--apply]                      diff del checklist',
           '  check [--fast] [--all] [--json [--detail]]            verificación por sub-etapa (--detail: datos del panel)',
           '  verify [--prod | --ci] [--pr]                         gate para CI (--ci: building → regresiones; live → barrera completa; --pr exige la revisión)',
+          '  prelaunch [--full]                                    revisión de seguridad antes de salir en vivo, línea por línea (a cualquier hora)',
           '  launch · stage [building]                             go-live: la barrera completa una vez; activa el modo en vivo',
           '  defer <id> <razón> · undefer <id>                     posponer un 🔴 hasta el go-live (no frena sub-etapas ni pushes)',
           '  domains [ruta] · focus <ruta> · domain off|on <ruta> [razón]   ítems por dominio; apagar un dominio entero',

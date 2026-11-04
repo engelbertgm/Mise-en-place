@@ -2,6 +2,11 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.4.2
+
+- **`mep prelaunch [--full]`** (`/mep:prelaunch`): la revisión de seguridad antes de salir en vivo, línea por línea (✅ lista · ❌ falta algo, y qué · ❔ falta correr comandos o el build · ⊘ no aplica a este scope). No cambia nada y se puede correr a cualquier hora; `mep launch` exige esos mismos ítems junto con el resto. Catálogo 2026.11.3: cuatro ítems nuevos (`password-reset-expiry`, `debug-mode-off`, `unused-dependencies`, `secrets-history-clean`).
+- El panel tiene "Seguridad antes de salir" en Herramientas.
+
 ## 0.4.1
 
 - **Panel en columnas:** cada línea de sub-etapa o dominio es `NOMBRE … barra de braille  rojos amarillos blancos`. La barra y los números van a la derecha y los números llevan el color (rojo, amarillo, blanco); el nombre es lo único que es botón. El número blanco cuenta los opcionales elegidos que faltan.

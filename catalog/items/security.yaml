@@ -753,3 +753,66 @@
   how: "Rutas /api/v1/…; cambios incompatibles en una versión nueva."
   verify:
     - { type: file_exists, path: ["{app,src/app,pages,src/pages}/api/v*/**/*"] }
+
+# ── Agregados en 2026.11.3: revisión de seguridad antes de salir en vivo (mep prelaunch) ──
+
+- id: password-reset-expiry
+  title: "Los enlaces de recuperación de contraseña expiran (≤ 1 hora) y sirven una sola vez"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  when: { capabilities: [auth] }
+  depends_on: [password-recovery]
+  effort: { size: XS, hours: [0.5, 1.5] }
+  why: "Un enlace de recuperación que no expira, o que sirve dos veces, es una llave de la cuenta olvidada en un correo: quien lo encuentre después puede entrar."
+  how: "Token aleatorio, guardado con hash, válido 1 hora como máximo (Supabase: otp_expiry ≤ 3600 en la configuración de Auth). Se invalida al usarlo, al cambiar la contraseña y al pedir uno nuevo; la respuesta es la misma exista o no el correo, y cambiar la contraseña cierra las demás sesiones."
+  verify:
+    - { type: grep, pattern: "otp_expiry|expiresIn|expires_at|expiresAt|resetTokenExpires|passwordResetExpires|tokenExpir", glob: "**/*.{ts,tsx,js,jsx,toml,sql,py}" }
+    - { type: manual, prompt: "El enlace de recuperación expira en una hora o menos, no sirve una segunda vez y se invalida al cambiar la contraseña" }
+  references: ["https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html"]
+
+- id: debug-mode-off
+  title: "Modo debug apagado en producción: el detalle queda en logs privados y el usuario solo ve un mensaje"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  depends_on: [production-errors-hidden, error-monitoring]
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "El modo debug muestra rutas, variables de entorno y consultas en la página de error: es el mapa que un atacante necesita. Los detalles sirven al equipo, no a quien visita."
+  how: "NODE_ENV=production y sin DEBUG, APP_DEBUG ni debug: true en la configuración de producción (Dockerfile, vercel.json, variables del hosting). Un error le muestra al usuario un mensaje genérico con un código; el detalle (stack, contexto) va al monitoreo o a logs privados."
+  verify:
+    - { type: grep, pattern: "NODE_ENV\\s*=\\s*[\"']?development|^\\s*(APP_)?DEBUG(_MODE)?\\s*=\\s*[\"']?(true|1|\\*)|FLASK_DEBUG\\s*=\\s*1|\\bdebug:\\s*true", glob: "{Dockerfile*,docker-compose*.{yml,yaml},vercel.json,.env.production,.env.production.local,.github/workflows/*deploy*.{yml,yaml}}", flags: m, expect: absent }
+    - { type: manual, prompt: "En producción un error muestra al usuario solo un mensaje genérico; el detalle queda en los logs privados o en el monitoreo" }
+
+- id: unused-dependencies
+  title: "Paquetes sin usar eliminados: cada dependencia instalada se importa en algún lado"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  when: { signals: { has_javascript: true } }
+  depends_on: [no-critical-vulnerabilities]
+  effort: { size: S, hours: [1, 2] }
+  why: "Cada paquete que no se usa es código ajeno con acceso a tu servidor y una puerta más para una vulnerabilidad o un paquete comprometido; quitarlo cuesta un comando."
+  how: "knip (modo dependencias) sin hallazgos: cada paquete de package.json se importa y cada import está declarado. Se corre antes de salir, junto con la auditoría de vulnerabilidades (pnpm audit) y la actualización de lo riesgoso."
+  verify:
+    - { type: grep, pattern: "\"knip\"", glob: "package.json" }
+    - { type: command, run: "if [ -f pnpm-lock.yaml ]; then pnpm exec knip --dependencies; elif [ -f yarn.lock ]; then yarn knip --dependencies; else npx --no-install knip --dependencies; fi", timeout: 300 }
+  references: ["https://knip.dev/"]
+
+- id: secrets-history-clean
+  title: "Historial de git sin llaves filtradas; las que aparezcan, rotadas"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.3"
+  depends_on: [secrets-scan-ci, key-rotation-procedure]
+  effort: { size: S, hours: [1, 3] }
+  why: "Una llave que alguna vez se subió sigue en el historial aunque hoy no esté en los archivos: cualquiera que clone el repo la puede sacar. Borrarla no la invalida; solo rotarla lo hace."
+  how: "gitleaks detect sobre todo el historial sin hallazgos (instalado en tu máquina; en CI ya corre con fetch-depth: 0). Si aparece una llave: rotarla en el proveedor de inmediato, poner la nueva en el gestor de variables y anotar la fecha en SECURITY.md; limpiar el historial con git filter-repo es opcional, la rotación no."
+  verify:
+    - { type: command, run: "gitleaks detect --source . --redact --no-banner", timeout: 300 }
+    - { type: manual, prompt: "Si el historial tuvo llaves, cada una se rotó en su proveedor (borrarla del repo no basta) y la fecha de rotación quedó anotada en SECURITY.md" }
+  references: ["https://github.com/gitleaks/gitleaks"]

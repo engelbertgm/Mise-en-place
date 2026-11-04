@@ -7,7 +7,7 @@ Tú describes el proyecto. mep sabe qué preguntar y qué exigir.
 
 [![Licencia](https://img.shields.io/badge/licencia-BSL_1.1-blue.svg)](LICENSE)
 [![Versión](https://img.shields.io/badge/versión-0.4.0-informational.svg)](.claude-plugin/plugin.json)
-[![Catálogo](https://img.shields.io/badge/catálogo-2026.11.2-informational.svg)](catalog/CHANGELOG.md)
+[![Catálogo](https://img.shields.io/badge/catálogo-2026.11.3-informational.svg)](catalog/CHANGELOG.md)
 [![Plugin de Claude Code](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Funciona con ponytail](https://img.shields.io/badge/funciona_con-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Funciona con baladero](https://img.shields.io/badge/funciona_con-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
@@ -152,6 +152,7 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:check` | Estado por sub-etapa: ✅ cumplido · ❌ pendiente · ⏭️ omitido · ⚠️ desactivado. Avisa si el código muestra señales que el perfil no tiene |
 | `/mep:phase [close <sub-etapa>]` | Sub-etapa activa y qué falta; `close` (opcional) corre la auditoría de seguridad y la revisión de calidad, y la cierra |
 | `/mep:domains [dominio]` · `/mep:focus <ruta>` | Avance por dominio y subdominio; lo pendiente en uno, con los ítems enlazados desde otros dominios (↗) |
+| `/mep:prelaunch [--full]` | Revisión de seguridad antes de salir, línea por línea (hash de contraseñas, llaves en el servidor, acceso a la base de datos, HTTPS, XSS/SQL, límites de intentos, CSRF, cookies, subidas, admin, precios, debug, paquetes, historial de git). No cambia nada; córrela a cualquier hora |
 | `/mep:launch` | Go-live: corre la barrera completa una vez. Si pasa, el proyecto queda en vivo y un push a `main` es un deploy a producción |
 | `/mep:defer <id> <razón>` · `/mep:domain off <ruta> <razón>` | Acciones tuyas: posponer un 🔴 hasta el go-live (`defer undo <id>` lo devuelve); apagar un dominio entero |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |

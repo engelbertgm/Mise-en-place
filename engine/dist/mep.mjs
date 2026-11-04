@@ -8004,6 +8004,38 @@ function blockersByDomain(blockers) {
   return [...by.entries()].sort((a, b) => b[1] - a[1]).map(([d, n]) => `${d} ${n}`).join(" \xB7 ");
 }
 
+// engine/src/prelaunch.ts
+function prelaunch(checks, results, detail) {
+  const byId = new Map(results.filter((r) => r.state === "active").map((r) => [r.item.id, r]));
+  return checks.map((c) => {
+    const mine = c.items.map((id) => byId.get(id)).filter((r) => r !== void 0);
+    if (!mine.length) return { label: c.label, state: "na", detail: "no aplica a este scope", items: [] };
+    const failing = mine.find((r) => r.status === "fail");
+    const unknown = mine.find((r) => r.status === "unknown");
+    const state = failing ? "fail" : unknown ? "unknown" : "pass";
+    const pending = failing ?? unknown;
+    return {
+      label: c.label,
+      state,
+      detail: pending ? `${pending.item.id}: ${detail(pending) || "pendiente"}` : "",
+      items: mine.map((r) => ({ id: r.item.id, status: r.status }))
+    };
+  });
+}
+var ICON = { pass: "\u2705", fail: "\u274C", unknown: "\u2754", na: "\u2298" };
+function formatPrelaunch(rows, full) {
+  const applies = rows.filter((r) => r.state !== "na");
+  const done = applies.filter((r) => r.state === "pass").length;
+  const out = [`Antes de salir en vivo \xB7 seguridad: ${done} de ${applies.length} listas${rows.length - applies.length ? ` (${rows.length - applies.length} no aplican)` : ""}`];
+  for (const r of rows) {
+    out.push(`${ICON[r.state]} ${r.label}${r.state === "pass" ? "" : ` \u2014 ${r.detail}`}`);
+  }
+  out.push("");
+  if (!full && rows.some((r) => r.state === "unknown")) out.push("\u2754 = falta correr comandos o el build: `mep prelaunch --full` los corre.");
+  out.push("Se puede correr en cualquier momento; `mep launch` exige estos mismos \xEDtems junto con todo lo dem\xE1s.");
+  return out.join("\n");
+}
+
 // engine/src/gate.ts
 import { execSync as execSync4 } from "node:child_process";
 import { createHash as createHash4 } from "node:crypto";
@@ -11123,6 +11155,16 @@ ${formatItems(pending)}` : `
       return print(cmd === "skip" ? `\u23ED\uFE0F ${id} omitido: ${reason}` : `\u26A0\uFE0F ${id} desactivado: ${reason} (registrado en .mep/log)
 Riesgo aceptado: ${e.item.why}`);
     }
+    case "prelaunch": {
+      const profile = requireProfile(root, catalog);
+      const file = join17(catalog.dir, "prelaunch.yaml");
+      const checks = existsSync16(file) ? (0, import_yaml8.parse)(readFileSync15(file, "utf8")).checks ?? [] : [];
+      const results = verifyItems(root, profile, evaluate(profile, catalog), args.flags.full ? "full" : "fast");
+      const rows = prelaunch(checks, results, failingDetail);
+      if (args.flags.json) return json(rows);
+      process.exitCode = rows.some((r) => r.state === "fail") ? 1 : 0;
+      return print(formatPrelaunch(rows, Boolean(args.flags.full)));
+    }
     case "launch": {
       requireProfile(root, catalog);
       const r = launch(root, catalog);
@@ -11453,6 +11495,7 @@ ${errors.map((e) => `  - ${e}`).join("\n")}` : "\u2705 REGISTRY.md al d\xEDa");
           "  add --from cambio.yaml [--apply]                      diff del checklist",
           "  check [--fast] [--all] [--json [--detail]]            verificaci\xF3n por sub-etapa (--detail: datos del panel)",
           "  verify [--prod | --ci] [--pr]                         gate para CI (--ci: building \u2192 regresiones; live \u2192 barrera completa; --pr exige la revisi\xF3n)",
+          "  prelaunch [--full]                                    revisi\xF3n de seguridad antes de salir en vivo, l\xEDnea por l\xEDnea (a cualquier hora)",
           "  launch \xB7 stage [building]                             go-live: la barrera completa una vez; activa el modo en vivo",
           "  defer <id> <raz\xF3n> \xB7 undefer <id>                     posponer un \u{1F534} hasta el go-live (no frena sub-etapas ni pushes)",
           "  domains [ruta] \xB7 focus <ruta> \xB7 domain off|on <ruta> [raz\xF3n]   \xEDtems por dominio; apagar un dominio entero",
