@@ -157,7 +157,7 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 | `/mep:defer <id> <razón>` · `/mep:domain off <ruta> <razón>` | Acciones tuyas: posponer un 🔴 hasta el go-live (`defer undo <id>` lo devuelve); apagar un dominio entero |
 | `/mep:skip <id> <razón>` | Omite un ítem 🟡 |
 | `/mep:override <id> <razón>` | Desactiva un ítem 🔴; rechaza ítems 🔒. Solo lo escribes tú: el agente no puede |
-| `/mep:panel` | Panel junto al chat: pendientes por sub-etapa; un clic en uno muestra qué pide, por qué y todo lo que falla, y permite confirmarlo, omitirlo o desactivarlo |
+| `/mep:panel` | Panel junto al chat: pendientes por sub-etapa o por dominio, y un botón **Flujo** (qué comando correr y cuándo; un clic lo escribe en el chat); un clic en uno muestra qué pide, por qué y todo lo que falla, y permite confirmarlo, omitirlo o desactivarlo |
 | `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Acciones tuyas, nunca del agente: confirmar un ítem manual (con tu usuario de git), relajar un umbral de calidad, re-sellar el estado cambiado fuera de la CLI |
 | `/mep:audit [scope]` | Para un repo existente: parte del scope del proyecto, lo contrasta con lo que muestra el código (lo que sobra y lo que falta) y reporta la brecha solo con las reglas que ese scope activa. No cambia nada hasta que adoptes el brief |
 | `/mep:update` | Trae los ítems nuevos del catálogo que aplican a tu perfil, marcados ＋ nuevo o ✎ modificado. Los que caen en una sub-etapa cerrada tienen periodo de gracia. Escribe los documentos de planeación que falten |

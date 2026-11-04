@@ -16,6 +16,8 @@ const expanded = atom({ plugin: 'mep', key: 'expanded' } as const, [], { shape: 
 const pending = atom({ plugin: 'mep', key: 'pending' } as const, null, { shape: 'pending-1' })
 const flash = atom({ plugin: 'mep', key: 'flash' } as const, '', { shape: 'flash-1' })
 const tools = atom({ plugin: 'mep', key: 'tools' } as const, false, { shape: 'tools-1' })
+// The flow view: which command to run, and when.
+const flowOpen = atom({ plugin: 'mep', key: 'flow' } as const, false, { shape: 'flow-1' })
 // How the list is grouped: by sub-phase (the order of the work) or by domain (the area).
 const view = atom({ plugin: 'mep', key: 'view' } as const, 'fase', { shape: 'view-1' })
 // Frame of the braille spinner while the engine works; -1 when idle.
@@ -40,6 +42,45 @@ const WITH_TEXT = [
   ['mep:scope', 'Scope, descripción:', 'crear'],
   ['mep:add', 'Agregar scope:', 'agregar'],
   ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
+] as const
+
+/**
+ * The flow line: which command, and when. Each command is [what shows, what goes into the chat box, why]; a text that
+ * ends in a space waits for the person to finish it. Nothing runs from here: the person presses Enter.
+ */
+const FLOW = [
+  { id: 'scope', title: 'Definir el scope', when: 'una vez, al empezar', cmds: [
+    ['/mep:scope <descripción>', '/mep:scope ', 'crea el perfil, SCOPE.md y BRIEF.md'],
+    ['/mep:audit', '/mep:audit', 'si el repo ya existe: scope contra código'],
+  ] },
+  { id: 'work', title: 'Trabajar', when: 'todo el tiempo', cmds: [
+    ['/mep:domains', '/mep:domains', 'avance por dominio'],
+    ['/mep:focus <dominio>', '/mep:focus ', 'qué falta en uno'],
+    ['/mep:check', '/mep:check', 'estado por sub-etapa'],
+    ['/mep:add <cambio>', '/mep:add ', 'el scope cambió'],
+  ] },
+  { id: 'decide', title: 'Si algo no aplica o puede esperar', when: 'solo tú lo escribes', cmds: [
+    ['/mep:defer <id> <razón>', '/mep:defer ', 'esperar hasta salir en vivo'],
+    ['/mep:skip <id> <razón>', '/mep:skip ', 'omitir un recomendado'],
+    ['/mep:override <id> <razón>', '/mep:override ', 'apagar un obligatorio'],
+    ['/mep:domain off <ruta> <razón>', '/mep:domain off ', 'apagar un dominio'],
+    ['/mep:confirm <id>', '/mep:confirm ', 'ya verifiqué un ítem manual'],
+  ] },
+  { id: 'push', title: 'Subir avance', when: 'cuando quieras', note: 'git push o PR a main: no exige cerrar nada', cmds: [
+    ['/mep:phase close <sub-etapa>', '/mep:phase close ', 'opcional: proteger lo hecho'],
+  ] },
+  { id: 'prelaunch', title: 'Antes de salir', when: 'a cualquier hora', cmds: [
+    ['/mep:prelaunch', '/mep:prelaunch', 'seguridad, línea por línea'],
+    ['/mep:prelaunch --full', '/mep:prelaunch --full', 'con comandos y build'],
+  ] },
+  { id: 'launch', title: 'Salir en vivo', when: 'cuando no falte ningún obligatorio', cmds: [
+    ['/mep:launch', '/mep:launch', 'la barrera completa, una vez'],
+  ] },
+  { id: 'live', title: 'Ya en vivo', when: 'después', note: 'cada push a main es un deploy con la barrera completa', cmds: [
+    ['/mep:update', '/mep:update', 'ítems nuevos del catálogo'],
+    ['/mep:export', '/mep:export', 'brief para el cliente'],
+    ['/mep:quote', '/mep:quote', 'cotización interna'],
+  ] },
 ] as const
 
 // Levels are circles in a theme color, so they follow light and dark themes: full red (required), full yellow
@@ -317,6 +358,56 @@ export const register: Register = on => {
         {num(opts.counts[2], 'optional')}
       </Box>
     )
+
+    if (await read($, flowOpen)) {
+      // Where the project stands: live, nothing required left (ready to go live), or still being worked.
+      const current = data.stage === 'live' ? 'live' : data.counts.required === 0 ? 'launch' : 'work'
+      const at = FLOW.findIndex(s => s.id === current)
+      // Into the chat box if it takes it; on a surface that draws its own composer, onto the clipboard.
+      const put = async (text: string) => {
+        const shown = text.trim()
+        const filled = await $.prompt.fill({ text, mode: 'replace' }).catch(() => ({ isFilled: false }))
+        if (filled.isFilled) return update($, flash, () => `En el chat: ${shown}. Enter para correrlo.`)
+        const copied = await $.ui.copy({ text: shown, surface: e.surface }).catch(() => ({ isCopied: false }))
+        await update($, flash, () => (copied.isCopied ? `Copiado: ${shown}. Pégalo en el chat.` : `Escríbelo en el chat: ${shown}`))
+      }
+      return (
+        <Box flexDirection="column">
+          <Button key="flow-back" plain onPress={() => update($, flowOpen, () => false)}>
+            ← Volver
+          </Button>
+          <Text bold>Flujo: qué comando y cuándo</Text>
+          <Text dimColor>Un clic escribe el comando en el chat; tú le das Enter.</Text>
+          {message ? <Text dimColor>{message}</Text> : null}
+          <Box flexDirection="column" marginTop={1}>
+            {FLOW.map((step, i) => {
+              const here = i === at
+              const mark = here ? '▶' : i < at ? '✓' : '○'
+              return (
+                <Box flexDirection="column">
+                  {i > 0 && <Text dimColor>{'  │'}</Text>}
+                  <Box flexDirection="row" gap={1}>
+                    {here ? <Text color={e.surface === 'terminal' ? 'claude' : '#d97757'}>{mark}</Text> : <Text dimColor>{mark}</Text>}
+                    <Text bold={here}>{`${i + 1}. ${step.title}`}</Text>
+                    <Text dimColor>{step.when}</Text>
+                  </Box>
+                  {'note' in step && <Text dimColor>{`  │ ${step.note}`}</Text>}
+                  {step.cmds.map(([label, fill, hint], k) => (
+                    <Box flexDirection="row">
+                      <Text dimColor>{k === step.cmds.length - 1 ? '  └ ' : '  ├ '}</Text>
+                      <Button key={`f-${step.id}-${k}`} plain onPress={() => put(fill)}>
+                        {label}
+                      </Button>
+                      <Text dimColor>{`  ${hint}`}</Text>
+                    </Box>
+                  ))}
+                </Box>
+              )
+            })}
+          </Box>
+        </Box>
+      )
+    }
 
     if (await read($, tools)) {
       const run = async (command: string, args = '') => {
@@ -617,6 +708,9 @@ export const register: Register = on => {
         <Box flexDirection="row" gap={2}>
           <Button key="full" plain onPress={() => refresh($, true)}>
             ↻ Verificar todo
+          </Button>
+          <Button key="flow" plain onPress={() => update($, flowOpen, () => true)}>
+            ⇢ Flujo
           </Button>
           <Button key="tools" plain onPress={() => update($, tools, () => true)}>
             ⚙ Herramientas

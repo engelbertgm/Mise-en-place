@@ -60,6 +60,7 @@ declare module 'claude-code' {
       pending: Shaped<PendingOverride | null>
       flash: Shaped<string>
       tools: Shaped<boolean>
+      flow: Shaped<boolean>
       view: Shaped<'fase' | 'dominio'>
       spinner: Shaped<number>
     }

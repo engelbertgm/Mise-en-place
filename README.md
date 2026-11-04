@@ -157,7 +157,7 @@ Then, in a new or existing project folder:
 | `/mep:defer <id> <reason>` · `/mep:domain off <path> <reason>` | Your actions: postpone a 🔴 until go-live (`defer undo <id>` brings it back); switch a whole domain off |
 | `/mep:skip <id> <reason>` | Skips a 🟡 item |
 | `/mep:override <id> <reason>` | Turns off a 🔴 item; rejects 🔒 items. Only you type it: the agent cannot |
-| `/mep:panel` | Panel beside the chat: pending items by sub-phase; press one to see what it asks, why and everything that fails, and to confirm, skip or turn it off |
+| `/mep:panel` | Panel beside the chat: pending items by sub-phase or by domain, plus a **Flow** button (which command to run and when; a click writes it in the chat); press one to see what it asks, why and everything that fails, and to confirm, skip or turn it off |
 | `/mep:confirm <id>` · `/mep:threshold …` · `/mep:resync` | Your actions, never the agent's: confirm a manual item (recorded with your git user), relax a quality threshold, re-seal state changed outside the CLI |
 | `/mep:audit [scope]` | For an existing repo: starts from the project's scope, compares it with what the code shows (code-only vs scope-only), and reports the gap with only the rules that scope activates. Changes nothing until you adopt the brief |
 | `/mep:update` | Brings new catalog items that apply to your profile, marked ＋ new or ✎ changed. Items that land in a closed sub-phase get a grace period. Writes planning documents the project is missing |

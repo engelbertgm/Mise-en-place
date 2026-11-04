@@ -327,6 +327,39 @@ describe('panel', () => {
     await ui.unmount()
   })
 
+  test('the flow line: a click puts the command in the chat box, with its arguments left to type', async ($, on) => {
+    const filled: string[] = []
+    on('prompt.fill', (_, e) => (filled.push(e.text), { isFilled: true }))
+    await opened($, on)
+    for (const surface of ['terminal', 'vscode'] as const) {
+      filled.length = 0
+      const ui = await $.ui.mount({ ...PANE, surface })
+      await ui.press({ key: 'flow' })
+      expect((await ui.find({ type: 'Text', text: /Flujo: qué comando y cuándo/ }))?.text).toBeTruthy()
+      await ui.press({ key: 'f-launch-0' })
+      await ui.press({ key: 'f-work-1' })
+      await ui.press({ key: 'f-decide-0' })
+      expect(filled).toEqual(['/mep:launch', '/mep:focus ', '/mep:defer '])
+      expect((await ui.find({ type: 'Text', text: /En el chat: \/mep:defer/ }))?.text).toBeTruthy()
+      await ui.press({ key: 'flow-back' })
+      await ui.unmount()
+    }
+  })
+
+  test('the flow line: where the chat box is not ours, the command goes to the clipboard', async ($, on) => {
+    const copied: string[] = []
+    on('prompt.fill', () => ({ isFilled: false, refusal: 'no_composer' }))
+    on('ui.copy', (_, e) => (copied.push(e.text), { value: { isCopied: true } }))
+    await opened($, on)
+    const ui = await $.ui.mount({ ...PANE, surface: 'vscode' })
+    await ui.press({ key: 'flow' })
+    await ui.press({ key: 'f-prelaunch-0' })
+    expect(copied).toEqual(['/mep:prelaunch'])
+    expect((await ui.find({ type: 'Text', text: /Copiado: \/mep:prelaunch/ }))?.text).toBeTruthy()
+    await ui.press({ key: 'flow-back' })
+    await ui.unmount()
+  })
+
   test('the list draws no card over its rows: every item stays pressable', async ($, on) => {
     await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
