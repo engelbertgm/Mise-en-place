@@ -6,8 +6,8 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.2-informational.svg)](.claude-plugin/plugin.json)
-[![Catalog](https://img.shields.io/badge/catalog-2026.11.3-informational.svg)](catalog/CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-0.4.3-informational.svg)](.claude-plugin/plugin.json)
+[![Catalog](https://img.shields.io/badge/catalog-2026.11.4-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
 [![Works with baladero](https://img.shields.io/badge/works_with-baladero-555.svg)](https://github.com/engelbertgm/Baladero)
@@ -41,6 +41,8 @@ flowchart TD
     LIVE --> G2["Blocks on any<br/>pending 🔴"]
     G2 --> CI["CI: mep verify --ci<br/>required check on main"]
 ```
+
+**The rules are guidelines for building, not tasks to tick off.** While you build, the agent keeps `BRIEF.md` in mind the way you would say "make the site, and consider accessibility and WCAG": it writes the real thing well the first time. Pending items during construction are normal; mep tells the agent never to create placeholder pages, throwaway sites or filler code just to make a check pass, and not to walk the checklist item by item. Checks run at the checkpoints (closing a sub-phase, `/mep:prelaunch`, `/mep:launch`, CI), on what actually exists.
 
 You never have to close a sub-phase to push. A project starts **building**: a push or PR to `main` only stops on secrets, 🔒 violations and regressions in sub-phases you already closed. `/mep:launch` runs the full gate once; if it passes, the project goes **live** and every push to `main` is a production deploy.
 
@@ -149,7 +151,7 @@ What can be measured is a check, not a principle:
 | Code (Python) | Ruff with the same limits plus its security rules, mypy --strict, pytest, a lockfile with pip-audit, vulture; only in projects with `pyproject.toml`, `requirements*.txt` or `uv.lock` |
 | CSS · HTML · SQL | Stylelint, no `!important`, CSS size; valid, semantic HTML without inline handlers; SQL lint, safe migrations, indexed foreign keys |
 | Frameworks · CI | React hooks and jsx-a11y lint, `"use client"` only where needed; actionlint, shellcheck, hadolint, `.editorconfig` with LF line endings |
-| Architecture | Twelve-Factor (config validated from env, stateless server, logs to stdout, pinned runtime) and a walking skeleton deployed before features (Gall's law) |
+| Architecture | Twelve-Factor (config validated from env, stateless server, logs to stdout, pinned runtime) and, if you want it, what exists deployed to preview early (Gall's law; optional, never a placeholder page) |
 | Systems design | idempotency keys, caching and CDN, message queues, a shared-store rate limit with 429, circuit breakers and timeouts, structured logs, metrics and traces; with `high_traffic` also load balancing, replicas and recovery, a consistency (CAP) model, sharding and consistent hashing |
 | Honesty and privacy | no fake reviews, claims with evidence, a notice beside every form, data minimization, an audit of third-party SDKs, business identity on the page |
 

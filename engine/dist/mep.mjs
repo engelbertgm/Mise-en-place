@@ -10934,12 +10934,10 @@ function runHook(event, root, catalog) {
       const profile = loadProfile(cwd, catalog);
       const results = verifyItems(cwd, profile, evaluate(profile, catalog), "fast");
       const c = counts(results);
-      const active = results.filter((r) => r.state === "active" && r.level === "required" && r.item.phase === profile.phase.active && r.status !== "pass");
       const text = [
-        `mep \xB7 sub-etapa activa: ${profile.phase.active} \xB7 pendientes \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended}. Este proyecto se rige por BRIEF.md.`,
-        ...active.slice(0, 5).map((r) => `  \u{1F534} ${r.item.id} \u2014 ${r.item.how}`),
-        active.length > 5 ? `  \u2026 y ${active.length - 5} m\xE1s (/mep:check)` : ""
-      ].filter(Boolean).join("\n");
+        `mep \xB7 sub-etapa activa: ${profile.phase.active} \xB7 pendientes \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended} (normales mientras se construye).`,
+        "BRIEF.md son gu\xEDas para construir lo real: tenlas presentes al escribir. No crees placeholders ni c\xF3digo de relleno para cumplir un punto; se verifica al cerrar una sub-etapa, en /mep:prelaunch y en /mep:launch."
+      ].join("\n");
       json({ systemMessage: text.split("\n")[0], hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } });
       return;
     }
@@ -10979,7 +10977,7 @@ function runHook(event, root, catalog) {
       json({
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
-          additionalContext: `mep: ${rel} es un archivo sensible. Al terminar este cambio, pide al agente mep-security que lo audite; su reporte en .mep/security/ es lo que da por cumplidos los \xEDtems de seguridad.`
+          additionalContext: `mep: ${rel} es un archivo sensible. Escr\xEDbelo siguiendo las gu\xEDas de seguridad del BRIEF. No hace falta auditarlo ahora: el agente mep-security lo revisa una vez, al cerrar la sub-etapa o en /mep:prelaunch, y su reporte en .mep/security/ es lo que da por cumplidos los \xEDtems de seguridad.`
         }
       });
       return;

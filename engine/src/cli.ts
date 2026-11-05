@@ -179,14 +179,11 @@ function runHook(event: string, root: string, catalog: Catalog): void {
       const profile = loadProfile(cwd, catalog)
       const results = verifyItems(cwd, profile, evaluate(profile, catalog), 'fast')
       const c = counts(results)
-      const active = results.filter(r => r.state === 'active' && r.level === 'required' && r.item.phase === profile.phase.active && r.status !== 'pass')
+      // A reminder of the posture, never a to-do list: a list of pending items invites placeholders to clear it.
       const text = [
-        `mep · sub-etapa activa: ${profile.phase.active} · pendientes 🔴 ${c.required} · 🟡 ${c.recommended}. Este proyecto se rige por BRIEF.md.`,
-        ...active.slice(0, 5).map(r => `  🔴 ${r.item.id} — ${r.item.how}`),
-        active.length > 5 ? `  … y ${active.length - 5} más (/mep:check)` : '',
-      ]
-        .filter(Boolean)
-        .join('\n')
+        `mep · sub-etapa activa: ${profile.phase.active} · pendientes 🔴 ${c.required} · 🟡 ${c.recommended} (normales mientras se construye).`,
+        'BRIEF.md son guías para construir lo real: tenlas presentes al escribir. No crees placeholders ni código de relleno para cumplir un punto; se verifica al cerrar una sub-etapa, en /mep:prelaunch y en /mep:launch.',
+      ].join('\n')
       json({ systemMessage: text.split('\n')[0], hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } })
       return
     }
@@ -227,7 +224,7 @@ function runHook(event: string, root: string, catalog: Catalog): void {
       json({
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
-          additionalContext: `mep: ${rel} es un archivo sensible. Al terminar este cambio, pide al agente mep-security que lo audite; su reporte en .mep/security/ es lo que da por cumplidos los ítems de seguridad.`,
+          additionalContext: `mep: ${rel} es un archivo sensible. Escríbelo siguiendo las guías de seguridad del BRIEF. No hace falta auditarlo ahora: el agente mep-security lo revisa una vez, al cerrar la sub-etapa o en /mep:prelaunch, y su reporte en .mep/security/ es lo que da por cumplidos los ítems de seguridad.`,
         },
       })
       return

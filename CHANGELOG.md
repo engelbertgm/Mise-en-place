@@ -2,6 +2,15 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.4.3
+
+**Las reglas son guías para construir, no tareas que cumplir.** Antes el agente leía los pendientes como una lista por limpiar y a veces construía páginas de prueba o código de relleno solo para que una verificación pasara.
+
+- **El agente trabaja con las reglas como guías:** el bloque de `CLAUDE.md`, la skill `mep` y el contexto de inicio de sesión ahora dicen "ten presentes las guías al escribir lo real (accesibilidad, WCAG, seguridad…) y hazlo bien a la primera". Los pendientes durante la construcción son normales; nunca se crean placeholders, sitios de prueba ni archivos vacíos para cumplir un punto; no se recorre el checklist ítem por ítem.
+- **Se verifica en los puntos de control** (cerrar una sub-etapa, `/mep:prelaunch`, `/mep:launch`, el CI), sobre lo que existe. El inicio de sesión ya no lista los pendientes con su "cómo"; solo recuerda la postura.
+- **Sin auditorías tras cada edición:** al editar un archivo sensible, mep ya no pide auditar con `mep-security` en ese momento; la auditoría se hace una vez, al cerrar la sub-etapa o en `/mep:prelaunch`.
+- Catálogo 2026.11.4: `walking-skeleton` (esqueleto desplegado antes de las features) pasa a ⚪ opcional; era el ítem que más empujaba a construir un sitio de relleno.
+
 ## 0.4.2
 
 - **`mep prelaunch [--full]`** (`/mep:prelaunch`): la revisión de seguridad antes de salir en vivo, línea por línea (✅ lista · ❌ falta algo, y qué · ❔ falta correr comandos o el build · ⊘ no aplica a este scope). No cambia nada y se puede correr a cualquier hora; `mep launch` exige esos mismos ítems junto con el resto. Catálogo 2026.11.3: cuatro ítems nuevos (`password-reset-expiry`, `debug-mode-off`, `unused-dependencies`, `secrets-history-clean`) y tres de subidas (`upload-type-allowlist`, `upload-content-hardening`, `upload-served-safely`); `upload-antivirus` pasa a 🔴 con contenido de usuarios o en marketplaces.

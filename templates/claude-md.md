@@ -1,4 +1,7 @@
-Este proyecto se rige por BRIEF.md (checklist) y SCOPE.md (qué es y qué no incluye). Los ítems 🔴 son requisitos no negociables.
+Este proyecto se rige por BRIEF.md y SCOPE.md (qué es y qué no incluye). BRIEF.md son **guías para construir lo real**: tenlas presentes mientras escribes (accesibilidad y WCAG, seguridad, SEO, rendimiento, lo legal que aplique) y hazlo bien a la primera, como parte de hacer el sitio.
+- Los pendientes durante la construcción son normales. No los "limpies": nunca crees páginas de prueba, sitios placeholder, archivos vacíos ni código de relleno solo para que pase una verificación, ni construyas algo que luego se cambia solo para cumplir un punto.
+- Se verifica en los puntos de control (cerrar una sub-etapa, `/mep:prelaunch`, `/mep:launch`, el CI), sobre lo que de verdad existe. Si un punto aún no aplica porque esa parte no está construida, se cumple cuando se construya.
+- Un push o un PR no exigen cumplir los 🔴 pendientes.
 
 Mantra de código: claro, simple, bonito y reutilizado.
 - Para encontrar algo, consulta primero CODEMAP.md y REGISTRY.md; no busques archivo por archivo.

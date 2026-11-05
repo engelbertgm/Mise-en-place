@@ -136,7 +136,32 @@ describe('classic hooks', () => {
     }
   })
 
-  test('session-start shows the active sub-phase and its pending items', () => {
+  test('session-start reminds the posture (guidelines, no placeholders) and lists no items to clear', () => {
+    const root = initialized()
+    const out = JSON.parse(mep(root, ['hook', 'session-start'], JSON.stringify({ cwd: root })).out)
+    const text = out.hookSpecificOutput.additionalContext as string
+    assert.match(text, /sub-etapa activa: foundation\.setup/)
+    assert.match(text, /guías para construir lo real/)
+    assert.match(text, /No crees placeholders/)
+    assert.doesNotMatch(text, /🔴 [a-z0-9-]+ —/) // no per-item to-do lines
+  })
+
+  test('the project\'s CLAUDE.md block frames BRIEF.md as guidelines and forbids filler to pass a check', () => {
+    const root = initialized()
+    const claude = readFileSync(join(root, 'CLAUDE.md'), 'utf8')
+    assert.match(claude, /guías para construir lo real/)
+    assert.match(claude, /nunca crees páginas de prueba, sitios placeholder/)
+    assert.doesNotMatch(claude, /requisitos no negociables/)
+  })
+
+  test('the walking skeleton is optional: a placeholder page is never required', () => {
+    const root = initialized()
+    const results = JSON.parse(mep(root, ['check', '--json', '--fast']).out).results as { id: string; level: string }[]
+    const skeleton = results.find(r => r.id === 'walking-skeleton')
+    assert.ok(!skeleton || skeleton.level === 'optional')
+  })
+
+  test('session-start shows the active sub-phase and its pending counts', () => {
     const root = initialized()
     const out = JSON.parse(mep(root, ['hook', 'session-start'], JSON.stringify({ cwd: root })).out)
     assert.match(out.hookSpecificOutput.additionalContext, /sub-etapa activa: foundation\.setup/)

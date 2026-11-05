@@ -2,6 +2,10 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.11.4
+
+- **`walking-skeleton` pasa a ⚪ opcional.** Pedir "una página mínima desplegada" en `foundation.setup` empujaba a construir un sitio de relleno solo para que pasara la verificación. Ahora es una opción: si la eliges, se despliega lo que ya exista, nunca una página de prueba. Los proyectos que lo tenían como 🔴 lo ven como ofrecido.
+
 ## 2026.11.3
 
 Revisión de seguridad antes de salir en vivo (`mep prelaunch`), con cuatro ítems nuevos:

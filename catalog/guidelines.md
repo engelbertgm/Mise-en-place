@@ -35,7 +35,7 @@ Code
 - Server code is stateless: no local files or in-memory sessions
 - Logs go to stdout or a structured logger, never to local files
 - Dev and prod run the same runtime version and the same DB engine
-- A walking skeleton is deployed before features are built
+- Optionally, what already exists is deployed to preview early (never a placeholder page built just for that)
 
 ---
 

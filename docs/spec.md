@@ -2,7 +2,7 @@
 
 > Instrucciones para Claude Code. Este documento define qué construir y cómo debe comportarse.
 >
-> **Estado:** fases 1–10 implementadas (catálogo 2026.11.3). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
+> **Estado:** fases 1–10 implementadas (catálogo 2026.11.4). Decisiones de implementación: motor en TypeScript publicado como `@engelbertgm/mep`; verificaciones extra `html`, `sql`, `maps`, `quality` y `design`; idiomas derivados de los mercados (`market_languages`); revisión de calidad antes del PR a `main` una vez por commit; mods en un solo módulo; export desde un subconjunto de Markdown a .docx y .pdf sin dependencias; proyecto de prueba en `examples/estudio-saas` con su test de punta a punta.
 > Antes de implementar, verifica en la documentación actual de Claude Code la estructura de plugins, comandos, skills y hooks.
 
 ---
@@ -366,7 +366,7 @@ Reglas:
 5. Escribe `.mep/profile.yaml` y genera `SCOPE.md` (resumen del scope en lenguaje claro: qué es, qué incluye, qué no incluye, tecnología, cuántas reglas aplican y qué falta definir) y `BRIEF.md`. Ambos se regeneran con cada `/mep:add`; no se editan a mano.
 6. Agrega a `CLAUDE.md` (sin borrar lo existente):
    ```
-   Este proyecto se rige por BRIEF.md. Los ítems 🔴 son requisitos no negociables.
+   Este proyecto se rige por BRIEF.md y SCOPE.md. BRIEF.md son guías para construir lo real (se tienen presentes al escribir, no se "limpian" con código de relleno); se verifican en los puntos de control: cerrar una sub-etapa, `/mep:prelaunch`, `/mep:launch` y el CI.
 
    Mantra de código: claro, simple, bonito y reutilizado.
    - Para encontrar algo, consulta primero CODEMAP.md y REGISTRY.md; no busques archivo por archivo.

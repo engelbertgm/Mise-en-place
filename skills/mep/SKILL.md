@@ -37,11 +37,13 @@ Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o
 
 ## Reglas de trabajo en un proyecto con mep
 
+- **Guías, no tareas.** Los ítems de `BRIEF.md` son lo que el sitio terminado debe cumplir, y se verifican en los puntos de control (cerrar una sub-etapa, `/mep:prelaunch`, `/mep:launch`, el CI). Mientras construyes, **tenlos presentes y hazlo bien a la primera**, como al decirte "haz el sitio, considerando accesibilidad y WCAG": úsalos para decidir cómo escribes lo real. **Nunca crees placeholders, sitios de prueba, archivos vacíos ni código de relleno para que pase una verificación**, ni construyas algo que después se cambia solo para cumplir un punto: eso gasta trabajo y no mejora el producto. Un pendiente durante la construcción es normal; si un punto depende de algo que aún no existe, se cumple cuando se construya. No recorras el checklist ítem por ítem ni lances auditorías (`mep-security`, revisiones) tras cada edición: se hacen al cerrar la sub-etapa o en `/mep:prelaunch`.
+
 - **Etapa y push.** Un proyecto está `building` (en construcción) o `live` (en vivo). En construcción, un push o un PR a `main` solo se detiene por secretos, ítems 🔒 violados o regresiones en sub-etapas ya cerradas: **no pidas al usuario cerrar sub-etapas ni cumplir los 🔴 pendientes para poder subir avance.** Cerrar una sub-etapa es opcional (protege lo hecho contra regresiones). El momento de exigirlo todo es `/mep:launch`; ya en vivo, cada push a `main` es un deploy a producción con la barrera completa.
 - **Dominios.** Cada ítem vive en un dominio y subdominio (`ui.motion`, `security.abuse`, `payments.checkout`…). `/mep:domains` muestra el avance por dominio y `/mep:focus <ruta>` lo pendiente de uno (con ↗ los ítems enlazados desde otro dominio). Trabaja por dominio si el usuario lo prefiere; no hace falta seguir el orden de las sub-etapas. Apagar un dominio (`/mep:domain off`) y diferir un 🔴 hasta el go-live (`/mep:defer`) son decisiones del usuario, no tuyas.
 
 - `BRIEF.md` es la instrucción maestra; se regenera desde el perfil, no se edita a mano.
-- Fases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Trabaja la sub-etapa activa; las 🔴 de sub-etapas cerradas están protegidas contra regresiones.
+- Fases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Son un orden sugerido para trabajar; las 🔴 de sub-etapas cerradas están protegidas contra regresiones.
 - Documentos de planeación (`docs/plan/`): son el plan contra el que se construye.
   - Al empezar `foundation.design`, si falta `FLOWS.md`, escríbelo antes que nada; al empezar `build.data` con `has_db`, lo mismo con `SCHEMA.md`, antes de escribir migraciones. Plantillas en `${CLAUDE_PLUGIN_ROOT}/templates/plan/`.
   - Lee `SCHEMA.md` antes de tocar la base de datos y `FLOWS.md` antes de construir una pantalla.
