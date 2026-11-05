@@ -177,14 +177,18 @@ function runHook(event: string, root: string, catalog: Catalog): void {
   switch (event) {
     case 'session-start': {
       const profile = loadProfile(cwd, catalog)
+      // mep's block in CLAUDE.md follows the plugin version: an older one (e.g. "requisitos no negociables") is refreshed.
+      linkClaudeMd(cwd, readFileSync(join(pluginRoot(catalog), 'templates', 'claude-md.md'), 'utf8'))
       const results = verifyItems(cwd, profile, evaluate(profile, catalog), 'fast')
       const c = counts(results)
       // A reminder of the posture, never a to-do list: a list of pending items invites placeholders to clear it.
-      const text = [
-        `mep · sub-etapa activa: ${profile.phase.active} · pendientes 🔴 ${c.required} · 🟡 ${c.recommended} (normales mientras se construye).`,
-        'BRIEF.md son guías para construir lo real: tenlas presentes al escribir. No crees placeholders ni código de relleno para cumplir un punto; se verifica al cerrar una sub-etapa, en /mep:prelaunch y en /mep:launch.',
+      // For the agent (English, fewer tokens); the user sees the one-line Spanish summary.
+      const note = [
+        `mep · active sub-phase: ${profile.phase.active} · pending 🔴 ${c.required} · 🟡 ${c.recommended} (normal while building).`,
+        'BRIEF.md holds guidelines for building the real thing: keep them in mind as you write. Do not create placeholders or filler code to meet a point; checks run when a sub-phase closes, in /mep:prelaunch and in /mep:launch. Talk to the user in their language.',
       ].join('\n')
-      json({ systemMessage: text.split('\n')[0], hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } })
+      const summary = `mep · sub-etapa activa: ${profile.phase.active} · pendientes 🔴 ${c.required} · 🟡 ${c.recommended} (normales mientras se construye)`
+      json({ systemMessage: summary, hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: note } })
       return
     }
     case 'stop': {
@@ -224,7 +228,7 @@ function runHook(event: string, root: string, catalog: Catalog): void {
       json({
         hookSpecificOutput: {
           hookEventName: 'PostToolUse',
-          additionalContext: `mep: ${rel} es un archivo sensible. Escríbelo siguiendo las guías de seguridad del BRIEF. No hace falta auditarlo ahora: el agente mep-security lo revisa una vez, al cerrar la sub-etapa o en /mep:prelaunch, y su reporte en .mep/security/ es lo que da por cumplidos los ítems de seguridad.`,
+          additionalContext: `mep: ${rel} is a sensitive file. Write it following the BRIEF's security guidelines. No need to audit it now: the mep-security agent reviews it once, when the sub-phase closes or in /mep:prelaunch, and its report in .mep/security/ is what marks the security items as met.`,
         },
       })
       return

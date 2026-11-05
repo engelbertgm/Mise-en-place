@@ -1,15 +1,15 @@
 ---
 name: prelaunch
-description: Revisión de seguridad antes de salir en vivo, línea por línea (hashing de contraseñas, llaves, RLS, HTTPS, XSS/SQL, rate limit, CSRF, cookies, subidas —formatos permitidos y contenido revisado—, admin, precios, debug, paquetes, historial de git). Se puede correr a cualquier hora.
+description: Security review before going live, line by line (password hashing, keys, RLS, HTTPS, XSS/SQL, rate limits, CSRF, cookies, uploads — allowed formats and content checked —, admin, prices, debug, packages, git history). Can run at any time.
 argument-hint: "[--full]"
 allowed-tools: Bash(node *)
 ---
 
 # /mep:prelaunch
 
-Con mods, el mod responde este comando sin turno de Claude. Si llegaste aquí (sin mods), corre
-`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" prelaunch $ARGUMENTS` y muestra la salida tal cual.
+With mods, the mod answers this command without a Claude turn. If you got here (no mods), run
+`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" prelaunch $ARGUMENTS` and show the output as is.
 
-Cada línea junta los ítems del catálogo que la cumplen: ✅ lista · ❌ falta algo (dice qué) · ❔ falta correr comandos o el build (`--full`) · ⊘ no aplica a este scope (sin subidas, sin admin, sin cobros…). Los ítems de seguridad solo cuentan con su auditoría de `mep-security`.
+Each line gathers the catalog items that fulfil it: ✅ done · ❌ something is missing (says what) · ❔ commands or the build still need to run (`--full`) · ⊘ not applicable to this scope (no uploads, no admin, no payments…). Security items only count with their `mep-security` audit.
 
-No cambia nada y no exige nada por sí sola: `/mep:launch` pide estos mismos ítems junto con todo lo demás, así que conviene correrla antes y arreglar sin prisa. Para trabajar un área: `/mep:focus security`.
+It changes nothing and requires nothing by itself: `/mep:launch` asks for these same items together with everything else, so run it early and fix without hurry. To work on one area: `/mep:focus security`.

@@ -189,6 +189,8 @@ Luego, en la carpeta de un proyecto nuevo o existente:
 /mep:scope --preset saas "app de reservas para estudios de danza, México y California, planes mensuales"
 ```
 
+Las instrucciones del plugin para el modelo (skills, agentes y el bloque de `CLAUDE.md` que mep agrega a un proyecto) están en inglés porque cuesta menos tokens; el asistente te sigue hablando en tu idioma, y el panel, los mensajes del motor y el catálogo están en español.
+
 Para actualizar después: `claude plugin marketplace update mise-en-place`, luego `claude plugin update mep@mise-en-place`, y reinicia Claude Code (`/exit` y `claude --continue`). `claude plugin list` muestra la versión.
 
 > [!TIP]

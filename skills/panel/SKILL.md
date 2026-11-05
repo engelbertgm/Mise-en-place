@@ -1,10 +1,10 @@
 ---
 name: panel
-description: Abre el panel de mep junto al chat: pendientes por sub-etapa, el detalle de cada ítem (qué pide, por qué, todo lo que falla) y las acciones del usuario.
+description: Open the mep panel beside the chat: pending items by sub-phase or domain, each item's detail (what it asks, why, everything that fails), the flow line and the user's actions.
 ---
 
 # /mep:panel
 
-Con mods (Claude Code 2.1.287 o posterior), el mod abre el panel sin turno de Claude. En el panel, un clic en un ítem muestra qué pide, por qué, cómo cumplirlo y la lista completa de lo que falla; ahí mismo el usuario confirma un ítem manual, omite un 🟡 o desactiva un 🔴 con razón. Los conteos 🔴 y 🟡 de arriba abren el primer pendiente de su nivel. ⚙ Herramientas reúne la consulta previa al deploy y al PR, los comandos de mep (check, phase, quote, audit, update, export, phase close, scope, add, log-time) y la actividad reciente de .mep/log.
+With mods (Claude Code 2.1.287 or later), the mod opens the panel without a Claude turn. In the panel, a click on an item shows what it asks, why, how to meet it and the full list of what fails; there the user confirms a manual item, skips a 🟡, postpones a 🔴 until go-live or turns it off with a reason. The 🔴 and 🟡 counts at the top open the first pending item of their level. ⇢ Flow shows which command to run and when (a click writes it in the chat). ⚙ Tools gathers the pre-deploy and pre-PR checks, mep's commands and the recent activity of .mep/log.
 
-Si llegaste aquí (sin mods), el panel no está disponible: corre `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" check` y muestra la salida tal cual.
+If you got here (no mods), the panel is not available: run `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" check` and show the output as is.

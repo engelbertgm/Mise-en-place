@@ -1,16 +1,16 @@
 ---
 name: update
-description: Integra al proyecto los ítems nuevos o modificados del catálogo de mep que aplican a su perfil.
+description: Bring into the project the new or modified mep catalog items that apply to its profile.
 argument-hint: ""
 allowed-tools: Bash(node *), Bash(python *), Bash(python3 *), Read, Write, Edit, AskUserQuestion, Skill
 ---
 
 # /mep:update
 
-Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
+Engine: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 
-1. Corre `update`. Muestra solo los ítems nuevos (＋) o modificados (✎) que aplican a este perfil.
-2. Explica en una línea cada 🔴 nuevo (su `why`) y aclara: los que caen en una sub-etapa ya cerrada tienen periodo de gracia; no bloquean hasta el siguiente cierre de fase o el deploy a producción.
-3. Con la confirmación del usuario: `update --apply`.
-4. Si la actualización trae ítems `plan-*`, escribe los documentos que falten para las sub-etapas ya abiertas o cerradas (PRD, TRD e IMPLEMENTATION siempre; FLOWS desde `foundation.design`; SCHEMA desde `build.data` con `has_db`), a partir del perfil, el código y las migraciones, siguiendo la skill `mep`. Requiere diagram-design, igual que `/mep:scope`.
-5. Si el usuario no quiere un 🟡 nuevo, `/mep:skip`; si no quiere un 🔴 nuevo, `/mep:override` (con razón y confirmación).
+1. Run `update`. It shows only the new (＋) or modified (✎) items that apply to this profile.
+2. Explain each new 🔴 in one line (its `why`) and clarify: those that land in an already closed sub-phase get a grace period; they do not block until the next phase close or the production deploy.
+3. With the user's confirmation: `update --apply`.
+4. If the update brings `plan-*` items, write the missing documents for the sub-phases already open or closed (PRD, TRD and IMPLEMENTATION always; FLOWS from `foundation.design`; SCHEMA from `build.data` with `has_db`), from the profile, the code and the migrations, following the `mep` skill. It needs diagram-design, as `/mep:scope` does.
+5. If the user does not want a new 🟡, `/mep:skip`; if they do not want a new 🔴, `/mep:override` (with a reason and confirmation).

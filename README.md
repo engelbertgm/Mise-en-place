@@ -6,7 +6,7 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.3-informational.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.4.4-informational.svg)](.claude-plugin/plugin.json)
 [![Catalog](https://img.shields.io/badge/catalog-2026.11.4-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -188,6 +188,8 @@ Then, in a new or existing project folder:
 ```
 /mep:scope --preset saas "booking app for dance studios, Mexico and California, monthly plans"
 ```
+
+The plugin's instructions to the model (skills, agents and the `CLAUDE.md` block mep adds to a project) are written in English because it costs fewer tokens; the assistant still talks to you in your language, and the panel, the engine's messages and the catalog are in Spanish.
 
 To update later: `claude plugin marketplace update mise-en-place`, then `claude plugin update mep@mise-en-place`, and restart Claude Code (`/exit`, then `claude --continue`). `claude plugin list` shows the version.
 

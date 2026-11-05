@@ -1,6 +1,6 @@
 ---
 name: quote
-description: Muestra la cotización del proyecto desde el brief de mep (vista interna o vista cliente).
+description: Show the project quote from the mep brief (internal view or client view).
 argument-hint: "[--client]"
 disable-model-invocation: true
 allowed-tools: Bash(node *)
@@ -8,9 +8,9 @@ allowed-tools: Bash(node *)
 
 # /mep:quote
 
-Corre `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" quote $ARGUMENTS` y muestra la salida tal cual.
+Run `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" quote $ARGUMENTS` and show the output as is.
 
-- Sin `--client`: vista interna (horas por ítem y sub-etapa, tarifa, gestión y colchón). Es para el usuario, nunca para el cliente.
-- Con `--client`: precio por fase y total, extras opcionales, costos recurrentes y planes de mantenimiento; sin tarifa, márgenes ni colchón.
-- Si la tarifa está en 0, indica que se define en `~/.config/mep-check/rates.yaml` (fuera del repo).
-- La cotización corre sola solo al definir el scope (`/mep:scope`) y en cambios de scope (`/mep:add`). Este comando es la consulta manual.
+- Without `--client`: internal view (hours per item and sub-phase, rate, management and buffer). For the user, never for the client.
+- With `--client`: price per phase and total, optional extras, recurring costs and maintenance plans; no rate, margins or buffer.
+- If the rate is 0, say it is set in `~/.config/mep-check/rates.yaml` (outside the repo).
+- The quote runs by itself only when the scope is defined (`/mep:scope`) and when it changes (`/mep:add`). This command is the manual lookup.

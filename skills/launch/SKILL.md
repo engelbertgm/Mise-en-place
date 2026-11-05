@@ -1,17 +1,17 @@
 ---
 name: launch
-description: Go-live de mep. Corre la barrera completa una vez (todos los 🔴 de los dominios activos, en todas las sub-etapas); si pasa, el proyecto queda en vivo y cada push a main es un deploy a producción.
+description: mep go-live. Runs the full gate once (every 🔴 of the active domains, in every sub-phase); if it passes, the project is live and every push to main is a production deploy.
 disable-model-invocation: true
 allowed-tools: Bash(node *)
 ---
 
 # /mep:launch
 
-Mientras el proyecto está **en construcción** (`stage: building`), un push o un PR a `main` solo se detiene por secretos, ítems 🔒 violados o regresiones en sub-etapas ya cerradas: no hace falta cerrar nada para subir avance. `/mep:launch` es el momento de salir en vivo.
+While the project is **building** (`stage: building`), a push or PR to `main` only stops on secrets, violated 🔒 items or regressions in already closed sub-phases: nothing needs to be closed to push progress. `/mep:launch` is the moment to go live.
 
-Con mods, el mod responde este comando sin turno de Claude. Si llegaste aquí (sin mods), corre
-`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" launch` y muestra la salida tal cual.
+With mods, the mod answers this command without a Claude turn. If you got here (no mods), run
+`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" launch` and show the output as is.
 
-- Antes, a cualquier hora: `/mep:prelaunch` revisa la seguridad línea por línea sin exigir nada.
-- Si faltan 🔴, el motor los lista agrupados por dominio (`Por dominio: seguridad 8 · pagos 5`). Arréglalos, difiérelos con `/mep:defer` solo si de verdad pueden esperar (igual los exige el go-live), o apaga un dominio con `/mep:domain off` si no es del proyecto.
-- Ya en vivo, volver a construcción lo decide el usuario: `mep stage building`.
+- Before, at any time: `/mep:prelaunch` reviews security line by line without requiring anything.
+- If 🔴 items are missing, the engine lists them grouped by domain (`Por dominio: seguridad 8 · pagos 5`). Fix them, defer them with `/mep:defer` only if they can truly wait (go-live still requires them), or switch a domain off with `/mep:domain off` if it is not part of the project.
+- Once live, going back to building is the user's decision: `mep stage building`.

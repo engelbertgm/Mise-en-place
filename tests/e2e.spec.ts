@@ -53,7 +53,7 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     for (const id of ['plan-prd', 'plan-trd', 'plan-implementation', 'rls-all-tables', 'hosted-checkout', 'mx-privacy-notice', 'gpc-signal', 'eu-de-impressum', 'eu-withdrawal-right', 'i18n-hreflang']) {
       assert.match(brief, new RegExp('`' + id + '`'), id)
     }
-    assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /Mantra de código/)
+    assert.match(readFileSync(join(root, 'CLAUDE.md'), 'utf8'), /Code mantra/)
     assert.ok(existsSync(join(root, '.github/workflows/mep.yml')))
     assert.equal(profileFile().phase.active, 'foundation.setup')
     assert.equal(mep(['registry']).code, 0)

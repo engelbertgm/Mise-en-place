@@ -1,14 +1,14 @@
 ---
 name: check
-description: Verifica el repo contra el checklist de mep y muestra el estado por sub-etapa (✅ ❌ ⏭️ ⚠️), más señales del código que el perfil no tiene.
+description: Check the repo against the mep checklist and show the state by sub-phase (✅ ❌ ⏭️ ⚠️), plus signals in the code that the profile lacks.
 argument-hint: "[--all]"
 allowed-tools: Bash(node *)
 ---
 
 # /mep:check
 
-Corre `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" check $ARGUMENTS` y muestra la salida tal cual.
+Run `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" check $ARGUMENTS` and show the output as is.
 
-- Las verificaciones de HTML corren sobre el build: si salen como ❔ "sin salida de build", sugiere correr el build.
-- Si el motor avisa señales que el perfil no tiene, propone `/mep:add` para incorporarlas.
-- No marques nada como cumplido por tu cuenta: los ítems manuales los confirma el usuario con `/mep:confirm <id>` (tú no puedes: la guardia lo niega), y los de seguridad solo con una auditoría de `mep-security`.
+- HTML checks run on the build: if they show ❔ "no build output", suggest running the build.
+- If the engine reports signals the profile lacks, suggest `/mep:add` to add them.
+- Never mark anything as done yourself: manual items are confirmed by the user with `/mep:confirm <id>` (you cannot: the guard denies it), and security items only by a `mep-security` audit.

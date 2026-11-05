@@ -2,6 +2,12 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.4.4
+
+- **Skills, agents and the `CLAUDE.md` block are in English** (fewer tokens for the model to read). The assistant still talks to the user in their language, and the panel, the engine's messages and the catalog stay in Spanish. The context mep hands the agent at session start and when a sensitive file is edited is English too; the one-line summary the user sees is still Spanish.
+- **El bloque de mep en `CLAUDE.md` se actualiza solo** al abrir una sesión: un bloque viejo (el que decía "requisitos no negociables") se reemplaza por el actual, y lo que escribiste alrededor se queda. Así los proyectos que ya existían dejan de empujar al agente a limpiar pendientes con código de relleno.
+- `code-principles` acepta el bloque en español o en inglés.
+
 ## 0.4.3
 
 **Las reglas son guías para construir, no tareas que cumplir.** Antes el agente leía los pendientes como una lista por limpiar y a veces construía páginas de prueba o código de relleno solo para que una verificación pasara.

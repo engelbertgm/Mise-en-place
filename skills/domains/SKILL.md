@@ -1,14 +1,14 @@
 ---
 name: domains
-description: Muestra el avance de mep por dominio (UI, UX, seguridad, pagos, base de datos…) y por subdominio, con qué está apagado o diferido.
-argument-hint: "[dominio]"
+description: Show mep progress by domain (UI, UX, security, payments, database…) and subdomain, with what is switched off or deferred.
+argument-hint: "[domain]"
 allowed-tools: Bash(node *)
 ---
 
 # /mep:domains
 
-Con mods, el mod responde este comando sin turno de Claude. Si llegaste aquí (sin mods), corre
-`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" domains $ARGUMENTS` y muestra la salida tal cual.
+With mods, the mod answers this command without a Claude turn. If you got here (no mods), run
+`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" domains $ARGUMENTS` and show the output as is.
 
-Cada dominio muestra una barra de avance de sus 🔴 y cuántos quedan (● obligatorios, ● recomendados). Sin argumento lista los dominios; con uno, sus subdominios.
-Para trabajar uno: `/mep:focus <dominio[.subdominio]>`.
+Each domain shows a progress bar of its 🔴 and how many are left (● required, ● recommended). No argument lists the domains; with one, its subdomains.
+To work on one: `/mep:focus <domain[.subdomain]>`.

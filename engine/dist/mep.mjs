@@ -10106,14 +10106,22 @@ var CLAUDE_MARKER = "<!-- mep -->";
 function linkClaudeMd(root, template) {
   const file = join12(root, "CLAUDE.md");
   const current = existsSync11(file) ? readFileSync10(file, "utf8") : "";
-  if (current.includes(CLAUDE_MARKER)) return false;
   const block = `${CLAUDE_MARKER}
 ${template.trim()}
 ${CLAUDE_MARKER}
 `;
-  writeFileSync6(file, current ? `${current.trimEnd()}
+  const start = current.indexOf(CLAUDE_MARKER);
+  if (start === -1) {
+    writeFileSync6(file, current ? `${current.trimEnd()}
 
 ${block}` : block);
+    return true;
+  }
+  const end = current.lastIndexOf(CLAUDE_MARKER);
+  if (end === start) return false;
+  const fresh = current.slice(0, start) + block + current.slice(end + CLAUDE_MARKER.length).replace(/^\n/, "");
+  if (fresh === current) return false;
+  writeFileSync6(file, fresh);
   return true;
 }
 
@@ -10932,13 +10940,15 @@ function runHook(event, root, catalog) {
   switch (event) {
     case "session-start": {
       const profile = loadProfile(cwd, catalog);
+      linkClaudeMd(cwd, readFileSync15(join17(pluginRoot(catalog), "templates", "claude-md.md"), "utf8"));
       const results = verifyItems(cwd, profile, evaluate(profile, catalog), "fast");
       const c = counts(results);
-      const text = [
-        `mep \xB7 sub-etapa activa: ${profile.phase.active} \xB7 pendientes \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended} (normales mientras se construye).`,
-        "BRIEF.md son gu\xEDas para construir lo real: tenlas presentes al escribir. No crees placeholders ni c\xF3digo de relleno para cumplir un punto; se verifica al cerrar una sub-etapa, en /mep:prelaunch y en /mep:launch."
+      const note = [
+        `mep \xB7 active sub-phase: ${profile.phase.active} \xB7 pending \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended} (normal while building).`,
+        "BRIEF.md holds guidelines for building the real thing: keep them in mind as you write. Do not create placeholders or filler code to meet a point; checks run when a sub-phase closes, in /mep:prelaunch and in /mep:launch. Talk to the user in their language."
       ].join("\n");
-      json({ systemMessage: text.split("\n")[0], hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: text } });
+      const summary = `mep \xB7 sub-etapa activa: ${profile.phase.active} \xB7 pendientes \u{1F534} ${c.required} \xB7 \u{1F7E1} ${c.recommended} (normales mientras se construye)`;
+      json({ systemMessage: summary, hookSpecificOutput: { hookEventName: "SessionStart", additionalContext: note } });
       return;
     }
     case "stop": {
@@ -10977,7 +10987,7 @@ function runHook(event, root, catalog) {
       json({
         hookSpecificOutput: {
           hookEventName: "PostToolUse",
-          additionalContext: `mep: ${rel} es un archivo sensible. Escr\xEDbelo siguiendo las gu\xEDas de seguridad del BRIEF. No hace falta auditarlo ahora: el agente mep-security lo revisa una vez, al cerrar la sub-etapa o en /mep:prelaunch, y su reporte en .mep/security/ es lo que da por cumplidos los \xEDtems de seguridad.`
+          additionalContext: `mep: ${rel} is a sensitive file. Write it following the BRIEF's security guidelines. No need to audit it now: the mep-security agent reviews it once, when the sub-phase closes or in /mep:prelaunch, and its report in .mep/security/ is what marks the security items as met.`
         }
       });
       return;

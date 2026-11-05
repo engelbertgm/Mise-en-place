@@ -10,7 +10,7 @@
   why: "El código claro y reutilizado es más barato de mantener y más difícil de romper."
   how: "Bloque del mantra en CLAUDE.md (lo agrega /mep:scope); al tercer uso de un patrón, se extrae."
   verify:
-    - { type: grep, pattern: "Mantra de código", glob: CLAUDE.md }
+    - { type: grep, pattern: "Mantra de código|Code mantra", glob: CLAUDE.md }
 
 - id: code-structure
   title: "Carpetas por feature o dominio con convención documentada; UI solo del sistema; un patrón de errores"

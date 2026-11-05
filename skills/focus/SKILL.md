@@ -1,14 +1,14 @@
 ---
 name: focus
-description: Lista lo pendiente de un dominio o subdominio de mep, incluidos los ítems de otros dominios que enlazan a él (↗).
-argument-hint: "<dominio[.subdominio]>"
+description: List what is pending in a mep domain or subdomain, including items from other domains that link to it (↗).
+argument-hint: "<domain[.subdomain]>"
 allowed-tools: Bash(node *)
 ---
 
 # /mep:focus
 
-Con mods, el mod responde este comando sin turno de Claude. Si llegaste aquí (sin mods), corre
-`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" focus $ARGUMENTS` y muestra la salida tal cual.
+With mods, the mod answers this command without a Claude turn. If you got here (no mods), run
+`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" focus $ARGUMENTS` and show the output as is.
 
-Los ítems con ↗ tienen su hogar en otro dominio y aparecen aquí como sugerencia: su estado y su nivel se manejan donde viven.
-Trabaja en ese dominio, sin esperar a que cierre toda la sub-etapa: un push no lo exige (ver `/mep:launch`).
+Items marked ↗ live in another domain and show here as a suggestion: their state and level are managed where they live.
+Work in that domain without waiting for the whole sub-phase to close: a push does not require it (see `/mep:launch`).

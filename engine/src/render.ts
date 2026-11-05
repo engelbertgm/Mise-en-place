@@ -212,8 +212,17 @@ const CLAUDE_MARKER = '<!-- mep -->'
 export function linkClaudeMd(root: string, template: string): boolean {
   const file = join(root, 'CLAUDE.md')
   const current = existsSync(file) ? readFileSync(file, 'utf8') : ''
-  if (current.includes(CLAUDE_MARKER)) return false
   const block = `${CLAUDE_MARKER}\n${template.trim()}\n${CLAUDE_MARKER}\n`
-  writeFileSync(file, current ? `${current.trimEnd()}\n\n${block}` : block)
+  const start = current.indexOf(CLAUDE_MARKER)
+  if (start === -1) {
+    writeFileSync(file, current ? `${current.trimEnd()}\n\n${block}` : block)
+    return true
+  }
+  // The block between the markers is mep's: an older version of it is replaced, what the person wrote around it is kept.
+  const end = current.lastIndexOf(CLAUDE_MARKER)
+  if (end === start) return false
+  const fresh = current.slice(0, start) + block + current.slice(end + CLAUDE_MARKER.length).replace(/^\n/, '')
+  if (fresh === current) return false
+  writeFileSync(file, fresh)
   return true
 }

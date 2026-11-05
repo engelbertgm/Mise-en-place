@@ -1,15 +1,15 @@
 ---
 name: confirm
-description: Confirma un ítem manual del brief de mep (lo que solo una persona puede afirmar). Solo la escribe el usuario.
+description: Confirm a manual item of the mep brief (what only a person can state). Only the user types it.
 argument-hint: "<id>"
 disable-model-invocation: true
 ---
 
 # /mep:confirm
 
-Argumentos: $ARGUMENTS
+Arguments: $ARGUMENTS
 
-Con mods, el mod responde este comando sin turno de Claude: el motor registra la confirmación con el usuario de git (nombre y email), no con un nombre escrito, y la anota en `.mep/log` (aparece en el resumen del PR). Los ítems de seguridad no se confirman así: los confirma una auditoría de `mep-security`.
+With mods, the mod answers this command without a Claude turn: the engine records the confirmation with the git user (name and email), not a typed name, and writes it to `.mep/log` (it shows in the PR summary). Security items are not confirmed this way: a `mep-security` audit confirms them.
 
-Si llegaste aquí (sin mods), **no lo ejecutes tú**: la guardia de mep niega confirmaciones desde el Bash del agente. Dale al usuario el comando para su propia terminal (le pedirá teclear el id):
+If you got here (no mods), **do not run it yourself**: mep's guard denies confirmations from the agent's Bash. Give the user the command for their own terminal (it asks them to type the id):
 `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" confirm <id>`

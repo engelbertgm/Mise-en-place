@@ -1,19 +1,19 @@
 ---
 name: add
-description: Agrega o cambia scope en un proyecto con mep y muestra solo el diff del checklist (ítems nuevos, que suben de nivel o que dejan de aplicar).
-argument-hint: "<cambio de scope en lenguaje natural>"
+description: Add or change scope in a project with mep and show only the checklist diff (items that are new, move up a level or stop applying).
+argument-hint: "<scope change in natural language>"
 allowed-tools: Bash(node *), Bash(python *), Bash(python3 *), Read, Write, Edit, AskUserQuestion, Skill
 ---
 
 # /mep:add
 
-Cambio pedido: $ARGUMENTS
+Requested change: $ARGUMENTS
 
-Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
+Engine: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 
-1. Lee `.mep/profile.yaml`. Traduce el cambio a campos del perfil (skill `mep`): capacidades, mercados, audiencia, señales, counts o stack. Pregunta solo si cambia 🔴.
-2. Escribe en `.mep/change.yaml` **solo** los campos que cambian, con su valor completo (ej. la lista entera de `capabilities`).
-3. Corre `add --from .mep/change.yaml` y muestra el diff tal cual, con su línea de impacto en horas y precio. No muestres el checklist completo.
-4. Si el cambio altera qué es el proyecto, actualiza también `summary`. Si el usuario confirma: `add --from .mep/change.yaml --apply` (recalcula y guarda la cotización interna fuera del repo). Borra `.mep/change.yaml`.
-5. Si cambió una decisión de stack, el motor escribe un ADR nuevo que reemplaza al anterior; menciónalo.
-6. Con el cambio aplicado, actualiza las secciones afectadas de `docs/plan/PRD.md`, `TRD.md` e `IMPLEMENTATION.md` (y sus diagramas si cambian) y corre `check` para confirmar que los ítems `plan-*` siguen pasando.
+1. Read `.mep/profile.yaml`. Translate the change into profile fields (`mep` skill): capabilities, markets, audience, signals, counts or stack. Ask only if it changes a 🔴.
+2. Write into `.mep/change.yaml` **only** the fields that change, with their full value (e.g. the whole `capabilities` list).
+3. Run `add --from .mep/change.yaml` and show the diff as is, with its impact line in hours and price. Do not show the full checklist.
+4. If the change alters what the project is, update `summary` too. If the user confirms: `add --from .mep/change.yaml --apply` (it recalculates and saves the internal quote outside the repo). Delete `.mep/change.yaml`.
+5. If a stack decision changed, the engine writes a new ADR that replaces the old one; mention it.
+6. With the change applied, update the affected sections of `docs/plan/PRD.md`, `TRD.md` and `IMPLEMENTATION.md` (and their diagrams if they change) and run `check` to confirm the `plan-*` items still pass.

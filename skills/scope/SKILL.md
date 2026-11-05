@@ -1,40 +1,40 @@
 ---
 name: scope
-description: Crea el brief de un website o webapp desde una descripción en lenguaje natural — perfil, stack justificado y checklist 🔴🟡⚪.
-argument-hint: "[--preset landing|corporate|ecommerce|saas|marketplace] <descripción del proyecto>"
+description: Create the brief of a website or webapp from a natural-language description — profile, justified stack and 🔴🟡⚪ checklist.
+argument-hint: "[--preset landing|corporate|ecommerce|saas|marketplace] <project description>"
 allowed-tools: Bash(node *), Bash(python *), Bash(python3 *), Read, Write, Edit, AskUserQuestion, Skill
 ---
 
 # /mep:scope
 
-Scope del usuario: $ARGUMENTS
+User's scope: $ARGUMENTS
 
-Sigue el skill `mep` para interpretar el scope. Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
+Follow the `mep` skill to interpret the scope. Engine: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 
-1. Si ya existe `.mep/profile.yaml`, detente y sugiere `/mep:add`.
-2. Lee `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml` (valores válidos) y, si se indicó `--preset` o hay uno cercano, `${CLAUDE_PLUGIN_ROOT}/catalog/presets/<preset>.yaml`.
-**Límite de mep.** Si el proyecto está dirigido a menores de edad, los incluye como usuarios, o necesita verificar edad (contenido para adultos, apuestas, alcohol, tabaco, cannabis, citas 18+), di en una línea que mep no cubre ese tipo de proyecto y detente: no crees perfil ni brief. Si no queda claro, pregunta antes de seguir.
+1. If `.mep/profile.yaml` already exists, stop and suggest `/mep:add`.
+2. Read `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml` (valid values) and, if `--preset` was given or there is a close one, `${CLAUDE_PLUGIN_ROOT}/catalog/presets/<preset>.yaml`.
+**mep's limit.** If the project is aimed at minors, includes them as users, or needs age verification (adult content, gambling, alcohol, tobacco, cannabis, 18+ dating), say in one line that mep does not cover that kind of project and stop: create no profile or brief. If it is unclear, ask before continuing.
 
-Si ya hay dominio o URL de preview, guárdalos en el perfil (`urls: { production, preview }` y, si envía emails, `email_domain`): con ellos mep prueba el sitio real (encabezados, cookies, 404, redirecciones, sitemap) y el DNS del email (SPF, DMARC, DKIM). Si aún no hay, se agregan después con `/mep:add`.
+If there is already a domain or preview URL, save them in the profile (`urls: { production, preview }` and, if it sends emails, `email_domain`): with them mep tests the real site (headers, cookies, 404, redirects, sitemap) and the email DNS (SPF, DMARC, DKIM). If there is none yet, they are added later with `/mep:add`.
 
-Si cobra por uso o por resultado (por unidad, por resultado generado, por usuario activo a partir de un umbral), es la capacidad `usage-billing`.
+If it charges by usage or by result (per unit, per generated result, per active user above a threshold), it is the `usage-billing` capability.
 
-Lenguajes y herramientas (`has_*`): el stack por defecto (Next.js) deja `has_javascript`, `has_typescript`, `has_css` y `has_html` en verdadero. Pon en `false` los que el proyecto no usa (por ejemplo un backend solo en Python) y en `true` los que sí (`has_python`, `has_sql`, `has_react`, `has_tailwind`, `has_ci`, `has_shell`, `has_docker`): solo se agregan las reglas de calidad de lo que se usa.
+Languages and tools (`has_*`): the default stack (Next.js) leaves `has_javascript`, `has_typescript`, `has_css` and `has_html` true. Set to `false` those the project does not use (for example a Python-only backend) and to `true` those it does (`has_python`, `has_sql`, `has_react`, `has_tailwind`, `has_ci`, `has_shell`, `has_docker`): only the quality rules of what is used are added.
 
-3. Propón el perfil (tipo, capacidades, mercados, audiencia, contexto, señales, counts) en una tabla corta. Pregunta **solo** lo que cambia 🔴 o los counts (ver skill `mep`). Si el scope cobra algo y no queda claro, pregunta si el pago es con enlace del proveedor (`payment-links`) o con checkout propio (`payments`); no marques `has_db` sin algo que guardar.
-4. Escribe en `summary` un párrafo con las palabras del usuario: qué es el proyecto, para quién y qué debe lograr (encabeza SCOPE.md). Las features del scope que no están en el catálogo (ej. "agenda por instructor") van en `custom_work` con su talla: `[{ title, size: XS|S|M|L|XL, phase }]`. Escribe la propuesta en `.mep/draft.yaml` (incluye `project` y `preset` si aplica) y corre `evaluate --from .mep/draft.yaml`. Si el motor rechaza un valor, corrígelo; no inventes valores.
-5. Muestra el resultado agrupado (🔴, 🟡, ⚪ por categoría) y las recomendaciones de stack con su porqué. Pide al usuario que elija los ⚪ que quiere y confirme.
-6. Con la confirmación:
-   - `init --from .mep/draft.yaml` (crea `.mep/profile.yaml`, `SCOPE.md`, `BRIEF.md`, ADRs de stack, enlaza `CLAUDE.md` y agrega `.github/workflows/mep.yml`).
-   - `select <id> <id>…` con los ⚪ elegidos (si hay).
-   - Borra `.mep/draft.yaml`.
-   - `codemap` y `registry` para crear `CODEMAP.md` y `REGISTRY.md`.
-   - `init` instala `tests/responsive.spec.ts` y el script `test:responsive`: pide editar `PAGES` con las rutas clave y agregar `@playwright/test` si no está.
-   - `init` ya calcula la cotización (el toggle: solo corre al definir el scope y en cambios de scope). Muestra su línea; si la tarifa está en 0, indica dónde definirla.
-7. Documentos de planeación (`docs/plan/`):
-   - Comprueba que la skill `diagram-design:diagram-design` esté disponible (plugin `cathrynlavery/diagram-design` ≥ 2.6.136) y que su exportación a PNG funcione (Python + Playwright + Chromium). Si falta algo, detente aquí y da los comandos: `claude plugin install diagram-design@diagram-design`, `pip install playwright` y `python -m playwright install chromium`. No hay respaldo sin PNG.
-   - Escribe `PRD.md`, `TRD.md` e `IMPLEMENTATION.md` desde `${CLAUDE_PLUGIN_ROOT}/templates/plan/`, en el idioma del usuario. Sigue los comentarios de cada sección; los marcadores `<!-- mep:clave -->` se quedan tal cual.
-   - Diagramas: genera cada uno con la skill `diagram-design:diagram-design` y expórtalo a PNG con `diagram-design:export-diagram` (correr esta skill de mep es la petición del usuario para esas exportaciones). Guarda el HTML y el PNG en `docs/plan/diagrams/<doc>-<tipo>[-<nombre>]` (`<tipo>` es el nombre del tipo en diagram-design: `journey`, `architecture`, `gantt`…) y muéstralo con `![descripción](diagrams/<archivo>.png)`. Antes de cerrar `foundation.design` usan el estilo por defecto de diagram-design; después, los tokens del proyecto.
-   - Corre `check` y confirma que `plan-prd`, `plan-trd` y `plan-implementation` pasan.
-8. Si el plugin Ponytail no está instalado, sugiérelo una vez (`DietrichGebert/ponytail`); mep funciona igual sin él.
-9. Cierra con: sub-etapa activa (`foundation.setup`), cuántos 🔴 tiene y el siguiente paso. Recuerda hacer `mep` check obligatorio del PR a `main` en GitHub.
+3. Propose the profile (type, capabilities, markets, audience, context, signals, counts) in a short table. Ask **only** what changes a 🔴 or the counts (see the `mep` skill). If the scope charges for something and it is unclear, ask whether payment is by provider link (`payment-links`) or own checkout (`payments`); do not set `has_db` without something to store.
+4. Write a `summary` paragraph in the user's words: what the project is, for whom and what it must achieve (it heads SCOPE.md). Scope features that are not in the catalog (e.g. "schedule per instructor") go in `custom_work` with their size: `[{ title, size: XS|S|M|L|XL, phase }]`. Write the proposal to `.mep/draft.yaml` (include `project` and `preset` if any) and run `evaluate --from .mep/draft.yaml`. If the engine rejects a value, fix it; do not invent values.
+5. Show the result grouped (🔴, 🟡, ⚪ by category) and the stack recommendations with their reason. Ask the user to choose the ⚪ they want and confirm.
+6. With the confirmation:
+   - `init --from .mep/draft.yaml` (creates `.mep/profile.yaml`, `SCOPE.md`, `BRIEF.md`, stack ADRs, links `CLAUDE.md` and adds `.github/workflows/mep.yml`).
+   - `select <id> <id>…` with the chosen ⚪ (if any).
+   - Delete `.mep/draft.yaml`.
+   - `codemap` and `registry` to create `CODEMAP.md` and `REGISTRY.md`.
+   - `init` installs `tests/responsive.spec.ts` and the `test:responsive` script: ask the user to edit `PAGES` with the key routes and to add `@playwright/test` if it is missing.
+   - `init` already computes the quote (the toggle: it only runs when the scope is defined and when it changes). Show its line; if the rate is 0, say where to set it.
+7. Planning documents (`docs/plan/`):
+   - Check that the `diagram-design:diagram-design` skill is available (plugin `cathrynlavery/diagram-design` ≥ 2.6.136) and that its PNG export works (Python + Playwright + Chromium). If something is missing, stop here and give the commands: `claude plugin install diagram-design@diagram-design`, `pip install playwright` and `python -m playwright install chromium`. There is no fallback without PNG.
+   - Write `PRD.md`, `TRD.md` and `IMPLEMENTATION.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan/`, in the user's language. Follow each section's comments; the `<!-- mep:key -->` markers stay as they are.
+   - Diagrams: generate each with the `diagram-design:diagram-design` skill and export it to PNG with `diagram-design:export-diagram` (running this mep skill is the user's request for those exports). Save the HTML and the PNG in `docs/plan/diagrams/<doc>-<type>[-<name>]` (`<type>` is the diagram-design type name: `journey`, `architecture`, `gantt`…) and show it with `![description](diagrams/<file>.png)`. Before closing `foundation.design` they use diagram-design's default style; after, the project's tokens.
+   - Run `check` and confirm that `plan-prd`, `plan-trd` and `plan-implementation` pass.
+8. If the Ponytail plugin is not installed, suggest it once (`DietrichGebert/ponytail`); mep works without it.
+9. Close with: active sub-phase (`foundation.setup`), how many 🔴 it has and the next step. Remind the user to make the `mep` check required for PRs to `main` on GitHub.

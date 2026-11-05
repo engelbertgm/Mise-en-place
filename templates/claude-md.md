@@ -1,13 +1,14 @@
-Este proyecto se rige por BRIEF.md y SCOPE.md (qué es y qué no incluye). BRIEF.md son **guías para construir lo real**: tenlas presentes mientras escribes (accesibilidad y WCAG, seguridad, SEO, rendimiento, lo legal que aplique) y hazlo bien a la primera, como parte de hacer el sitio.
-- Los pendientes durante la construcción son normales. No los "limpies": nunca crees páginas de prueba, sitios placeholder, archivos vacíos ni código de relleno solo para que pase una verificación, ni construyas algo que luego se cambia solo para cumplir un punto.
-- Se verifica en los puntos de control (cerrar una sub-etapa, `/mep:prelaunch`, `/mep:launch`, el CI), sobre lo que de verdad existe. Si un punto aún no aplica porque esa parte no está construida, se cumple cuando se construya.
-- Un push o un PR no exigen cumplir los 🔴 pendientes.
+This project is governed by BRIEF.md and SCOPE.md (what it is and is not). BRIEF.md holds **guidelines for building the real thing**: keep them in mind as you write (accessibility and WCAG, security, SEO, performance, the legal items that apply) and do it right the first time, as part of making the site.
+- Pending items while building are normal. Do not "clear" them: never create test pages, placeholder sites, empty files or filler code just to make a check pass, and never build something that is later replaced just to meet a point.
+- Checks run at the checkpoints (closing a sub-phase, `/mep:prelaunch`, `/mep:launch`, CI), on what actually exists. If a point does not apply yet because that part is not built, it is met when it is built.
+- A push or PR does not require the pending 🔴 items to be met.
+- Talk to the user in their language.
 
-Mantra de código: claro, simple, bonito y reutilizado.
-- Para encontrar algo, consulta primero CODEMAP.md y REGISTRY.md; no busques archivo por archivo.
-- Antes de crear algo, revisa REGISTRY.md y reutiliza lo que exista.
-- Todo lo relacionado con seguridad lo hace o lo audita el agente mep-security.
-- Si Ponytail está instalado: sigue su escalera (¿hace falta? → ¿ya existe aquí? → librería estándar → función nativa → dependencia instalada → mínimo que funciona). Su paso "¿ya existe aquí?" se resuelve con REGISTRY.md.
-- La solución más simple que funcione; nada "por si acaso".
-- Nombres que explican; comentarios solo para el porqué.
-- Cada cambio deja el código igual o más limpio que antes.
+Code mantra: clear, simple, nice and reused.
+- To find something, consult CODEMAP.md and REGISTRY.md first; do not search file by file.
+- Before creating something, check REGISTRY.md and reuse what exists.
+- Anything security-related is done or audited by the mep-security agent.
+- If Ponytail is installed: follow its ladder (is it needed? → does it already exist here? → standard library → native function → installed dependency → the minimum that works). Its "does it already exist here?" step is resolved with REGISTRY.md.
+- The simplest solution that works; nothing "just in case".
+- Names that explain; comments only for the why.
+- Every change leaves the code equal or cleaner than before.

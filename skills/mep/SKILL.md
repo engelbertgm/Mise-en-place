@@ -1,64 +1,64 @@
 ---
 name: mep
-description: Cómo trabajar en un proyecto que usa Mise en place (mep) — interpretar un scope en lenguaje natural como perfil, usar el catálogo de ítems y respetar BRIEF.md. Úsalo cuando el proyecto tenga .mep/profile.yaml o BRIEF.md, o cuando el usuario describa un website o webapp nuevo.
+description: How to work in a project that uses Mise en place (mep) — read a natural-language scope as a profile, use the item catalog and respect BRIEF.md. Use it when the project has .mep/profile.yaml or BRIEF.md, or when the user describes a new website or webapp.
 user-invocable: false
 ---
 
 # Mise en place (mep)
 
-mep convierte un scope en un **perfil**, el perfil en un **checklist** (🔴 obligatorio · 🟡 recomendado · ⚪ opcional) y verifica el repo contra él con un motor determinista. Tú interpretas y conversas; el motor decide qué aplica y qué está cumplido. Nunca marques un ítem como cumplido por tu cuenta.
+mep turns a scope into a **profile**, the profile into a **checklist** (🔴 required · 🟡 recommended · ⚪ optional) and checks the repo against it with a deterministic engine. You interpret and talk; the engine decides what applies and what is met. Never mark an item as done yourself.
 
-Motor: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" <comando>` (desde la raíz del proyecto). `help` lista los comandos.
+Talk to the user in their own language (Spanish if they write Spanish). This file is in English only to save tokens; the project's files and the engine's messages stay as they are.
 
-## Perfil (`.mep/profile.yaml`)
+Engine: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" <command>` (from the project root). `help` lists the commands.
 
-Solo valores de `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml`:
+## Profile (`.mep/profile.yaml`)
 
-- `type` (uno), `capabilities`, `markets` (con sub-niveles: `USA:CA`, `CA:QC`, `EU:DE`), `audience`, `context` (`client-project` | `own-product`).
-- `signals`: hechos del proyecto (`has_forms`, `has_db`, `db_client_access`, `has_dates`, …). Las capacidades encienden algunas solas (`auth` → formularios, DB y datos personales); tú infieres las demás de la descripción.
-- `counts`: `pages`, `entities`, `languages`, `integrations` (alimentan el cotizador). Más de un idioma activa `i18n`.
-- `stack.decided`: solo lo que el usuario decidió explícitamente; lo demás lo recomiendan las reglas de `catalog/stack-rules.yaml` con su porqué.
+Only values from `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml`:
 
-Presets de partida: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace` (`catalog/presets/`). Si el usuario no elige, sugiere el más cercano.
+- `type` (one), `capabilities`, `markets` (with sub-levels: `USA:CA`, `CA:QC`, `EU:DE`), `audience`, `context` (`client-project` | `own-product`).
+- `signals`: facts about the project (`has_forms`, `has_db`, `db_client_access`, `has_dates`, …). Capabilities turn some on by themselves (`auth` → forms, DB and personal data); you infer the rest from the description.
+- `counts`: `pages`, `entities`, `languages`, `integrations` (they feed the quote). More than one language turns on `i18n`.
+- `stack.decided`: only what the user decided explicitly; the rest is recommended by the rules in `catalog/stack-rules.yaml` with their reason.
 
-## Las reglas se activan por el scope
+Starting presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace` (`catalog/presets/`). If the user does not choose, suggest the closest one.
 
-Cada regla del catálogo tiene una condición (`when`) sobre el perfil: aplica o no según el scope del proyecto, nunca por defecto. Una landing sin cuentas no recibe reglas de RLS; un sitio sin cookies no recibe banner. `explain <id>` muestra la condición con ✓/✗ y por qué una regla aplica o no. En un repo existente, el scope lo da el usuario y el código es solo evidencia (`/mep:audit`).
+## Rules are activated by the scope
 
-## Cómo interpretar un scope
+Every catalog rule has a condition (`when`) on the profile: it applies or not according to the project's scope, never by default. A landing without accounts gets no RLS rules; a site without cookies gets no banner. `explain <id>` shows the condition with ✓/✗ and why a rule applies or not. In an existing repo, the user gives the scope and the code is only evidence (`/mep:audit`).
 
-1. Elige `type` y preset por lo que el producto *es*, no por cómo se construye.
-2. Capacidades: solo las que el scope pide o implica claramente ("cobrar mensualidad" → `subscriptions`; "subir fotos" → `uploads`).
-   - Cobrar: `payment-links` si el pago ocurre en la página del proveedor (Stripe Payment Links, botón de compra, Mercado Pago, Gumroad): sin backend ni base de datos. `payments` solo si el sitio crea el pago en su servidor, recibe webhooks o guarda pedidos. Una landing que vende con un enlace es `payment-links`.
-   - Base de datos (`has_db`): solo si hay que guardar algo propio (cuentas, pedidos, reservas, contenido de usuarios). Un formulario de contacto que manda email, un newsletter en el proveedor o pagos por enlace **no** necesitan base de datos. `auth`, `subscriptions`, `ugc` y `admin-panel` ya la implican.
-3. Señales: infiere de verbos y objetos ("reservas con fecha" → `has_dates`; "listado de clientes" → `has_tables`; "borrar proyectos" → `has_destructive_actions`; Supabase con consultas desde el navegador → `db_client_access`).
-4. Pregunta **solo** lo que cambia ítems 🔴 o los `counts`: mercados, si hay menores o datos sensibles, cliente vs. producto propio, número aproximado de páginas, entidades, idiomas e integraciones. Agrupa las preguntas (AskUserQuestion, máximo 4).
-5. Escala (`high_traffic`): solo en `saas`, `marketplace`, `ecommerce`, `directory` y `booking`, y solo si el scope no lo dice: ¿se esperan picos o miles de usuarios a la vez? Si sí, activa balanceo, réplicas, colas, consistencia y demás ítems de diseño de sistemas. En un sitio chico no se pregunta: queda en `false`.
+## How to read a scope
 
-## Reglas de trabajo en un proyecto con mep
+1. Pick `type` and preset by what the product *is*, not how it is built.
+2. Capabilities: only those the scope asks for or clearly implies ("charge a monthly fee" → `subscriptions`; "upload photos" → `uploads`).
+   - Charging: `payment-links` if payment happens on the provider's page (Stripe Payment Links, buy button, Mercado Pago, Gumroad): no backend or database. `payments` only if the site creates the payment on its server, receives webhooks or stores orders. A landing that sells with a link is `payment-links`.
+   - Database (`has_db`): only if something of its own must be stored (accounts, orders, bookings, user content). A contact form that sends email, a newsletter at the provider or payment links do **not** need a database. `auth`, `subscriptions`, `ugc` and `admin-panel` already imply it.
+3. Signals: infer from verbs and objects ("bookings with a date" → `has_dates`; "list of clients" → `has_tables`; "delete projects" → `has_destructive_actions`; Supabase with queries from the browser → `db_client_access`).
+4. Ask **only** what changes 🔴 items or the `counts`: markets, whether there are minors or sensitive data, client vs. own product, approximate number of pages, entities, languages and integrations. Group the questions (AskUserQuestion, at most 4).
+5. Scale (`high_traffic`): only for `saas`, `marketplace`, `ecommerce`, `directory` and `booking`, and only if the scope does not say: are spikes or thousands of simultaneous users expected? If yes, it turns on load balancing, replicas, queues, consistency and the other systems-design items. For a small site do not ask: it stays `false`.
 
-- **Guías, no tareas.** Los ítems de `BRIEF.md` son lo que el sitio terminado debe cumplir, y se verifican en los puntos de control (cerrar una sub-etapa, `/mep:prelaunch`, `/mep:launch`, el CI). Mientras construyes, **tenlos presentes y hazlo bien a la primera**, como al decirte "haz el sitio, considerando accesibilidad y WCAG": úsalos para decidir cómo escribes lo real. **Nunca crees placeholders, sitios de prueba, archivos vacíos ni código de relleno para que pase una verificación**, ni construyas algo que después se cambia solo para cumplir un punto: eso gasta trabajo y no mejora el producto. Un pendiente durante la construcción es normal; si un punto depende de algo que aún no existe, se cumple cuando se construya. No recorras el checklist ítem por ítem ni lances auditorías (`mep-security`, revisiones) tras cada edición: se hacen al cerrar la sub-etapa o en `/mep:prelaunch`.
+## Working rules in a project with mep
 
-- **Etapa y push.** Un proyecto está `building` (en construcción) o `live` (en vivo). En construcción, un push o un PR a `main` solo se detiene por secretos, ítems 🔒 violados o regresiones en sub-etapas ya cerradas: **no pidas al usuario cerrar sub-etapas ni cumplir los 🔴 pendientes para poder subir avance.** Cerrar una sub-etapa es opcional (protege lo hecho contra regresiones). El momento de exigirlo todo es `/mep:launch`; ya en vivo, cada push a `main` es un deploy a producción con la barrera completa.
-- **Dominios.** Cada ítem vive en un dominio y subdominio (`ui.motion`, `security.abuse`, `payments.checkout`…). `/mep:domains` muestra el avance por dominio y `/mep:focus <ruta>` lo pendiente de uno (con ↗ los ítems enlazados desde otro dominio). Trabaja por dominio si el usuario lo prefiere; no hace falta seguir el orden de las sub-etapas. Apagar un dominio (`/mep:domain off`) y diferir un 🔴 hasta el go-live (`/mep:defer`) son decisiones del usuario, no tuyas.
-
-- `BRIEF.md` es la instrucción maestra; se regenera desde el perfil, no se edita a mano.
-- Fases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. Son un orden sugerido para trabajar; las 🔴 de sub-etapas cerradas están protegidas contra regresiones.
-- Documentos de planeación (`docs/plan/`): son el plan contra el que se construye.
-  - Al empezar `foundation.design`, si falta `FLOWS.md`, escríbelo antes que nada; al empezar `build.data` con `has_db`, lo mismo con `SCHEMA.md`, antes de escribir migraciones. Plantillas en `${CLAUDE_PLUGIN_ROOT}/templates/plan/`.
-  - Lee `SCHEMA.md` antes de tocar la base de datos y `FLOWS.md` antes de construir una pantalla.
-  - Mantenlos al día: una ruta nueva va al inventario de `FLOWS.md` y una tabla nueva a `SCHEMA.md` en el mismo cambio. Los ítems `plan-*` fallan cuando se desvían del código.
-  - Diagramas: genera cada uno con la skill `diagram-design:diagram-design` y expórtalo a PNG con `diagram-design:export-diagram` (correr esta skill de mep es la petición del usuario para esas exportaciones). Guarda el HTML y el PNG en `docs/plan/diagrams/<doc>-<tipo>[-<nombre>]` (`<tipo>` es el nombre del tipo en diagram-design: `journey`, `architecture`, `gantt`…) y muéstralo con `![descripción](diagrams/<archivo>.png)`. Antes de cerrar `foundation.design` usan el estilo por defecto de diagram-design; después, los tokens del proyecto.
-- Guías (`${CLAUDE_PLUGIN_ROOT}/catalog/guidelines.md`): al empezar una sub-etapa, lee solo su sección. `foundation.design`: 1 y 2. `build.ux`: 1 y 3. `launch.content`: 4, solo si `type` es landing, ecommerce, marketplace o saas. La 5 (código) aplica siempre. La sección 0 la verifica el motor; no la repitas a mano.
-- Seguridad: la implementa o la audita el agente `mep-security`. Un ítem de seguridad solo cuenta como cumplido con su reporte en `.mep/security/`.
-- Para encontrar código usa el agente `mep-locator`. Mantén los mapas al día: `codemap` regenera `CODEMAP.md` (respeta "Notas manuales") y `registry` regenera `REGISTRY.md` desde los exports; "Para qué", "No usar para", "Variantes" y `@example` se escriben en el comentario `/** */` de cada export, nunca en el registro.
-- Antes de abrir o fusionar un PR a `main`, mep exige una revisión de calidad de la rama, registrada y vigente para el código actual: `/ponytail-review branch` si Ponytail está instalado (si no, revisa duplicados, nombres, complejidad y reutilización contra `REGISTRY.md`), y regístrala con `review record --pr --must-fix <n>`. Reintentar sin revisión no pasa, y el CI la exige también.
-- Para cerrar una sub-etapa, el motor exige una revisión de calidad registrada (`review record`), sin "must fix" y sobre el código actual: `/ponytail-review` si Ponytail está instalado, si no la revisión propia. `review` dice cuál.
-- Umbrales de calidad (complexity, max_lines, max_function_lines, max_params) en `quality` del perfil; relajarlos solo con `/mep:threshold` (lo escribe el usuario) y razón.
-- Features fuera del catálogo van en `custom_work` del perfil, con talla; el cotizador las marca "estimación a revisar".
-- Cotización: solo corre sola al definir el scope y en cambios de scope. No la calcules en otros momentos salvo que el usuario la pida (`/mep:quote`).
-- Ítems 🔒 (`locked`) no se desactivan nunca. 🟡 se omite solo con `/mep:skip` y razón; 🔴 se desactiva solo con `/mep:override`, con razón y confirmación del usuario.
-- `MEP_BYPASS=1` es un escape de emergencia del usuario, no tuyo: la guardia niega comandos que lo mencionen. No aplica a ítems locked ni a un estado modificado fuera de la CLI.
-- El estado de mep (`.mep/profile.yaml`, `log`, `security/`, `reviews/`) solo cambia con la CLI y queda sellado; nunca lo edites a mano ni por script. Si `verify` dice "modificado fuera de la CLI", explica el cambio al usuario: re-sellarlo es suyo (`/mep:resync`).
-- Acciones del usuario, nunca tuyas: `/mep:confirm`, `/mep:override`, `/mep:defer`, `/mep:domain off`, `/mep:threshold` (relajar) y `/mep:resync`. Cada una queda en `.mep/log` y en el resumen del PR.
-- "Checklist orientativo, no sustituye asesoría legal."
+- **Guidelines, not tasks.** The `BRIEF.md` items are what the finished site must meet, and they are checked at the checkpoints (closing a sub-phase, `/mep:prelaunch`, `/mep:launch`, CI). While you build, **keep them in mind and do it right the first time**, as if told "make the site, considering accessibility and WCAG": use them to decide how you write the real thing. **Never create placeholders, throwaway sites, empty files or filler code to make a check pass**, and never build something that is later replaced just to meet a point: it burns work and does not improve the product. A pending item during construction is normal; if a point depends on something that does not exist yet, it is met when that is built. Do not walk the checklist item by item or launch audits (`mep-security`, reviews) after every edit: they happen when the sub-phase closes or in `/mep:prelaunch`.
+- **Stage and push.** A project is `building` or `live`. While building, a push or PR to `main` only stops on secrets, violated 🔒 items or regressions in already closed sub-phases: **do not ask the user to close sub-phases or meet pending 🔴 items to push progress.** Closing a sub-phase is optional (it protects against regressions). The moment to require everything is `/mep:launch`; once live, every push to `main` is a production deploy with the full gate.
+- **Domains.** Every item lives in a domain and subdomain (`ui.motion`, `security.abuse`, `payments.checkout`…). `/mep:domains` shows progress by domain and `/mep:focus <path>` what is pending in one (items linked from another domain show with ↗). Work by domain if the user prefers; the sub-phase order need not be followed. Switching a domain off (`/mep:domain off`) and deferring a 🔴 until go-live (`/mep:defer`) are the user's decisions, not yours.
+- `BRIEF.md` is the master instruction; it is regenerated from the profile, never edited by hand.
+- Phases: `foundation.setup → foundation.design → build.data → build.features → build.ux → launch.content → launch.seo → launch.ops`. They are a suggested working order; the 🔴 of closed sub-phases are protected against regressions.
+- Planning documents (`docs/plan/`): they are the plan you build against.
+  - When `foundation.design` starts, if `FLOWS.md` is missing, write it first; when `build.data` starts with `has_db`, the same with `SCHEMA.md`, before writing migrations. Templates in `${CLAUDE_PLUGIN_ROOT}/templates/plan/`.
+  - Read `SCHEMA.md` before touching the database and `FLOWS.md` before building a screen.
+  - Keep them current: a new route goes into the `FLOWS.md` inventory and a new table into `SCHEMA.md` in the same change. The `plan-*` items fail when they drift from the code.
+  - Diagrams: generate each with the `diagram-design:diagram-design` skill and export it to PNG with `diagram-design:export-diagram` (running this mep skill is the user's request for those exports). Save the HTML and the PNG in `docs/plan/diagrams/<doc>-<type>[-<name>]` (`<type>` is the diagram-design type name: `journey`, `architecture`, `gantt`…) and show it with `![description](diagrams/<file>.png)`. Before closing `foundation.design` they use diagram-design's default style; after, the project's tokens.
+- Guidelines (`${CLAUDE_PLUGIN_ROOT}/catalog/guidelines.md`): when a sub-phase starts, read only its section. `foundation.design`: 1 and 2. `build.ux`: 1 and 3. `launch.content`: 4, only if `type` is landing, ecommerce, marketplace or saas. Section 5 (code) always applies. Section 0 is checked by the engine; do not repeat it by hand.
+- Security: the `mep-security` agent implements or audits it. A security item only counts as met with its report in `.mep/security/`.
+- To find code use the `mep-locator` agent. Keep the maps current: `codemap` regenerates `CODEMAP.md` (it respects "Manual notes") and `registry` regenerates `REGISTRY.md` from the exports; "What for", "Do not use for", "Variants" and `@example` are written in each export's `/** */` comment, never in the registry.
+- Before opening or merging a PR to `main`, mep requires a quality review of the branch, recorded and valid for the current code: `/ponytail-review branch` if Ponytail is installed (otherwise review duplicates, names, complexity and reuse against `REGISTRY.md`), and record it with `review record --pr --must-fix <n>`. Retrying without a review does not pass, and CI requires it too.
+- To close a sub-phase, the engine requires a recorded quality review (`review record`), with no "must fix" and on the current code: `/ponytail-review` if Ponytail is installed, otherwise your own review. `review` says which.
+- Quality thresholds (complexity, max_lines, max_function_lines, max_params) are in the profile's `quality`; relax them only with `/mep:threshold` (the user types it) and a reason.
+- Features outside the catalog go in the profile's `custom_work`, with a size; the quote marks them "estimate to review".
+- Quote: it only runs by itself when the scope is defined and when it changes. Do not compute it at other times unless the user asks (`/mep:quote`).
+- 🔒 (`locked`) items are never switched off. A 🟡 is skipped only with `/mep:skip` and a reason; a 🔴 is turned off only with `/mep:override`, with a reason and the user's confirmation.
+- `MEP_BYPASS=1` is the user's emergency escape, not yours: the guard denies commands that mention it. It does not apply to locked items or to state modified outside the CLI.
+- mep's state (`.mep/profile.yaml`, `log`, `security/`, `reviews/`) only changes through the CLI and is sealed; never edit it by hand or by script. If `verify` says "modified outside the CLI", explain the change to the user: re-sealing it is theirs (`/mep:resync`).
+- The user's actions, never yours: `/mep:confirm`, `/mep:override`, `/mep:defer`, `/mep:domain off`, `/mep:threshold` (relaxing) and `/mep:resync`. Each one is recorded in `.mep/log` and in the PR summary.
+- "Guided checklist, not legal advice."

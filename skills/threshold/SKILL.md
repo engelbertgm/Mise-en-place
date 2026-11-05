@@ -1,17 +1,17 @@
 ---
 name: threshold
-description: Cambia un umbral de calidad de mep (complejidad, líneas por archivo o por función). Relajarlo pide razón y solo lo escribe el usuario.
-argument-hint: "<complexity|max_lines|max_function_lines|max_params> <valor> [razón]"
+description: Change a mep quality threshold (complexity, lines per file or per function). Relaxing one needs a reason and only the user types it.
+argument-hint: "<complexity|max_lines|max_function_lines|max_params> <value> [reason]"
 disable-model-invocation: true
 ---
 
 # /mep:threshold
 
-Argumentos: $ARGUMENTS
+Arguments: $ARGUMENTS
 
-Por defecto: complejidad 10, 300 líneas por archivo, 50 por función. Hacerlos más estrictos no requiere razón. Relajarlos sí: queda marcado ⚠️ en `BRIEF.md`, en `.mep/log` y en el resumen del PR.
+Defaults: complexity 10, 300 lines per file, 50 per function. Making them stricter needs no reason. Relaxing them does: it is marked ⚠️ in `BRIEF.md`, in `.mep/log` and in the PR summary.
 
-Con mods, el mod responde este comando sin turno de Claude: escribirlo con su razón es la confirmación.
+With mods, the mod answers this command without a Claude turn: typing it with its reason is the confirmation.
 
-Si llegaste aquí (sin mods) y el valor relaja el umbral, **no lo ejecutes tú**: dale al usuario el comando para su propia terminal (le pedirá teclear la clave):
-`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" threshold <clave> <valor> <razón> --yes`
+If you got here (no mods) and the value relaxes the threshold, **do not run it yourself**: give the user the command for their own terminal (it asks them to type the key):
+`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" threshold <key> <value> <reason> --yes`

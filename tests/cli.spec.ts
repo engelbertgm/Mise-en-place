@@ -44,7 +44,7 @@ describe('init', () => {
     assert.match(brief, /no sustituye asesoría legal/)
     const claude = readFileSync(join(root, 'CLAUDE.md'), 'utf8')
     assert.match(claude, /^# Notas previas/)
-    assert.match(claude, /Este proyecto se rige por BRIEF\.md/)
+    assert.match(claude, /This project is governed by BRIEF\.md/)
     assert.ok(readdirSync(join(root, 'docs/decisions')).some(f => f.includes('stack-framework-default')))
     assert.ok(existsSync(join(root, '.github/workflows/mep.yml')))
     assert.equal(mep(root, ['init', '--from', 'draft.yaml']).code, 1)
@@ -140,18 +140,19 @@ describe('classic hooks', () => {
     const root = initialized()
     const out = JSON.parse(mep(root, ['hook', 'session-start'], JSON.stringify({ cwd: root })).out)
     const text = out.hookSpecificOutput.additionalContext as string
-    assert.match(text, /sub-etapa activa: foundation\.setup/)
-    assert.match(text, /guías para construir lo real/)
-    assert.match(text, /No crees placeholders/)
+    assert.match(text, /active sub-phase: foundation\.setup/)
+    assert.match(text, /guidelines for building the real thing/)
+    assert.match(text, /Do not create placeholders/)
     assert.doesNotMatch(text, /🔴 [a-z0-9-]+ —/) // no per-item to-do lines
+    assert.match(out.systemMessage, /sub-etapa activa: foundation\.setup/) // the user still sees Spanish
   })
 
   test('the project\'s CLAUDE.md block frames BRIEF.md as guidelines and forbids filler to pass a check', () => {
     const root = initialized()
     const claude = readFileSync(join(root, 'CLAUDE.md'), 'utf8')
-    assert.match(claude, /guías para construir lo real/)
-    assert.match(claude, /nunca crees páginas de prueba, sitios placeholder/)
-    assert.doesNotMatch(claude, /requisitos no negociables/)
+    assert.match(claude, /guidelines for building the real thing/)
+    assert.match(claude, /never create test pages, placeholder sites/)
+    assert.doesNotMatch(claude, /non-negotiable/)
   })
 
   test('the walking skeleton is optional: a placeholder page is never required', () => {
@@ -164,7 +165,7 @@ describe('classic hooks', () => {
   test('session-start shows the active sub-phase and its pending counts', () => {
     const root = initialized()
     const out = JSON.parse(mep(root, ['hook', 'session-start'], JSON.stringify({ cwd: root })).out)
-    assert.match(out.hookSpecificOutput.additionalContext, /sub-etapa activa: foundation\.setup/)
+    assert.match(out.hookSpecificOutput.additionalContext, /active sub-phase: foundation\.setup/)
   })
 
   test('stop does not block on the active sub-phase; it blocks on a regression in a closed one', () => {
@@ -194,5 +195,24 @@ describe('classic hooks', () => {
     const sensitive = JSON.parse(mep(root, ['hook', 'post-edit'], JSON.stringify({ cwd: root, tool_input: { file_path: join(root, 'supabase/migrations/001.sql') } })).out)
     assert.match(sensitive.hookSpecificOutput.additionalContext, /mep-security/)
     assert.equal(mep(root, ['hook', 'post-edit'], JSON.stringify({ cwd: root, tool_input: { file_path: join(root, 'src/button.tsx') } })).out, '')
+  })
+})
+
+describe('the CLAUDE.md block follows the plugin version', () => {
+  test('an older block between the markers is replaced at session start; what the person wrote around it stays', () => {
+    const root = initialized()
+    const file = join(root, 'CLAUDE.md')
+    const marker = readFileSync(file, 'utf8').match(/<!--[^>]*-->/)![0]
+    writeFileSync(file, `# Mis notas\n\n${marker}\nEste proyecto se rige por BRIEF.md. Los ítems 🔴 son requisitos no negociables.\n${marker}\n\nDespués\n`)
+    mep(root, ['hook', 'session-start'], JSON.stringify({ cwd: root }))
+    const claude = readFileSync(file, 'utf8')
+    assert.match(claude, /^# Mis notas/)
+    assert.match(claude, /Después\n$/)
+    assert.match(claude, /guidelines for building the real thing/)
+    assert.doesNotMatch(claude, /no negociables/)
+    assert.equal(claude.split(marker).length, 3) // one block, two markers
+    const again = readFileSync(file, 'utf8')
+    mep(root, ['hook', 'session-start'], JSON.stringify({ cwd: root }))
+    assert.equal(readFileSync(file, 'utf8'), again) // stable
   })
 })

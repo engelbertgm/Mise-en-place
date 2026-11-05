@@ -1,13 +1,13 @@
 ---
 name: skip
-description: Omite un ítem 🟡 recomendado del brief de mep, con razón escrita.
-argument-hint: "<id> <razón>"
+description: Skip a 🟡 recommended item of the mep brief, with a written reason.
+argument-hint: "<id> <reason>"
 disable-model-invocation: true
 allowed-tools: Bash(node *)
 ---
 
 # /mep:skip
 
-Corre `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" skip $ARGUMENTS` y muestra la salida.
+Run `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" skip $ARGUMENTS` and show the output.
 
-Solo acepta 🟡. Si falta la razón, pídela. Si el ítem es 🔴, explica que se usa `/mep:override`.
+Accepts 🟡 only. If the reason is missing, ask for it. If the item is 🔴, explain that `/mep:override` is the command.

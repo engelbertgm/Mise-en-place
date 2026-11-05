@@ -1,18 +1,18 @@
 ---
 name: defer
-description: Pospone un ítem 🔴 hasta el go-live, con razón: no frena sub-etapas ni pushes, pero mep launch lo exige. Solo la escribe el usuario.
-argument-hint: "<id> <razón> · undo <id>"
+description: Postpone a 🔴 item until go-live, with a reason: it does not stop sub-phases or pushes, but mep launch requires it. Only the user types it.
+argument-hint: "<id> <reason> · undo <id>"
 disable-model-invocation: true
 allowed-tools: AskUserQuestion
 ---
 
 # /mep:defer
 
-Argumentos: $ARGUMENTS
+Arguments: $ARGUMENTS
 
-Diferir no es apagar: el ítem sigue siendo obligatorio y `/mep:launch` lo exige. Mientras tanto no cuenta para cerrar la sub-etapa ni para un push o PR, y queda con ⏳ en el panel, en `BRIEF.md` y en `.mep/log`. `/mep:defer undo <id>` lo devuelve a la lista normal.
+Deferring is not turning off: the item stays required and `/mep:launch` requires it. Meanwhile it does not count to close the sub-phase or for a push or PR, and it shows ⏳ in the panel, in `BRIEF.md` and in `.mep/log`. `/mep:defer undo <id>` returns it to the normal list.
 
-Con mods, el mod responde este comando sin turno de Claude: escribirlo con su razón es la confirmación. Rechaza ítems 🔒 y los que no son 🔴.
+With mods, the mod answers this command without a Claude turn: typing it with its reason is the confirmation. It rejects 🔒 items and anything that is not 🔴.
 
-Si llegaste aquí (sin mods): **no lo ejecutes tú**; la guardia de mep lo niega desde el Bash del agente. Dale el comando para su terminal (le pedirá teclear el id):
-`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" defer <id> <razón>`
+If you got here (no mods): **do not run it yourself**; mep's guard denies it from the agent's Bash. Give the user the command for their terminal (it asks them to type the id):
+`node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs" defer <id> <reason>`
