@@ -28,6 +28,7 @@ export function emptyProfile(catalog: Catalog): Profile {
     signals,
     selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [], domains_off: [], deferred: [] },
     stage: 'building',
+    tailoring: { not_applicable: [], notes: {} },
     stack: { decided: {} },
   }
 }
@@ -42,6 +43,7 @@ export function normalizeProfile(raw: Partial<Profile>, catalog: Catalog): Profi
     counts: { ...raw.counts },
     signals: { ...base.signals, ...raw.signals },
     selections: { ...base.selections, ...raw.selections },
+    tailoring: { not_applicable: [...(raw.tailoring?.not_applicable ?? [])], notes: { ...raw.tailoring?.notes } },
     stack: { decided: { ...raw.stack?.decided } },
     capabilities: [...(raw.capabilities ?? [])],
     markets: [...(raw.markets ?? [])],

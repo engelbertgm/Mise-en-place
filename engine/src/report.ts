@@ -5,21 +5,30 @@ import { failingDetail } from './verify.ts'
 
 const STATUS_ICON = { pass: '✅', fail: '❌', unknown: '❔' } as const
 
-/** What /mep:scope shows: 🔴 / 🟡 / ⚪ grouped by category. */
+/**
+ * What /mep:scope shows: 🔴 / 🟡 / ⚪ grouped by domain and subdomain, so the proposal can be reviewed against the scope
+ * area by area. Items already fitted out of the scope are listed apart, with their reason.
+ */
 export function formatProposal(evaluated: Evaluated[]): string {
   const out: string[] = []
+  const live = evaluated.filter(e => e.state !== 'off')
   for (const level of ['required', 'recommended', 'optional'] as const) {
-    const items = evaluated.filter(e => e.level === level)
+    const items = live.filter(e => e.level === level)
     if (!items.length) continue
     const label = { required: 'Obligatorios', recommended: 'Recomendados', optional: 'Opcionales (elige)' }[level]
     out.push(`\n${LEVEL_ICON[level]} ${label} (${items.length})`)
-    const categories = [...new Set(items.map(e => e.item.category))].sort()
-    for (const cat of categories) {
-      out.push(`  ${cat}`)
-      for (const e of items.filter(i => i.item.category === cat)) {
+    const groups = [...new Set(items.map(e => e.item.domain ?? e.item.category))].sort()
+    for (const group of groups) {
+      out.push(`  ${group}`)
+      for (const e of items.filter(i => (i.item.domain ?? i.item.category) === group)) {
         out.push(`    - ${e.item.id}${e.item.locked ? ' 🔒' : ''} — ${e.item.title}`)
       }
     }
+  }
+  const fitted = evaluated.filter(e => e.state === 'off' && e.reason?.startsWith('no aplica a este scope'))
+  if (fitted.length) {
+    out.push(`\n🎯 Ajustado a este scope (${fitted.length})`)
+    for (const e of fitted) out.push(`    - ${e.item.id} — ${e.reason}`)
   }
   return out.join('\n').trim()
 }

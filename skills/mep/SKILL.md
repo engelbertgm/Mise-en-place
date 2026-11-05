@@ -23,6 +23,10 @@ Only values from `${CLAUDE_PLUGIN_ROOT}/catalog/dimensions.yaml`:
 
 Starting presets: `landing`, `corporate`, `ecommerce`, `saas`, `marketplace` (`catalog/presets/`). If the user does not choose, suggest the closest one.
 
+## The catalog is a general guide: fit it to the scope
+
+`type` is a label, not a recipe. Do not assume everything a typical SaaS, shop or landing has: read what *this* scope asks for and take from the catalog what fits it. In `/mep:scope`, `/mep:add` and `/mep:audit`, go through the applicable items domain by domain and decide for each: keep, not applicable (in `tailoring.not_applicable` with a one-line reason), applies differently (a note in `tailoring.notes`, in this scope's terms), or missing (capability, optional item, `custom_work`). If you are unsure, ask; do not guess. 🔒 items are never fitted out. The BRIEF shows the notes under each item and lists what did not fit, so later sessions build with the scope's reality, not the generic rule.
+
 ## Rules are activated by the scope
 
 Every catalog rule has a condition (`when`) on the profile: it applies or not according to the project's scope, never by default. A landing without accounts gets no RLS rules; a site without cookies gets no banner. `explain <id>` shows the condition with ✓/✗ and why a rule applies or not. In an existing repo, the user gives the scope and the code is only evidence (`/mep:audit`).

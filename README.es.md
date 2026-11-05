@@ -90,6 +90,14 @@ Cada uno tiene secciones fijas y diagramas hechos con [diagram-design](https://g
 
 No tienen un comando propio: `/mep:scope` escribe los tres primeros, la skill `mep` escribe FLOWS y SCHEMA al empezar su sub-etapa, `/mep:add` los actualiza cuando cambia el scope, `/mep:update` escribe los que falten en proyectos ya avanzados, y los ítems `plan-*` del checklist dicen cuáles faltan o están desactualizados.
 
+### A la medida del scope, no del tipo
+
+El catálogo es una **guía general**, no una lista por tipo de proyecto. En `/mep:scope`, Claude arma el perfil con hechos concretos, revisa lo que propone el catálogo y lo ajusta a *este* proyecto: conserva lo que aplica, descarta lo que no (con razón), adapta lo que aplica distinto (nota) y agrega lo que falta. Si tiene dudas, pregunta (pocas a la vez). Los 🔒 nunca se descartan.
+
+- Lo descartado queda en `tailoring.not_applicable` (`id` + `reason`) y lo adaptado en `tailoring.notes` del perfil. Se ve como `off` ("no aplica a este scope"), no cuenta, y aparece en `BRIEF.md` (nota 🎯, "Ajustado a este scope") y en `SCOPE.md` ("A tu medida").
+- `/mep:add` y `/mep:audit` vuelven a ajustar cuando cambia el scope.
+- El panel y los nombres de dominio están en inglés.
+
 ### Dominios
 
 Cada ítem vive en un **dominio** y un **subdominio** (`ui.motion`, `security.abuse`, `payments.checkout`, `quality.typescript`…): UI, UX, accesibilidad, frontend, idiomas, backend, cuentas y acceso, pagos, base de datos, seguridad, privacidad, legal, SEO, contenido, producto por tipo, analítica, infraestructura y calidad por lenguaje. [`catalog/domains.yaml`](catalog/domains.yaml) es la única fuente del hogar de cada ítem y guarda los **enlaces**: un ítem puede aparecer en otros subdominios como sugerencia (↗), mientras su estado y su nivel siguen donde vive.
@@ -128,7 +136,7 @@ Las líneas viven en [`catalog/prelaunch.yaml`](catalog/prelaunch.yaml). Las rev
 
 ### El panel
 
-`/mep:panel` abre un panel junto al chat (también se abre solo cuando un proyecto tiene mep). Cada línea es `NOMBRE … barra de braille  rojos amarillos blancos`: la barra se llena conforme pasan los obligatorios y va de rojo a verde, y los tres números son los 🔴, 🟡 y ⚪ elegidos pendientes, cada uno en su color. Dentro de una categoría, los ítems van bajo un encabezado por nivel (`Obligatorios (12)` en rojo, `Recomendados (4)` en amarillo), cada uno con su círculo: ● rojo obligatorio, ● amarillo recomendado, ○ blanco opcional. El encabezado nombra el nivel, así que se lee aunque una superficie no muestre color.
+`/mep:panel` abre un panel junto al chat (también se abre solo cuando un proyecto tiene mep). Cada línea es `NOMBRE … barra de braille  rojos amarillos blancos`: la barra se llena conforme pasan los obligatorios y va de rojo a verde, y los tres números son los 🔴, 🟡 y ⚪ elegidos pendientes, cada uno en su color. Dentro de una categoría, los ítems van bajo un encabezado por nivel (`Required (12)` en rojo, `Recommended (4)` en amarillo), cada uno con su círculo: ● rojo obligatorio, ● amarillo recomendado, ○ blanco opcional. El encabezado nombra el nivel, así que se lee aunque una superficie no muestre color.
 
 - **Por sub-etapa o por dominio:** un selector cambia la agrupación; en la vista por dominio, los ítems enlazados desde otros dominios salen con ↗.
 - **La etapa a la vista:** si un push es solo integrar (en construcción) o un deploy a producción (en vivo).
@@ -251,6 +259,11 @@ signals:
   has_dates: true
   has_typescript: true    # también has_javascript, has_css, has_html (por defecto true), has_sql, has_react…
   high_traffic: false     # solo el scope lo puede decir: enciende las reglas de escala
+tailoring:               # ajuste del catálogo a este scope, hecho por Claude
+  not_applicable:
+    - { id: saas-trial-flow, reason: "sin prueba gratis; de pago desde el día uno" }
+  notes:
+    pricing-page: "solo dos planes; sin nivel enterprise"
 selections:
   optional_added: []
   recommended_skipped:

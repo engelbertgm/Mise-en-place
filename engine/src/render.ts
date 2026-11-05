@@ -52,10 +52,12 @@ function checkbox(e: Evaluated, results?: Map<string, ItemResult>): string {
   return r?.status === 'pass' ? '[x]' : '[ ]'
 }
 
-function line(e: Evaluated, results?: Map<string, ItemResult>): string {
+function line(e: Evaluated, results?: Map<string, ItemResult>, note?: string): string {
   const lock = e.item.locked ? ' 🔒' : ''
   const verify = e.item.verify.map(describeCheck).join(' · ')
-  return `- ${checkbox(e, results)} \`${e.item.id}\`${lock} — ${e.item.title} — ${verify}`
+  const base = `- ${checkbox(e, results)} \`${e.item.id}\`${lock} — ${e.item.title} — ${verify}`
+  // How this item applies to THIS scope, in the scope's own terms (set when the catalog was fitted to it).
+  return note ? `${base}\n  - 🎯 ${note}` : base
 }
 
 function profileSection(p: Profile, locales: string[]): string {
@@ -133,7 +135,7 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
       const items = inPhase.filter(e => e.level === level)
       if (!items.length) continue
       const label = { required: 'Obligatorios', recommended: 'Recomendados', optional: 'Opcionales elegidos' }[level]
-      out.push('', `#### ${LEVEL_ICON[level]} ${label}`, ...items.map(e => line(e, byId)))
+      out.push('', `#### ${LEVEL_ICON[level]} ${label}`, ...items.map(e => line(e, byId, profile.tailoring.notes[e.item.id])))
     }
   }
   const skipped = evaluated.filter(e => e.state === 'skipped')
@@ -142,6 +144,8 @@ export function renderBrief(profile: Profile, evaluated: Evaluated[], catalog: C
   const relaxed = profile.selections.overrides.filter(o => o.id.startsWith('threshold:'))
   const disabled = [...overridden.map(e => `- ⚠️ \`${e.item.id}\` — ${e.reason}`), ...relaxed.map(o => `- ⚠️ umbral \`${o.id.slice(10)}\` — ${o.reason}`)]
   out.push('', '### ⚠️ Desactivados (🔴 con override, con razón)', disabled.length ? disabled.join('\n') : '—')
+  const fitted = profile.tailoring.not_applicable
+  out.push('', '### 🎯 Ajustado a este scope (no aplica aquí)', fitted.length ? fitted.map(t => `- \`${t.id}\` — ${t.reason}`).join('\n') : '—')
   const off = profile.selections.domains_off
   out.push('', '### 🚫 Dominios apagados (con razón)', off.length ? off.map(o => `- ⚠️ \`${o.path}\` — ${o.reason}`).join('\n') : '—')
   const deferred = profile.selections.deferred

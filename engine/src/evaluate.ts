@@ -22,6 +22,7 @@ export function evaluate(profile: Profile, catalog: Catalog): Evaluated[] {
   const overridden = new Map(profile.selections.overrides.map(s => [s.id, s.reason]))
   const optional = new Set(profile.selections.optional_added)
   const off = profile.selections.domains_off
+  const notApplicable = new Map(profile.tailoring.not_applicable.map(t => [t.id, t.reason]))
 
   const result: Evaluated[] = []
   for (const item of catalog.items) {
@@ -30,7 +31,11 @@ export function evaluate(profile: Profile, catalog: Catalog): Evaluated[] {
     let state: Evaluated['state'] = 'active'
     let reason: string | undefined
     const switchedOff = item.locked ? undefined : off.find(o => inDomain(item, o.path))
-    if (switchedOff) {
+    const tailoredOut = item.locked ? undefined : notApplicable.get(item.id)
+    if (tailoredOut !== undefined) {
+      state = 'off'
+      reason = `no aplica a este scope: ${tailoredOut}`
+    } else if (switchedOff) {
       state = 'off'
       reason = `dominio apagado (${switchedOff.path}): ${switchedOff.reason}`
     } else if (level === 'optional' && !optional.has(item.id)) state = 'offered'
@@ -110,8 +115,9 @@ export type DiffEntry = { id: string; title: string; change: 'new' | 'raised' | 
 
 /** What `/mep:add` shows: only what changed between two profiles. */
 export function diff(before: Profile, after: Profile, catalog: Catalog): DiffEntry[] {
-  const a = new Map(evaluate(before, catalog).map(e => [e.item.id, e]))
-  const b = new Map(evaluate(after, catalog).map(e => [e.item.id, e]))
+  // An item tailored or switched off no longer applies: it leaves the diff like one whose condition stopped matching.
+  const a = new Map(evaluate(before, catalog).filter(e => e.state !== 'off').map(e => [e.item.id, e]))
+  const b = new Map(evaluate(after, catalog).filter(e => e.state !== 'off').map(e => [e.item.id, e]))
   const out: DiffEntry[] = []
   for (const [id, e] of b) {
     const prev = a.get(id)

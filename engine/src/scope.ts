@@ -89,6 +89,19 @@ export function renderScope(profile: Profile, evaluated: Evaluated[], catalog: C
     '## Tecnología',
     bullets([...stackGroups(stack(profile, catalog)).map(g => `${g.decisions.map(d => `${d.key}: ${d.value}`).join(', ')} — ${g.why}`), ...(tech.length ? [`Lenguajes y herramientas: ${tech.join(', ')}`] : [])]),
     '',
+    ...(profile.tailoring.not_applicable.length || Object.keys(profile.tailoring.notes).length
+      ? [
+          '## A tu medida',
+          'El catálogo es una guía general; esto es lo que se ajustó a este proyecto.',
+          ...(profile.tailoring.not_applicable.length
+            ? ['', `**No aplica aquí (${profile.tailoring.not_applicable.length}):**`, bullets(profile.tailoring.not_applicable.slice(0, 12).map(t => `\`${t.id}\` — ${t.reason}`)), ...(profile.tailoring.not_applicable.length > 12 ? [`… y ${profile.tailoring.not_applicable.length - 12} más (BRIEF.md)`] : [])]
+            : []),
+          ...(Object.keys(profile.tailoring.notes).length
+            ? ['', '**Cómo aplica aquí:**', bullets(Object.entries(profile.tailoring.notes).map(([id, note]) => `\`${id}\` — ${note}`))]
+            : []),
+          '',
+        ]
+      : []),
     '## Lo que exige este scope',
     `Aplican **${app.applies} de ${app.total}** reglas de mep: 🔴 ${plural(app.byLevel.required, 'obligatoria', 'obligatorias')} · 🟡 ${plural(app.byLevel.recommended, 'recomendada', 'recomendadas')} · ⚪ ${plural(app.byLevel.optional, 'opcional', 'opcionales')}. ${app.notApplying.length === 1 ? 'La otra no aplica' : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qué). El detalle está en BRIEF.md.`,
     ...(legal.length ? ['', '**Legales y de cumplimiento obligatorios:**', bullets(legal)] : []),

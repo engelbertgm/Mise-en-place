@@ -6,7 +6,7 @@
 You describe the project. mep knows what to ask and what to require.
 
 [![License](https://img.shields.io/badge/license-BSL_1.1-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.4.4-informational.svg)](.claude-plugin/plugin.json)
+[![Version](https://img.shields.io/badge/version-0.5.0-informational.svg)](.claude-plugin/plugin.json)
 [![Catalog](https://img.shields.io/badge/catalog-2026.11.4-informational.svg)](catalog/CHANGELOG.md)
 [![Claude Code plugin](https://img.shields.io/badge/Claude_Code-plugin-D97757.svg)](https://docs.claude.com/en/docs/claude-code/plugins)
 [![Works with ponytail](https://img.shields.io/badge/works_with-ponytail-555.svg)](https://github.com/DietrichGebert/ponytail)
@@ -90,12 +90,20 @@ Each one has fixed sections and diagrams made with [diagram-design](https://gith
 
 There is no separate command for them: `/mep:scope` writes the first three, the `mep` skill writes FLOWS and SCHEMA when their sub-phase starts, `/mep:add` updates them when the scope changes, `/mep:update` writes the missing ones in projects already underway, and the `plan-*` items in the checklist say which are missing or out of date.
 
+### Tailored to the scope, not to a type
+
+The catalog is a **general guide**, not a checklist per project type. At `/mep:scope`, Claude builds the profile from concrete facts, then goes through what the catalog proposes and fits it to *this* project: it keeps what applies, drops what does not (with a reason), adapts what applies differently (a note), and adds what is missing. If it is unsure, it asks (a few questions at a time). 🔒 items are never fitted out.
+
+- Left-out items are recorded in `tailoring.not_applicable` (`id` + `reason`) and adapted ones in `tailoring.notes` of the profile. They show as `off` ("does not apply to this scope"), stop counting, and appear in `BRIEF.md` (🎯 note, "Adjusted to this scope") and `SCOPE.md` ("A tu medida").
+- `/mep:add` and `/mep:audit` fit again when the scope changes.
+
 ### Domains
 
 Every item lives in one **domain** and **subdomain** (`ui.motion`, `security.abuse`, `payments.checkout`, `quality.typescript`…): UI, UX, accessibility, frontend, languages (i18n), backend, accounts & access, payments, database, security, privacy, legal, SEO, content, product by type, analytics, infrastructure, and quality by language. [`catalog/domains.yaml`](catalog/domains.yaml) is the single source of each item's home, and also holds the **links**: an item can show in other subdomains as a suggestion (↗), while its state and level stay where it lives.
 
 - `/mep:domains` shows progress per domain with a braille bar; `/mep:focus <domain[.subdomain]>` lists what is pending there, linked items included.
 - Work by area if you prefer: the panel groups by sub-phase or by domain.
+- Panel and domain names are in English.
 - A domain or subdomain can be switched off whole (`/mep:domain off backend.queues "another team owns it"`): its items stop counting, 🔒 stay on, and it is marked ⚠️ in `BRIEF.md` and the PR summary.
 - What does not apply to the scope is already out by the item's own condition. Languages follow what the code uses: `has_typescript`, `has_css`, `has_sql`, `has_python`, `has_react`… turn their quality rules on or off.
 
@@ -128,7 +136,7 @@ The lines live in [`catalog/prelaunch.yaml`](catalog/prelaunch.yaml). The checks
 
 ### The panel
 
-`/mep:panel` opens a panel beside the chat (it also opens by itself when a project has mep). Each line is `NAME … braille bar  red yellow white`: the bar fills as required items pass and moves from red to green, and the three numbers are the pending 🔴, 🟡 and chosen ⚪ items in their own colors. Inside a category, items sit under a heading per level (`Obligatorios (12)` in red, `Recomendados (4)` in yellow), each with its circle: ● red required, ● yellow recommended, ○ white optional. The heading names the level, so it reads even where a surface does not show color.
+`/mep:panel` opens a panel beside the chat (it also opens by itself when a project has mep). Each line is `NAME … braille bar  red yellow white`: the bar fills as required items pass and moves from red to green, and the three numbers are the pending 🔴, 🟡 and chosen ⚪ items in their own colors. Inside a category, items sit under a heading per level (`Required (12)` in red, `Recommended (4)` in yellow), each with its circle: ● red required, ● yellow recommended, ○ white optional. The heading names the level, so it reads even where a surface does not show color.
 
 - **By sub-phase or by domain:** a toggle switches the grouping; in the domain view, items linked from other domains appear with ↗.
 - **Stage at a glance:** whether a push is only an integration (building) or a production deploy (live).
@@ -251,6 +259,11 @@ signals:
   has_dates: true
   has_typescript: true    # also has_javascript, has_css, has_html (default true), has_sql, has_react…
   high_traffic: false     # only the scope can say it: turns on the scale rules
+tailoring:               # Claude's fit of the catalog to this scope
+  not_applicable:
+    - { id: saas-trial-flow, reason: "no free trial; paid from day one" }
+  notes:
+    pricing-page: "two plans only; no enterprise tier"
 selections:
   optional_added: []
   recommended_skipped:

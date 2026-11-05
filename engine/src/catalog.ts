@@ -264,6 +264,17 @@ export function validateProfile(profile: Profile, catalog: Catalog): string[] {
     if (!dims.phases.includes(p)) errors.push(`phase "${p}" is not valid`)
   }
   if (!['building', 'live'].includes(profile.stage)) errors.push(`stage "${profile.stage}" is not valid`)
+  const byId = new Map(catalog.items.map(i => [i.id, i]))
+  for (const t of profile.tailoring.not_applicable) {
+    const item = byId.get(t.id)
+    if (!item) errors.push(`tailoring: ${t.id} no existe en el catálogo`)
+    else if (item.locked) errors.push(`tailoring: ${t.id} es locked 🔒 y no se puede marcar como no aplicable`)
+    if (!t.reason?.trim()) errors.push(`tailoring: ${t.id} necesita una razón`)
+  }
+  for (const [id, note] of Object.entries(profile.tailoring.notes)) {
+    if (!byId.has(id)) errors.push(`tailoring: la nota de ${id} apunta a un ítem que no existe`)
+    if (!String(note).trim()) errors.push(`tailoring: la nota de ${id} está vacía`)
+  }
   const paths = new Set(catalog.domains.flatMap(d => [d.key, ...d.subdomains.map(s => `${d.key}.${s.key}`)]))
   for (const o of profile.selections.domains_off) {
     if (catalog.domains.length && !paths.has(o.path)) errors.push(`domain "${o.path}" is not valid`)

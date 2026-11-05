@@ -157,6 +157,11 @@ export type Profile = {
   }
   /** `building` (default): pushes and PRs only stop on regressions; `live`: every push to main is a production deploy. */
   stage: 'building' | 'live'
+  /**
+   * How the catalog was fitted to THIS scope (the catalog is a general guide, the type is only a label): items that
+   * do not fit and why, and notes on how others apply here. Set at /mep:scope or /mep:add, with the user's confirmation.
+   */
+  tailoring: { not_applicable: { id: string; reason: string }[]; notes: Record<string, string> }
   stack: { decided: Record<string, string> }
   /** Features of the scope that are not in the catalog; Claude sizes them and they show as "estimación a revisar". */
   custom_work?: { title: string; size: Size; phase?: string }[]

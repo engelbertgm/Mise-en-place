@@ -25,23 +25,23 @@ const spinner = atom({ plugin: 'mep', key: 'spinner' } as const, -1, { shape: 's
 
 /** The panel's tools: each runs the slash command as if typed. The human-only ones stay out (the engine refuses a plugin's). */
 const INSTANT = [
-  ['mep:check', 'Estado del checklist'],
-  ['mep:domains', 'Avance por dominio'],
-  ['mep:prelaunch', 'Seguridad antes de salir (a cualquier hora)'],
-  ['mep:launch', 'Pasar a en vivo (corre la barrera completa)'],
-  ['mep:phase', 'Sub-etapa activa'],
-  ['mep:quote', 'Cotización interna'],
+  ['mep:check', 'Checklist status'],
+  ['mep:domains', 'Progress by domain'],
+  ['mep:prelaunch', 'Security before going live (any time)'],
+  ['mep:launch', 'Go live (runs the full gate)'],
+  ['mep:phase', 'Active sub-phase'],
+  ['mep:quote', 'Internal quote'],
 ] as const
 const WITH_TURN = [
-  ['mep:audit', 'Auditar el repo contra su scope'],
-  ['mep:update', 'Integrar ítems nuevos del catálogo'],
-  ['mep:export', 'Exportar brief al cliente (.docx/.pdf)'],
-  ['mep:phase', 'Cerrar la sub-etapa (auditoría + revisión)', 'close'],
+  ['mep:audit', 'Audit the repo against its scope'],
+  ['mep:update', 'Bring in new catalog items'],
+  ['mep:export', 'Export the client brief (.docx/.pdf)'],
+  ['mep:phase', 'Close the sub-phase (audit + review)', 'close'],
 ] as const
 const WITH_TEXT = [
-  ['mep:scope', 'Scope, descripción:', 'crear'],
-  ['mep:add', 'Agregar scope:', 'agregar'],
-  ['mep:log-time', 'Horas, <id> <horas>:', 'registrar'],
+  ['mep:scope', 'Scope, description:', 'create'],
+  ['mep:add', 'Add scope:', 'add'],
+  ['mep:log-time', 'Hours, <id> <hours>:', 'log'],
 ] as const
 
 /**
@@ -49,44 +49,44 @@ const WITH_TEXT = [
  * ends in a space waits for the person to finish it. Nothing runs from here: the person presses Enter.
  */
 const FLOW = [
-  { id: 'scope', title: 'Definir el scope', when: 'una vez, al empezar', cmds: [
-    ['/mep:scope <descripción>', '/mep:scope ', 'crea el perfil, SCOPE.md y BRIEF.md'],
-    ['/mep:audit', '/mep:audit', 'si el repo ya existe: scope contra código'],
+  { id: 'scope', title: 'Define the scope', when: 'once, at the start', cmds: [
+    ['/mep:scope <description>', '/mep:scope ', 'creates the profile, SCOPE.md and BRIEF.md'],
+    ['/mep:audit', '/mep:audit', 'existing repo: scope vs code'],
   ] },
-  { id: 'work', title: 'Trabajar', when: 'todo el tiempo', cmds: [
-    ['/mep:domains', '/mep:domains', 'avance por dominio'],
-    ['/mep:focus <dominio>', '/mep:focus ', 'qué falta en uno'],
-    ['/mep:check', '/mep:check', 'estado por sub-etapa'],
-    ['/mep:add <cambio>', '/mep:add ', 'el scope cambió'],
-    ['/mep:phase', '/mep:phase', 'sub-etapa activa y qué falta'],
-    ['/mep:log-time <id> <horas>', '/mep:log-time ', 'horas reales: afinan la cotización'],
-    ['/mep:panel', '/mep:panel', 'abrir este panel'],
+  { id: 'work', title: 'Work', when: 'all the time', cmds: [
+    ['/mep:domains', '/mep:domains', 'progress by domain'],
+    ['/mep:focus <domain>', '/mep:focus ', 'what is missing in one'],
+    ['/mep:check', '/mep:check', 'status by sub-phase'],
+    ['/mep:add <change>', '/mep:add ', 'the scope changed'],
+    ['/mep:phase', '/mep:phase', 'active sub-phase and what is missing'],
+    ['/mep:log-time <id> <hours>', '/mep:log-time ', 'real hours: they tune the quote'],
+    ['/mep:panel', '/mep:panel', 'open this panel'],
   ] },
-  { id: 'decide', title: 'Decisiones que solo tú tomas', when: 'cuando algo no aplica o puede esperar', cmds: [
-    ['/mep:defer <id> <razón>', '/mep:defer ', 'esperar hasta salir en vivo'],
-    ['/mep:skip <id> <razón>', '/mep:skip ', 'omitir un recomendado'],
-    ['/mep:override <id> <razón>', '/mep:override ', 'apagar un obligatorio'],
-    ['/mep:domain off <ruta> <razón>', '/mep:domain off ', 'apagar un dominio'],
-    ['/mep:confirm <id>', '/mep:confirm ', 'ya verifiqué un ítem manual'],
-    ['/mep:defer undo <id>', '/mep:defer undo ', 'devolver un diferido'],
-    ['/mep:domain on <ruta>', '/mep:domain on ', 'encender un dominio'],
-    ['/mep:threshold <clave> <valor> <razón>', '/mep:threshold ', 'cambiar un umbral de calidad'],
-    ['/mep:resync', '/mep:resync', 're-sellar si el estado cambió fuera de mep'],
+  { id: 'decide', title: 'Decisions only you make', when: 'when something does not apply or can wait', cmds: [
+    ['/mep:defer <id> <reason>', '/mep:defer ', 'wait until go-live'],
+    ['/mep:skip <id> <reason>', '/mep:skip ', 'skip a recommended item'],
+    ['/mep:override <id> <reason>', '/mep:override ', 'turn off a required item'],
+    ['/mep:domain off <path> <reason>', '/mep:domain off ', 'switch a domain off'],
+    ['/mep:confirm <id>', '/mep:confirm ', 'I verified a manual item'],
+    ['/mep:defer undo <id>', '/mep:defer undo ', 'bring back a deferred item'],
+    ['/mep:domain on <path>', '/mep:domain on ', 'switch a domain on'],
+    ['/mep:threshold <key> <value> <reason>', '/mep:threshold ', 'change a quality threshold'],
+    ['/mep:resync', '/mep:resync', 're-seal if the state changed outside mep'],
   ] },
-  { id: 'push', title: 'Subir avance', when: 'cuando quieras', note: 'git push o PR a main: no exige cerrar nada', cmds: [
-    ['/mep:phase close <sub-etapa>', '/mep:phase close ', 'opcional: proteger lo hecho'],
+  { id: 'push', title: 'Push progress', when: 'whenever you want', note: 'git push or PR to main: nothing needs to be closed', cmds: [
+    ['/mep:phase close <sub-phase>', '/mep:phase close ', 'optional: protect what is done'],
   ] },
-  { id: 'prelaunch', title: 'Antes de salir', when: 'a cualquier hora', cmds: [
-    ['/mep:prelaunch', '/mep:prelaunch', 'seguridad, línea por línea'],
-    ['/mep:prelaunch --full', '/mep:prelaunch --full', 'con comandos y build'],
+  { id: 'prelaunch', title: 'Before going live', when: 'any time', cmds: [
+    ['/mep:prelaunch', '/mep:prelaunch', 'security, line by line'],
+    ['/mep:prelaunch --full', '/mep:prelaunch --full', 'with commands and build'],
   ] },
-  { id: 'launch', title: 'Salir en vivo', when: 'cuando no falte ningún obligatorio', cmds: [
-    ['/mep:launch', '/mep:launch', 'la barrera completa, una vez'],
+  { id: 'launch', title: 'Go live', when: 'when no required item is missing', cmds: [
+    ['/mep:launch', '/mep:launch', 'the full gate, once'],
   ] },
-  { id: 'live', title: 'Ya en vivo', when: 'después', note: 'cada push a main es un deploy con la barrera completa', cmds: [
-    ['/mep:update', '/mep:update', 'ítems nuevos del catálogo'],
-    ['/mep:export', '/mep:export', 'brief para el cliente'],
-    ['/mep:quote', '/mep:quote', 'cotización interna'],
+  { id: 'live', title: 'Live', when: 'afterwards', note: 'every push to main is a deploy with the full gate', cmds: [
+    ['/mep:update', '/mep:update', 'new catalog items'],
+    ['/mep:export', '/mep:export', 'client brief'],
+    ['/mep:quote', '/mep:quote', 'internal quote'],
   ] },
 ] as const
 
@@ -119,7 +119,7 @@ async function busy<T>($: EngineInterface, job: () => Promise<T>): Promise<T> {
 }
 // The log lines of the tools view, read only while idle: a turning spinner redraws the panel ten times a second.
 let recentLog: string[] = []
-/** Rows shown per sub-phase and lines of findings before a "ver más". */
+/** Rows shown per sub-phase and lines of findings before a "more". */
 const CAP = 8
 const FINDINGS_CAP = 6
 
@@ -136,12 +136,12 @@ async function hasProfile($: EngineInterface): Promise<boolean> {
 function secretIn(path: string, text: string): string | undefined {
   if (LOCAL_SECRET_FILE.test(path)) return undefined
   const found = findSecret(text)
-  return found ? `mep: ${path} recibiría un secreto (${found}). Los secretos van en .env local y en el gestor del hosting, nunca en archivos versionados.` : undefined
+  return found ? `mep: ${path} would receive a secret (${found}). Secrets belong in a local .env and in the hosting's variable manager, never in versioned files.` : undefined
 }
 
 /**
  * One engine run per refresh feeds both the status line and the panel. The quick check (every turn) leaves
- * commands and build checks as ❔; "Verificar todo" in the panel runs them.
+ * commands and build checks as ❔; "Verify all" in the panel runs them.
  */
 const refresh = ($: EngineInterface, full = false) => busy($, () => check($, full))
 
@@ -164,12 +164,12 @@ async function act($: EngineInterface, args: string[]) {
 
 const isPending = (i: PanelItem) => i.state === 'active' && i.status !== 'pass' && i.level !== 'optional'
 
-/** Turning off a 🔴 asks in a dialog of its own: it takes the keys, starts on Cancelar, and Esc cancels. */
+/** Turning off a 🔴 asks in a dialog of its own: it takes the keys, starts on Cancel, and Esc cancels. */
 const DIALOG = 'mep-override'
 
 async function askOverride($: EngineInterface, id: string, reason: string) {
   await update($, pending, () => ({ id, reason }))
-  await $.ui.open({ id: DIALOG, title: 'Desactivar un 🔴', focus: true, closeOnEscape: true, holdToasts: true, rows: 14 })
+  await $.ui.open({ id: DIALOG, title: 'Turn off a 🔴', focus: true, closeOnEscape: true, holdToasts: true, rows: 14 })
 }
 
 export const register: Register = on => {
@@ -190,7 +190,7 @@ export const register: Register = on => {
     const result = await runEngine($, ['verify', ...(kind === 'prod' ? ['--prod'] : [])])
     if (result.exitCode !== 0) return { deny: result.stdout.trim() || result.stderr.trim() }
     return next(e)
-  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'mep: no se pudo verificar el deploy (¿node disponible?). Corre /mep:check.' }))
+  }).catch(($, e, next) => (next.called ? next(e) : { deny: 'mep: could not verify the deploy (is node available?). Run /mep:check.' }))
 
   on('tool.call', { tool: 'Write' }, async ($, e, next) => {
     const deny = (await hasProfile($)) ? (guardFile(e.file_path) ?? secretIn(e.file_path, e.content)) : undefined
@@ -277,21 +277,21 @@ export const register: Register = on => {
     const { Box, Text, Button } = $.ui.resolve(e)
     const ask = await read($, pending)
     const item = ask ? (await read($, panel))?.items.find(i => i.id === ask.id) : undefined
-    if (!ask || !item) return <Text dimColor>Nada que confirmar.</Text>
+    if (!ask || !item) return <Text dimColor>Nothing to confirm.</Text>
     return (
       <Box flexDirection="column">
-        <Text bold>¿Desactivar {item.id}?</Text>
+        <Text bold>Turn off {item.id}?</Text>
         <Text>{item.title}</Text>
         <Text> </Text>
-        <Text dimColor>Riesgo que aceptas</Text>
+        <Text dimColor>Risk you accept</Text>
         <Text>{item.why}</Text>
-        <Text dimColor>Tu razón</Text>
+        <Text dimColor>Your reason</Text>
         <Text>{ask.reason}</Text>
         <Text dimColor>Queda en .mep/log, marcado ⚠️ en BRIEF.md y en el resumen del PR.</Text>
         <Text> </Text>
         <Box flexDirection="row" gap={2}>
           <Button key="cancel" role="dismiss" autoFocus onPress={() => $.ui.close({ id: DIALOG })}>
-            Cancelar
+            Cancel
           </Button>
           <Button
             key="override"
@@ -301,14 +301,14 @@ export const register: Register = on => {
               await $.ui.close({ id: DIALOG })
             }}
           >
-            Desactivar
+            Turn off
           </Button>
         </Box>
       </Box>
     )
   })
 
-  // Esc, Cancelar or the close mark: nothing is turned off.
+  // Esc, Cancel or the close mark: nothing is turned off.
   on('ui.close', async ($, e, next) => {
     if (e.id === DIALOG) await update($, pending, () => null)
     return next(e)
@@ -320,7 +320,7 @@ export const register: Register = on => {
     const Input = 'Input' in els ? els.Input : undefined
     const data = await read($, panel)
     const message = await read($, flash)
-    if (!data) return <Text dimColor>mep: verificando…</Text>
+    if (!data) return <Text dimColor>mep: verifying…</Text>
     const id = await read($, selected)
     const item = id ? data.items.find(i => i.id === id) : undefined
     const open = await read($, expanded)
@@ -374,17 +374,17 @@ export const register: Register = on => {
       const put = async (text: string) => {
         const shown = text.trim()
         const filled = await $.prompt.fill({ text, mode: 'replace' }).catch(() => ({ isFilled: false }))
-        if (filled.isFilled) return update($, flash, () => `En el chat: ${shown}. Enter para correrlo.`)
+        if (filled.isFilled) return update($, flash, () => `In the chat: ${shown}. Press Enter to run it.`)
         const copied = await $.ui.copy({ text: shown, surface: e.surface }).catch(() => ({ isCopied: false }))
-        await update($, flash, () => (copied.isCopied ? `Copiado: ${shown}. Pégalo en el chat.` : `Escríbelo en el chat: ${shown}`))
+        await update($, flash, () => (copied.isCopied ? `Copied: ${shown}. Paste it in the chat.` : `Type it in the chat: ${shown}`))
       }
       return (
         <Box flexDirection="column">
           <Button key="flow-back" plain onPress={() => update($, flowOpen, () => false)}>
-            ← Volver
+            ← Back
           </Button>
-          <Text bold>Flujo: qué comando y cuándo</Text>
-          <Text dimColor>Un clic escribe el comando en el chat; tú le das Enter.</Text>
+          <Text bold>Flow: which command, and when</Text>
+          <Text dimColor>A click writes the command in the chat; you press Enter.</Text>
           {message ? <Text dimColor>{message}</Text> : null}
           <Box flexDirection="column" marginTop={1}>
             {FLOW.map((step, i) => {
@@ -418,13 +418,13 @@ export const register: Register = on => {
 
     if (await read($, tools)) {
       const run = async (command: string, args = '') => {
-        await update($, flash, () => `/${command} ${args}`.trim() + ' en cola.')
+        await update($, flash, () => `/${command} ${args}`.trim() + ' queued.')
         void $.command.run({ command, args }).catch(err => update($, flash, () => `/${command}: ${String(err)}`))
       }
       // The same checks the gate runs on a deploy or a PR into main, asked ahead; the whole answer shows.
       const ask = (args: string[], clear: string) =>
         busy($, async () => {
-          await update($, flash, () => 'verificando…')
+          await update($, flash, () => 'verifying…')
           const r = await runEngine($, args)
           await update($, flash, () => r.stdout.trim() || (r.exitCode === 0 ? clear : r.stderr.trim()))
         })
@@ -439,20 +439,20 @@ export const register: Register = on => {
       return (
         <Box flexDirection="column">
           <Button key="tools-back" plain onPress={() => update($, tools, () => false)}>
-            ← Volver
+            ← Back
           </Button>
           {message ? <Text dimColor>{message}</Text> : null}
           <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Antes de deployar o abrir PR</Text>
-            <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nada bloquea el deploy a producción.')}>
-              {'  ¿Puedo deployar a producción?'}
+            <Text dimColor>Before deploying or opening a PR</Text>
+            <Button key="t-deploy" plain onPress={() => ask(['verify', '--prod'], '✅ Nothing blocks a production deploy.')}>
+              {'  Can I deploy to production?'}
             </Button>
-            <Button key="t-pr" plain onPress={() => ask(['pr-gate'], '✅ Nada detiene el PR a main.')}>
-              {'  ¿Puedo abrir PR a main?'}
+            <Button key="t-pr" plain onPress={() => ask(['pr-gate'], '✅ Nothing stops a PR to main.')}>
+              {'  Can I open a PR to main?'}
             </Button>
           </Box>
           <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Al instante</Text>
+            <Text dimColor>Instant</Text>
             {INSTANT.map(([command, label]) => (
               <Button key={`t-${command}`} plain onPress={() => run(command)}>
                 {`  ${label} `}
@@ -461,7 +461,7 @@ export const register: Register = on => {
             ))}
           </Box>
           <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Con un turno de Claude</Text>
+            <Text dimColor>Takes a Claude turn</Text>
             {WITH_TURN.map(([command, label, args]) => (
               <Button key={`t-${command}${args ? `-${args}` : ''}`} plain onPress={() => run(command, args)}>
                 {`  ${label} `}
@@ -474,8 +474,8 @@ export const register: Register = on => {
               ))}
           </Box>
           <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Actividad reciente</Text>
-            {recent.length ? recent.map(l => <Text dimColor>{`  ${l}`}</Text>) : <Text dimColor>  Sin eventos en .mep/log.</Text>}
+            <Text dimColor>Recent activity</Text>
+            {recent.length ? recent.map(l => <Text dimColor>{`  ${l}`}</Text>) : <Text dimColor>  No events in .mep/log.</Text>}
           </Box>
         </Box>
       )
@@ -485,17 +485,17 @@ export const register: Register = on => {
       const confirming = await read($, pending)
       const canConfirm = item.manual && item.category !== 'security' && isPending(item)
       const verdict =
-        item.state === 'skipped' ? <Text dimColor>omitido</Text>
-        : item.state !== 'active' ? <Text color="warning">desactivado</Text>
-        : item.status === 'pass' ? <Text color="success">✓ cumple</Text>
-        : item.status === 'fail' ? <Text color="error">✗ falla</Text>
-        : <Text dimColor>sin verificar</Text>
+        item.state === 'skipped' ? <Text dimColor>skipped</Text>
+        : item.state !== 'active' ? <Text color="warning">turned off</Text>
+        : item.status === 'pass' ? <Text color="success">✓ met</Text>
+        : item.status === 'fail' ? <Text color="error">✗ fails</Text>
+        : <Text dimColor>not verified</Text>
       const allFindings = open.includes(`findings:${item.id}`)
       const shownFindings = allFindings ? item.all : item.all.slice(0, FINDINGS_CAP)
       return (
         <Box flexDirection="column">
           <Button key="back" plain onPress={() => update($, selected, () => null)}>
-            ← Volver
+            ← Back
           </Button>
           <Box flexDirection="row" gap={1}>
             {dot(item.level)}
@@ -506,62 +506,62 @@ export const register: Register = on => {
             {item.phase}
             {item.domain ? ` · ${item.domain}` : ''}
             {item.locked ? ' · 🔒 locked' : ''}
-            {item.deferred ? ' · ⏳ diferido hasta el go-live' : ''}
+            {item.deferred ? ' · ⏳ deferred until go-live' : ''}
           </Text>
-          {item.links.length > 0 && <Text dimColor>{`También en: ${item.links.join(', ')}`}</Text>}
+          {item.links.length > 0 && <Text dimColor>{`Also in: ${item.links.join(', ')}`}</Text>}
           <Text>{item.title}</Text>
           {/* Actions sit above the long text, so they stay in the frame; the rest scrolls. */}
           {!e.props.isFocused && <Text dimColor>ctrl+x tab y flechas para desplazar.</Text>}
           {message ? <Text dimColor>{message}</Text> : null}
-          {item.locked && <Text dimColor>🔒 No se puede desactivar.</Text>}
-          {item.category === 'security' && isPending(item) && <Text dimColor>Lo da por cumplido una auditoría de mep-security.</Text>}
+          {item.locked && <Text dimColor>🔒 Cannot be turned off.</Text>}
+          {item.category === 'security' && isPending(item) && <Text dimColor>Only a mep-security audit marks it as met.</Text>}
           {canConfirm && (
             <Button key="confirm" variant="primary" onPress={() => act($, ['confirm', item.id])}>
-              Confirmar: lo verifiqué yo
+              Confirm: I verified it
             </Button>
           )}
           {Input && item.level === 'recommended' && item.state === 'active' && (
-            <Input key={`skip-${item.id}`} label="Omitir, razón:" submitLabel="omitir" onSubmit={v => (v.trim() ? act($, ['skip', item.id, ...v.trim().split(/\s+/)]) : undefined)} />
+            <Input key={`skip-${item.id}`} label="Skip, reason:" submitLabel="skip" onSubmit={v => (v.trim() ? act($, ['skip', item.id, ...v.trim().split(/\s+/)]) : undefined)} />
           )}
           {Input && item.level === 'required' && item.state === 'active' && !item.locked && !confirming && (
-            <Input key={`override-${item.id}`} label="Desactivar, razón:" submitLabel="siguiente" onSubmit={v => (v.trim() ? askOverride($, item.id, v.trim()) : undefined)} />
+            <Input key={`override-${item.id}`} label="Turn off, reason:" submitLabel="next" onSubmit={v => (v.trim() ? askOverride($, item.id, v.trim()) : undefined)} />
           )}
-          {confirming && confirming.id === item.id && <Text dimColor>Confirma o cancela en el diálogo.</Text>}
+          {confirming && confirming.id === item.id && <Text dimColor>Confirm or cancel in the dialog.</Text>}
           {/* Postponing is not turning off: the item still has to pass at go-live. */}
           {item.deferred && (
             <Button key="undefer" plain onPress={() => act($, ['undefer', item.id])}>
-              Quitar el diferido
+              Remove the deferral
             </Button>
           )}
           {Input && !item.deferred && item.level === 'required' && item.state === 'active' && !item.locked && item.status !== 'pass' && (
-            <Input key={`defer-${item.id}`} label="Diferir hasta el go-live, razón:" submitLabel="diferir" onSubmit={v => (v.trim() ? act($, ['defer', item.id, ...v.trim().split(/\s+/)]) : undefined)} />
+            <Input key={`defer-${item.id}`} label="Defer until go-live, reason:" submitLabel="defer" onSubmit={v => (v.trim() ? act($, ['defer', item.id, ...v.trim().split(/\s+/)]) : undefined)} />
           )}
           {/* What to do first, then how, then why. */}
           {item.detail ? (
             <Box flexDirection="column" marginTop={1}>
-              <Text dimColor>{item.state === 'active' ? 'Qué falta' : 'Razón'}</Text>
+              <Text dimColor>{item.state === 'active' ? 'What is missing' : 'Reason'}</Text>
               <Text>{item.detail}</Text>
             </Box>
           ) : null}
           {item.all.length > 0 && (
             <Box flexDirection="column" marginTop={1}>
-              <Text dimColor>Todo lo que falla ({item.all.length})</Text>
+              <Text dimColor>Everything that fails ({item.all.length})</Text>
               {shownFindings.map(f => (
                 <Text>  · {f}</Text>
               ))}
               {item.all.length > FINDINGS_CAP && (
                 <Button key="more-findings" plain onPress={() => toggle(`findings:${item.id}`)}>
-                  {allFindings ? '  ver menos' : `  … ${item.all.length - FINDINGS_CAP} más`}
+                  {allFindings ? '  less' : `  … ${item.all.length - FINDINGS_CAP} more`}
                 </Button>
               )}
             </Box>
           )}
           <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Cómo</Text>
+            <Text dimColor>How</Text>
             <Text>{item.how}</Text>
           </Box>
           <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Por qué</Text>
+            <Text dimColor>Why</Text>
             <Text>{item.why}</Text>
           </Box>
         </Box>
@@ -573,7 +573,7 @@ export const register: Register = on => {
     // A count opens its first pending item; a zero count is not a button.
     const first = (level: 'required' | 'recommended') => data.items.find(i => i.level === level && isPending(i) && !i.deferred)
     const narrow = e.props.bodyColumns < 56
-    const WORD = { required: narrow ? 'Oblig.' : 'Obligatorios', recommended: narrow ? 'Recom.' : 'Recomendados' } as const
+    const WORD = { required: narrow ? 'Req.' : 'Required', recommended: narrow ? 'Rec.' : 'Recommended' } as const
     const count = (level: 'required' | 'recommended') => {
       const target = first(level)
       const label = ` ${data.counts[level]}`
@@ -604,7 +604,7 @@ export const register: Register = on => {
       </Box>
     )
     /** Rows grouped under a heading per level, the heading in the level's color and naming it, so the level reads even if the color does not. */
-    const SECTION = { required: 'Obligatorios', recommended: 'Recomendados', optional: 'Opcionales elegidos' } as const
+    const SECTION = { required: 'Required', recommended: 'Recommended', optional: 'Optional (chosen)' } as const
     const sections = (shownRows: PanelItem[], all: PanelItem[], note?: (i: PanelItem) => string | undefined) =>
       (['required', 'recommended', 'optional'] as const).map(level => {
         const here = shownRows.filter(i => i.level === level)
@@ -640,7 +640,7 @@ export const register: Register = on => {
             <Box flexDirection="column">
               {line({
                 key: `phase-${phase}`,
-                label: `${shown ? '▾' : '▸'} ${phase}${closed ? ' · cerrada' : ''}`,
+                label: `${shown ? '▾' : '▸'} ${phase}${closed ? ' · closed' : ''}`,
                 onPress: () => toggle(phase),
                 done: progress.done,
                 total: progress.total,
@@ -650,7 +650,7 @@ export const register: Register = on => {
               {shown && sections(rows, items)}
               {shown && items.length > CAP && (
                 <Button key={`more-${phase}`} plain onPress={() => toggle(`all:${phase}`)}>
-                  {all ? '     ver menos' : `     … ${items.length - CAP} más`}
+                  {all ? '     less' : `     … ${items.length - CAP} more`}
                 </Button>
               )}
             </Box>
@@ -676,7 +676,7 @@ export const register: Register = on => {
               <Box flexDirection="column">
                 {line({
                   key,
-                  label: `${shown ? '▾' : '▸'} ${d.row.label}${d.row.off ? ' · apagado' : ''}`,
+                  label: `${shown ? '▾' : '▸'} ${d.row.label}${d.row.off ? ' · off' : ''}`,
                   onPress: () => toggle(key),
                   done: d.row.off ? 0 : d.row.done,
                   total: d.row.off ? 0 : d.row.required,
@@ -684,16 +684,16 @@ export const register: Register = on => {
                 })}
                 {shown && d.row.off && (
                   <Button key={`on-${d.row.path}`} plain onPress={() => act($, ['domain', 'on', d.row.path])}>
-                    {`   ${d.row.off} · activar`}
+                    {`   ${d.row.off} · turn on`}
                   </Button>
                 )}
                 {shown && !d.row.off && sections(rows, mine, i => i.domain.slice(d.row.path.length + 1))}
                 {shown && !d.row.off && mine.length > CAP && (
                   <Button key={`more-${key}`} plain onPress={() => toggle(`all:${key}`)}>
-                    {all ? '     ver menos' : `     … ${mine.length - CAP} más`}
+                    {all ? '     less' : `     … ${mine.length - CAP} more`}
                   </Button>
                 )}
-                {shown && !d.row.off && linked.length > 0 && <Text dimColor>{`   ↗ enlazados (${linked.length})`}</Text>}
+                {shown && !d.row.off && linked.length > 0 && <Text dimColor>{`   ↗ linked (${linked.length})`}</Text>}
                 {shown && !d.row.off && linked.slice(0, 3).map(i => row(i, `↗ ${i.domain}`))}
               </Box>
             )
@@ -711,34 +711,34 @@ export const register: Register = on => {
           {deferredPending > 0 && <Text dimColor>{`⏳ ${deferredPending}`}</Text>}
           <Text color="claude">{frame >= 0 ? SPINNER_FRAMES[frame % SPINNER_FRAMES.length] : ' '}</Text>
         </Box>
-        <Text dimColor>{data.stage === 'live' ? 'en vivo: un push a main es un deploy' : 'en construcción: un push solo frena por regresiones'}</Text>
+        <Text dimColor>{data.stage === 'live' ? 'live: a push to main is a deploy' : 'building: a push only stops on regressions'}</Text>
         <Box flexDirection="row" gap={2}>
           <Button key="full" plain onPress={() => refresh($, true)}>
-            ↻ Verificar todo
+            ↻ Verify all
           </Button>
           <Button key="flow" plain onPress={() => update($, flowOpen, () => true)}>
-            ⇢ Flujo
+            ⇢ Flow
           </Button>
           <Button key="tools" plain onPress={() => update($, tools, () => true)}>
-            ⚙ Herramientas
+            ⚙ Tools
           </Button>
         </Box>
         {overall.total ? (
           <Box flexDirection="row" gap={1}>
             {overall.node}
-            <Text dimColor>{`${overall.done}/${overall.total} obligatorios`}</Text>
+            <Text dimColor>{`${overall.done}/${overall.total} required`}</Text>
           </Box>
         ) : null}
         <Box flexDirection="row" gap={2}>
-          <Text dimColor>Ver por</Text>
+          <Text dimColor>View by</Text>
           <Button key="view-phase" plain onPress={() => update($, view, () => 'fase')}>
-            {mode === 'fase' ? <Text bold>sub-etapa</Text> : <Text dimColor>sub-etapa</Text>}
+            {mode === 'fase' ? <Text bold>sub-phase</Text> : <Text dimColor>sub-phase</Text>}
           </Button>
           <Button key="view-domain" plain onPress={() => update($, view, () => 'dominio')}>
-            {mode === 'dominio' ? <Text bold>dominio</Text> : <Text dimColor>dominio</Text>}
+            {mode === 'dominio' ? <Text bold>domain</Text> : <Text dimColor>domain</Text>}
           </Button>
         </Box>
-        {!data.full && <Text dimColor>Comandos y build se verifican con ↻.</Text>}
+        {!data.full && <Text dimColor>Commands and the build are verified with ↻.</Text>}
         {message ? <Text dimColor>{message}</Text> : null}
         {mode === 'dominio' ? byDomain : byPhase}
         {mode === 'fase' && clean.length > 0 && <Text dimColor>{`✓ ${clean.join(' · ')}`}</Text>}

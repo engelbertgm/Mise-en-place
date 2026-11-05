@@ -192,7 +192,7 @@ describe('panel', () => {
       expect((await ui.find({ type: 'Text', text: /foundation\.setup · / }))?.text).toMatch(/foundation\.setup/)
       await ui.press({ key: 'first-required' })
       expect((await ui.find({ type: 'Text', text: /Saber dónde está cada cosa/ }))?.text).toMatch(/Saber dónde está cada cosa/)
-      expect((await ui.find({ type: 'Text', text: /Todo lo que falla \(61\)/ }))?.text).toMatch(/Todo lo que falla \(61\)/)
+      expect((await ui.find({ type: 'Text', text: /Everything that fails \(61\)/ }))?.text).toMatch(/Everything that fails \(61\)/)
       // Six lines first, the rest behind "más": a long list does not bury the page.
       expect(await ui.find({ type: 'Text', text: /export60 no está en REGISTRY\.md/ })).toBeFalsy()
       await ui.press({ key: 'more-findings' })
@@ -212,7 +212,7 @@ describe('panel', () => {
     await ui.unmount()
   })
 
-  test('turning off a 🔴 takes a reason, then a dialog that shows the risk and starts on Cancelar', async ($, on) => {
+  test('turning off a 🔴 takes a reason, then a dialog that shows the risk and starts on Cancel', async ($, on) => {
     const calls = await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
     await ui.press({ key: 'code-maps' })
@@ -220,7 +220,7 @@ describe('panel', () => {
     expect(calls.some(a => a.includes('override'))).toBe(false)
     expect(opens).toContain('mep-override')
     const dialog = await $.ui.mount({ ...PANE, requestId: 'mep-override', surface: 'terminal' })
-    expect((await dialog.find({ type: 'Text', text: /¿Desactivar code-maps\?/ }))?.text).toMatch(/¿Desactivar code-maps\?/)
+    expect((await dialog.find({ type: 'Text', text: /Turn off code-maps\?/ }))?.text).toMatch(/Turn off code-maps\?/)
     expect((await dialog.find({ type: 'Text', text: /Saber dónde está cada cosa/ }))?.text).toMatch(/Saber dónde/)
     await dialog.press({ key: 'override' })
     expect(calls.some(a => a.includes('override') && a.includes('legado') && a.includes('--yes') && a.includes('--human'))).toBe(true)
@@ -229,7 +229,7 @@ describe('panel', () => {
     await ui.unmount()
   })
 
-  test('Cancelar in the dialog turns nothing off', async ($, on) => {
+  test('Cancel in the dialog turns nothing off', async ($, on) => {
     const calls = await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
     await ui.press({ key: 'code-maps' })
@@ -253,7 +253,7 @@ describe('panel', () => {
       await ui.input({ key: 't-mep:add', text: 'pagos con Stripe', kind: 'submit' })
       expect(runs()).toEqual(['mep:audit', 'mep:phase close', 'mep:add pagos con Stripe'])
       await ui.press({ key: 't-deploy' })
-      expect((await ui.find({ type: 'Text', text: /bloquea el deploy a producción|Nada bloquea/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /bloquea el deploy a producción|Nothing blocks/ }))?.text).toBeTruthy()
       expect(calls.some(a => a.includes('verify') && a.includes('--prod'))).toBe(true)
       await ui.press({ key: 't-pr' })
       expect((await ui.find({ type: 'Text', text: /revisión de calidad/ }))?.text).toMatch(/revisión de calidad/)
@@ -286,8 +286,8 @@ describe('panel', () => {
     await opened($, on)
     for (const surface of ['terminal', 'vscode'] as const) {
       const ui = await $.ui.mount({ ...PANE, surface })
-      expect((await ui.find({ type: 'Text', text: /Obligatorios \(2\)/ }))?.text).toBeTruthy()
-      expect((await ui.find({ type: 'Text', text: /Recomendados \(1\)/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /Required \(2\)/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /Recommended \(1\)/ }))?.text).toBeTruthy()
       await ui.press({ key: 'csp-strict' }) // the recommended item is under its own heading and pressable
       await ui.press({ key: 'back' })
       await ui.unmount()
@@ -297,16 +297,16 @@ describe('panel', () => {
   test('by domain: a row per domain; open, its pending items and the ones linked from elsewhere', async ($, on) => {
     await opened($, on)
     const ui = await $.ui.mount({ ...PANE, surface: 'terminal' })
-    expect((await ui.find({ type: 'Text', text: /en construcción/ }))?.text).toMatch(/un push solo frena por regresiones/)
+    expect((await ui.find({ type: 'Text', text: /building/ }))?.text).toMatch(/a push only stops on regressions/)
     await ui.press({ key: 'view-domain' })
     await ui.press({ key: 'dom:quality' }) // opens: its own pending item can be pressed
     await ui.press({ key: 'code-maps' })
     expect((await ui.find({ type: 'Text', text: /quality\.code/ }))?.text).toMatch(/quality\.code/)
-    expect((await ui.find({ type: 'Text', text: /También en: ux\.principles/ }))?.text).toBeTruthy()
+    expect((await ui.find({ type: 'Text', text: /Also in: ux\.principles/ }))?.text).toBeTruthy()
     await ui.press({ key: 'back' })
     await ui.press({ key: 'dom:quality' }) // fold it again
     await ui.press({ key: 'dom:ux' }) // nothing of its own: the item linked to ux.principles shows with ↗
-    expect((await ui.find({ type: 'Text', text: /↗ enlazados \(1\)/ }))?.text).toBeTruthy()
+    expect((await ui.find({ type: 'Text', text: /↗ linked \(1\)/ }))?.text).toBeTruthy()
     await ui.press({ key: 'dom:ux' })
     await ui.press({ key: 'view-phase' })
     await ui.unmount()
@@ -335,12 +335,12 @@ describe('panel', () => {
       filled.length = 0
       const ui = await $.ui.mount({ ...PANE, surface })
       await ui.press({ key: 'flow' })
-      expect((await ui.find({ type: 'Text', text: /Flujo: qué comando y cuándo/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /Flow: which command, and when/ }))?.text).toBeTruthy()
       await ui.press({ key: 'f-launch-0' })
       await ui.press({ key: 'f-work-1' })
       await ui.press({ key: 'f-decide-0' })
       expect(filled).toEqual(['/mep:launch', '/mep:focus ', '/mep:defer '])
-      expect((await ui.find({ type: 'Text', text: /En el chat: \/mep:defer/ }))?.text).toBeTruthy()
+      expect((await ui.find({ type: 'Text', text: /In the chat: \/mep:defer/ }))?.text).toBeTruthy()
       await ui.press({ key: 'flow-back' })
       await ui.unmount()
     }
@@ -355,7 +355,7 @@ describe('panel', () => {
     await ui.press({ key: 'flow' })
     await ui.press({ key: 'f-prelaunch-0' })
     expect(copied).toEqual(['/mep:prelaunch'])
-    expect((await ui.find({ type: 'Text', text: /Copiado: \/mep:prelaunch/ }))?.text).toBeTruthy()
+    expect((await ui.find({ type: 'Text', text: /Copied: \/mep:prelaunch/ }))?.text).toBeTruthy()
     await ui.press({ key: 'flow-back' })
     await ui.unmount()
   })

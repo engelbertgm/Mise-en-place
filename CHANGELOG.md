@@ -2,6 +2,14 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.5.0
+
+**The scope is read, not matched to a type.** Before, `type: saas` brought every SaaS rule whether or not the project needed it.
+
+- **Fitting the catalog to the scope.** `/mep:scope`, `/mep:add` and `/mep:audit` now ask Claude to go through the proposal domain by domain and decide, for each applicable item, whether it is kept, does not apply (with a reason), applies differently (with a note in the scope's terms) or is missing (`custom_work`), and to ask the user when unsure. The result is saved in the profile as `tailoring` (`not_applicable` and `notes`) and goes through the same confirmation as the rest of the scope.
+- **The engine honors it:** an item fitted out has state `off` ("no aplica a este scope: <reason>") and stops counting everywhere (panel, counts, prelaunch, go-live); 🔒 items cannot be fitted out; ids and reasons are validated. `/mep:add` shows a fitted-out item as "deja de aplicar" and bringing one back as new.
+- **`BRIEF.md`** shows each note under its item (🎯) and lists what did not fit; **`SCOPE.md`** gets an "A tu medida" section; **`evaluate`** groups the proposal by domain and lists the fitted-out items apart.
+
 ## 0.4.4
 
 - **Skills, agents and the `CLAUDE.md` block are in English** (fewer tokens for the model to read). The assistant still talks to the user in their language, and the panel, the engine's messages and the catalog stay in Spanish. The context mep hands the agent at session start and when a sensitive file is edited is English too; the one-line summary the user sees is still Spanish.

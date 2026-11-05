@@ -7611,6 +7611,17 @@ function validateProfile(profile, catalog) {
     if (!dims.phases.includes(p)) errors.push(`phase "${p}" is not valid`);
   }
   if (!["building", "live"].includes(profile.stage)) errors.push(`stage "${profile.stage}" is not valid`);
+  const byId = new Map(catalog.items.map((i) => [i.id, i]));
+  for (const t of profile.tailoring.not_applicable) {
+    const item = byId.get(t.id);
+    if (!item) errors.push(`tailoring: ${t.id} no existe en el cat\xE1logo`);
+    else if (item.locked) errors.push(`tailoring: ${t.id} es locked \u{1F512} y no se puede marcar como no aplicable`);
+    if (!t.reason?.trim()) errors.push(`tailoring: ${t.id} necesita una raz\xF3n`);
+  }
+  for (const [id, note] of Object.entries(profile.tailoring.notes)) {
+    if (!byId.has(id)) errors.push(`tailoring: la nota de ${id} apunta a un \xEDtem que no existe`);
+    if (!String(note).trim()) errors.push(`tailoring: la nota de ${id} est\xE1 vac\xEDa`);
+  }
   const paths = new Set(catalog.domains.flatMap((d) => [d.key, ...d.subdomains.map((s) => `${d.key}.${s.key}`)]));
   for (const o of profile.selections.domains_off) {
     if (catalog.domains.length && !paths.has(o.path)) errors.push(`domain "${o.path}" is not valid`);
@@ -7729,6 +7740,7 @@ function evaluate(profile, catalog) {
   const overridden = new Map(profile.selections.overrides.map((s) => [s.id, s.reason]));
   const optional = new Set(profile.selections.optional_added);
   const off = profile.selections.domains_off;
+  const notApplicable = new Map(profile.tailoring.not_applicable.map((t) => [t.id, t.reason]));
   const result2 = [];
   for (const item of catalog.items) {
     if (!matches(item.when, profile)) continue;
@@ -7736,7 +7748,11 @@ function evaluate(profile, catalog) {
     let state = "active";
     let reason;
     const switchedOff = item.locked ? void 0 : off.find((o) => inDomain(item, o.path));
-    if (switchedOff) {
+    const tailoredOut = item.locked ? void 0 : notApplicable.get(item.id);
+    if (tailoredOut !== void 0) {
+      state = "off";
+      reason = `no aplica a este scope: ${tailoredOut}`;
+    } else if (switchedOff) {
       state = "off";
       reason = `dominio apagado (${switchedOff.path}): ${switchedOff.reason}`;
     } else if (level === "optional" && !optional.has(item.id)) state = "offered";
@@ -7798,8 +7814,8 @@ function stack(profile, catalog) {
   return [...out.values()].sort((a, b) => a.key.localeCompare(b.key));
 }
 function diff(before, after, catalog) {
-  const a = new Map(evaluate(before, catalog).map((e) => [e.item.id, e]));
-  const b = new Map(evaluate(after, catalog).map((e) => [e.item.id, e]));
+  const a = new Map(evaluate(before, catalog).filter((e) => e.state !== "off").map((e) => [e.item.id, e]));
+  const b = new Map(evaluate(after, catalog).filter((e) => e.state !== "off").map((e) => [e.item.id, e]));
   const out = [];
   for (const [id, e] of b) {
     const prev = a.get(id);
@@ -8159,6 +8175,7 @@ function emptyProfile(catalog) {
     signals,
     selections: { optional_added: [], recommended_skipped: [], overrides: [], manual_confirmed: [], grace: [], domains_off: [], deferred: [] },
     stage: "building",
+    tailoring: { not_applicable: [], notes: {} },
     stack: { decided: {} }
   };
 }
@@ -8171,6 +8188,7 @@ function normalizeProfile(raw, catalog) {
     counts: { ...raw.counts },
     signals: { ...base.signals, ...raw.signals },
     selections: { ...base.selections, ...raw.selections },
+    tailoring: { not_applicable: [...raw.tailoring?.not_applicable ?? []], notes: { ...raw.tailoring?.notes } },
     stack: { decided: { ...raw.stack?.decided } },
     capabilities: [...raw.capabilities ?? []],
     markets: [...raw.markets ?? []],
@@ -9963,10 +9981,12 @@ function checkbox(e, results) {
   const r = results?.get(e.item.id);
   return r?.status === "pass" ? "[x]" : "[ ]";
 }
-function line(e, results) {
+function line(e, results, note) {
   const lock = e.item.locked ? " \u{1F512}" : "";
   const verify = e.item.verify.map(describeCheck).join(" \xB7 ");
-  return `- ${checkbox(e, results)} \`${e.item.id}\`${lock} \u2014 ${e.item.title} \u2014 ${verify}`;
+  const base = `- ${checkbox(e, results)} \`${e.item.id}\`${lock} \u2014 ${e.item.title} \u2014 ${verify}`;
+  return note ? `${base}
+  - \u{1F3AF} ${note}` : base;
 }
 function profileSection(p, locales) {
   const signals = Object.entries(p.signals).filter(([, v]) => v !== false).map(([k, v]) => v === true ? k : `${k}=${v}`);
@@ -10033,7 +10053,7 @@ function renderBrief(profile, evaluated, catalog, results) {
       const items = inPhase.filter((e) => e.level === level);
       if (!items.length) continue;
       const label = { required: "Obligatorios", recommended: "Recomendados", optional: "Opcionales elegidos" }[level];
-      out.push("", `#### ${LEVEL_ICON[level]} ${label}`, ...items.map((e) => line(e, byId)));
+      out.push("", `#### ${LEVEL_ICON[level]} ${label}`, ...items.map((e) => line(e, byId, profile.tailoring.notes[e.item.id])));
     }
   }
   const skipped = evaluated.filter((e) => e.state === "skipped");
@@ -10042,6 +10062,8 @@ function renderBrief(profile, evaluated, catalog, results) {
   const relaxed = profile.selections.overrides.filter((o) => o.id.startsWith("threshold:"));
   const disabled = [...overridden.map((e) => `- \u26A0\uFE0F \`${e.item.id}\` \u2014 ${e.reason}`), ...relaxed.map((o) => `- \u26A0\uFE0F umbral \`${o.id.slice(10)}\` \u2014 ${o.reason}`)];
   out.push("", "### \u26A0\uFE0F Desactivados (\u{1F534} con override, con raz\xF3n)", disabled.length ? disabled.join("\n") : "\u2014");
+  const fitted = profile.tailoring.not_applicable;
+  out.push("", "### \u{1F3AF} Ajustado a este scope (no aplica aqu\xED)", fitted.length ? fitted.map((t) => `- \`${t.id}\` \u2014 ${t.reason}`).join("\n") : "\u2014");
   const off = profile.selections.domains_off;
   out.push("", "### \u{1F6AB} Dominios apagados (con raz\xF3n)", off.length ? off.map((o) => `- \u26A0\uFE0F \`${o.path}\` \u2014 ${o.reason}`).join("\n") : "\u2014");
   const deferred = profile.selections.deferred;
@@ -10129,19 +10151,26 @@ ${block}` : block);
 var STATUS_ICON = { pass: "\u2705", fail: "\u274C", unknown: "\u2754" };
 function formatProposal(evaluated) {
   const out = [];
+  const live = evaluated.filter((e) => e.state !== "off");
   for (const level of ["required", "recommended", "optional"]) {
-    const items = evaluated.filter((e) => e.level === level);
+    const items = live.filter((e) => e.level === level);
     if (!items.length) continue;
     const label = { required: "Obligatorios", recommended: "Recomendados", optional: "Opcionales (elige)" }[level];
     out.push(`
 ${LEVEL_ICON[level]} ${label} (${items.length})`);
-    const categories = [...new Set(items.map((e) => e.item.category))].sort();
-    for (const cat of categories) {
-      out.push(`  ${cat}`);
-      for (const e of items.filter((i) => i.item.category === cat)) {
+    const groups = [...new Set(items.map((e) => e.item.domain ?? e.item.category))].sort();
+    for (const group of groups) {
+      out.push(`  ${group}`);
+      for (const e of items.filter((i) => (i.item.domain ?? i.item.category) === group)) {
         out.push(`    - ${e.item.id}${e.item.locked ? " \u{1F512}" : ""} \u2014 ${e.item.title}`);
       }
     }
+  }
+  const fitted = evaluated.filter((e) => e.state === "off" && e.reason?.startsWith("no aplica a este scope"));
+  if (fitted.length) {
+    out.push(`
+\u{1F3AF} Ajustado a este scope (${fitted.length})`);
+    for (const e of fitted) out.push(`    - ${e.item.id} \u2014 ${e.reason}`);
   }
   return out.join("\n").trim();
 }
@@ -10515,6 +10544,13 @@ function renderScope(profile, evaluated, catalog) {
     "## Tecnolog\xEDa",
     bullets([...stackGroups(stack(profile, catalog)).map((g) => `${g.decisions.map((d) => `${d.key}: ${d.value}`).join(", ")} \u2014 ${g.why}`), ...tech.length ? [`Lenguajes y herramientas: ${tech.join(", ")}`] : []]),
     "",
+    ...profile.tailoring.not_applicable.length || Object.keys(profile.tailoring.notes).length ? [
+      "## A tu medida",
+      "El cat\xE1logo es una gu\xEDa general; esto es lo que se ajust\xF3 a este proyecto.",
+      ...profile.tailoring.not_applicable.length ? ["", `**No aplica aqu\xED (${profile.tailoring.not_applicable.length}):**`, bullets(profile.tailoring.not_applicable.slice(0, 12).map((t) => `\`${t.id}\` \u2014 ${t.reason}`)), ...profile.tailoring.not_applicable.length > 12 ? [`\u2026 y ${profile.tailoring.not_applicable.length - 12} m\xE1s (BRIEF.md)`] : []] : [],
+      ...Object.keys(profile.tailoring.notes).length ? ["", "**C\xF3mo aplica aqu\xED:**", bullets(Object.entries(profile.tailoring.notes).map(([id, note]) => `\`${id}\` \u2014 ${note}`))] : [],
+      ""
+    ] : [],
     "## Lo que exige este scope",
     `Aplican **${app.applies} de ${app.total}** reglas de mep: \u{1F534} ${plural(app.byLevel.required, "obligatoria", "obligatorias")} \xB7 \u{1F7E1} ${plural(app.byLevel.recommended, "recomendada", "recomendadas")} \xB7 \u26AA ${plural(app.byLevel.optional, "opcional", "opcionales")}. ${app.notApplying.length === 1 ? "La otra no aplica" : `Las otras ${app.notApplying.length} no aplican`} a este scope (\`mep explain <id>\` dice por qu\xE9). El detalle est\xE1 en BRIEF.md.`,
     ...legal.length ? ["", "**Legales y de cumplimiento obligatorios:**", bullets(legal)] : [],
