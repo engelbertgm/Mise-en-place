@@ -1,9 +1,9 @@
-# Documentos de planeación en docs/plan/: Claude los escribe desde templates/plan/; el motor verifica que existan, que tengan sus secciones y que sigan al día con el código.
+# Documentos de planeación en docs/plan/: OPCIONALES. Claude los escribe desde templates/plan/ solo si la persona los quiere (cliente que aprueba, equipo grande); el motor verifica sus secciones y que sigan al día con el código solo si se eligieron.
 
 - id: plan-prd
   title: "PRD en docs/plan/PRD.md: qué se construye, para quién y cómo se mide"
   category: plan
-  level: required
+  level: optional
   phase: foundation.setup
   since: "2026.10.9"
   effort: { size: S, hours: [1, 3] }
@@ -17,7 +17,7 @@
 - id: plan-trd
   title: "TRD en docs/plan/TRD.md: stack, arquitectura, entornos y requisitos no funcionales"
   category: plan
-  level: required
+  level: optional
   phase: foundation.setup
   since: "2026.10.9"
   effort: { size: S, hours: [1, 3] }
@@ -31,7 +31,7 @@
 - id: plan-implementation
   title: "Plan de implementación en docs/plan/IMPLEMENTATION.md: fases, hitos y calendario"
   category: plan
-  level: required
+  level: optional
   phase: foundation.setup
   since: "2026.10.9"
   effort: { size: S, hours: [1, 2] }
@@ -45,7 +45,7 @@
 - id: plan-flows
   title: "Flujos en docs/plan/FLOWS.md: cada pantalla y cada tarea principal del usuario"
   category: plan
-  level: required
+  level: optional
   phase: foundation.design
   since: "2026.10.9"
   effort: { size: M, hours: [2, 4], scales_with: pages }
@@ -60,7 +60,7 @@
 - id: plan-schema
   title: "Esquema de datos en docs/plan/SCHEMA.md: tablas, relaciones, autenticación y RLS"
   category: plan
-  level: required
+  level: optional
   phase: build.data
   since: "2026.10.9"
   when: { signals: { has_db: true } }

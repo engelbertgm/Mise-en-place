@@ -37,10 +37,10 @@ Languages and tools (`has_*`): the default stack (Next.js) leaves `has_javascrip
    - `codemap` and `registry` to create `CODEMAP.md` and `REGISTRY.md`.
    - `init` installs `tests/responsive.spec.ts` and the `test:responsive` script: ask the user to edit `PAGES` with the key routes and to add `@playwright/test` if it is missing.
    - `init` already computes the quote (the toggle: it only runs when the scope is defined and when it changes). Show its line; if the rate is 0, say where to set it.
-8. Planning documents (`docs/plan/`):
-   - Check that the `diagram-design:diagram-design` skill is available (plugin `cathrynlavery/diagram-design` ≥ 2.6.136) and that its PNG export works (Python + Playwright + Chromium). If something is missing, stop here and give the commands: `claude plugin install diagram-design@diagram-design`, `pip install playwright` and `python -m playwright install chromium`. There is no fallback without PNG.
-   - Write `PRD.md`, `TRD.md` and `IMPLEMENTATION.md` from `${CLAUDE_PLUGIN_ROOT}/templates/plan/`, in the user's language. Follow each section's comments; the `<!-- mep:key -->` markers stay as they are.
-   - Diagrams: generate each with the `diagram-design:diagram-design` skill and export it to PNG with `diagram-design:export-diagram` (running this mep skill is the user's request for those exports). Save the HTML and the PNG in `docs/plan/diagrams/<doc>-<type>[-<name>]` (`<type>` is the diagram-design type name: `journey`, `architecture`, `gantt`…) and show it with `![description](diagrams/<file>.png)`. Before closing `foundation.design` they use diagram-design's default style; after, the project's tokens.
-   - Run `check` and confirm that `plan-prd`, `plan-trd` and `plan-implementation` pass.
+8. Planning documents (`docs/plan/`) are **optional**. Do not write them by default and never to satisfy a check. Ask once: "Do you want written PRD / TRD / IMPLEMENTATION docs (useful when a client approves or a team shares them)?" Only if yes:
+   - Check that the `diagram-design:diagram-design` skill is available (plugin `cathrynlavery/diagram-design` ≥ 2.6.136) and its PNG export works. If not, give the commands (`claude plugin install diagram-design@diagram-design`, `pip install playwright`, `python -m playwright install chromium`) or write the docs without diagrams.
+   - Write only the ones the user picked from `${CLAUDE_PLUGIN_ROOT}/templates/plan/`, in the user's language, short and true to this scope. Keep the `<!-- mep:key -->` markers.
+   - Diagrams only where they help; save HTML and PNG in `docs/plan/diagrams/` and link them.
+   - Then add the matching `plan-*` items with `mep select <id>…` so they are tracked.
 9. If the Ponytail plugin is not installed, suggest it once (`DietrichGebert/ponytail`); mep works without it.
 10. Close with: active sub-phase (`foundation.setup`), how many 🔴 it has and the next step. Remind the user to make the `mep` check required for PRs to `main` on GitHub.

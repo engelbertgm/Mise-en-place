@@ -16,4 +16,4 @@ Engine: `node "${CLAUDE_PLUGIN_ROOT}/engine/dist/mep.mjs"`.
 3. Run `add --from .mep/change.yaml` and show the diff as is, with its impact line in hours and price. Do not show the full checklist.
 4. If the change alters what the project is, update `summary` too. If the user confirms: `add --from .mep/change.yaml --apply` (it recalculates and saves the internal quote outside the repo). Delete `.mep/change.yaml`.
 5. If a stack decision changed, the engine writes a new ADR that replaces the old one; mention it.
-6. With the change applied, update the affected sections of `docs/plan/PRD.md`, `TRD.md` and `IMPLEMENTATION.md` (and their diagrams if they change) and run `check` to confirm the `plan-*` items still pass.
+6. If the project keeps planning docs in `docs/plan/` (the user chose them), update the affected sections and run `check`. If it has none, do not create them.

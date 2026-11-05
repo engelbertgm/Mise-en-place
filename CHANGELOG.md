@@ -2,6 +2,10 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.5.1
+
+- `plan-*` (PRD, TRD, IMPLEMENTATION, FLOWS, SCHEMA) are now optional: `/mep:scope`, `/mep:add` and `/mep:update` no longer force them; Claude asks once and writes them only if you want them.
+
 ## 0.5.0
 
 **The scope is read, not matched to a type.** Before, `type: saas` brought every SaaS rule whether or not the project needed it.
