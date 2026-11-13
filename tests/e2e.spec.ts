@@ -115,13 +115,15 @@ describe('test project: Estudio (SaaS, auth + payments, MX + USA:CA + EU:DE)', (
     assert.equal(hook('stop').decision, undefined)
   })
 
-  test('6. a secret in the code blocks at any time, even with MEP_BYPASS', () => {
-    writeFileSync(join(root, 'lib/config.ts'), `export const key = "sk_live_${'a'.repeat(24)}"\n`)
-    const out = hook('stop', {}, { MEP_BYPASS: '1' })
-    assert.equal(out.decision, 'block')
-    assert.match(out.reason, /no-secrets-in-repo/)
-    assert.match(out.reason, /lib\/config\.ts:1/)
-    rmSync(join(root, 'lib/config.ts'))
+  test('6. a secret in the code does not block while building, but blocks the production gate even with MEP_BYPASS', () => {
+    writeFileSync(join(root, 'notes.txt'), `export const key = "sk_live_${'a'.repeat(24)}"\n`)
+    assert.equal(hook('stop', {}, { MEP_BYPASS: '1' }).decision, undefined)
+    assert.equal(hook('stop').decision, undefined)
+    const out = mep(['verify', '--prod', '--no-cache'], { env: { MEP_BYPASS: '1' } })
+    assert.equal(out.code, 1)
+    assert.match(out.out + out.err, /no-secrets-in-repo/)
+    assert.match(out.out + out.err, /notes\.txt:1/)
+    rmSync(join(root, 'notes.txt'))
   })
 
   test('7. editing a sensitive file asks for a mep-security audit', () => {

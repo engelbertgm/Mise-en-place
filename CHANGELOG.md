@@ -2,6 +2,10 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.5.2
+
+- `no-secrets-in-repo` is now checked only at go-live (`prod_only` in the catalog): it no longer blocks pushes, previews or closing sub-phases while building. `mep verify --prod` / `mep launch` still stop on it, with no bypass.
+
 ## 0.5.1
 
 - `plan-*` (PRD, TRD, IMPLEMENTATION, FLOWS, SCHEMA) are now optional: `/mep:scope`, `/mep:add` and `/mep:update` no longer force them; Claude asks once and writes them only if you want them.

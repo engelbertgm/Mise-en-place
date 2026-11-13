@@ -71,6 +71,8 @@ export type Item = {
   level: Level
   phase: string
   locked?: boolean
+  /** Only checked at go-live (prod gate, launch): never blocks a push, a preview or a sub-phase while building. */
+  prod_only?: boolean
   conflicts_with?: string[]
   since: string
   /** Catalog version of the last meaningful change (shown by /mep:update). */

@@ -9841,8 +9841,8 @@ function gate(root, catalog, kind, env = process.env) {
   const mode = kind === "prod" ? "full" : "fast";
   const results = verifyItems(root, profile, evaluate(profile, catalog), mode).filter((r) => r.state === "active");
   const closed = new Set(profile.phase.closed);
-  const locked = results.filter((r) => r.item.locked && r.violation);
-  const required = results.filter((r) => r.level === "required");
+  const locked = results.filter((r) => r.item.locked && r.violation && (kind === "prod" || !r.item.prod_only));
+  const required = results.filter((r) => r.level === "required" && (kind === "prod" || !r.item.prod_only));
   const grace = new Set(profile.selections.grace);
   const deferred = new Set(profile.selections.deferred.map((d) => d.id));
   const regressions = kind === "prod" ? required.filter((r) => r.status !== "pass") : required.filter((r) => closed.has(r.item.phase) && r.status === "fail" && !grace.has(r.item.id) && !deferred.has(r.item.id));
@@ -9880,7 +9880,7 @@ function closePhase(root, catalog, sub, { review = true, env = process.env } = {
   const quality = review ? reviewState(root, sub, env) : { valid: true, detail: "" };
   const results = verifyItems(root, profile, relevant, "full");
   const pending = results.filter(
-    (r) => r.state === "active" && r.level === "required" && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass" && !deferredIds.has(r.item.id)
+    (r) => r.state === "active" && r.level === "required" && !r.item.prod_only && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== "pass" && !deferredIds.has(r.item.id)
   );
   if (pending.length || !quality.valid) {
     const parts = [`No se puede cerrar ${sub}:`];

@@ -12,6 +12,7 @@
   phase: foundation.setup
   sensitive: [config]
   locked: true
+  prod_only: true
   since: "2026.10.1"
   effort: { size: S, hours: [1, 2] }
   why: "Una llave en el repo queda en el historial para siempre; cualquiera con acceso al código (o al bundle) la usa."

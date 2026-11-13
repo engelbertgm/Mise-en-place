@@ -31,7 +31,8 @@ export function formatItems(results: ItemResult[], max = 15): string {
 }
 
 /**
- * stop / preview: block on required items of closed sub-phases (regressions) and on locked violations.
+ * stop / preview: block on required items of closed sub-phases (regressions) and on locked violations
+ * (except `prod_only` items, which wait for go-live).
  * prod: block on every required item that is not verified, in every sub-phase.
  */
 export function gate(root: string, catalog: Catalog, kind: GateKind, env = process.env): GateResult {
@@ -44,8 +45,8 @@ export function gate(root: string, catalog: Catalog, kind: GateKind, env = proce
   const results = verifyItems(root, profile, evaluate(profile, catalog), mode).filter(r => r.state === 'active')
   const closed = new Set(profile.phase.closed)
 
-  const locked = results.filter(r => r.item.locked && r.violation)
-  const required = results.filter(r => r.level === 'required')
+  const locked = results.filter(r => r.item.locked && r.violation && (kind === 'prod' || !r.item.prod_only))
+  const required = results.filter(r => r.level === 'required' && (kind === 'prod' || !r.item.prod_only))
   const grace = new Set(profile.selections.grace)
   // Postponed on purpose: they do not stop a push or a sub-phase, but go-live needs them.
   const deferred = new Set(profile.selections.deferred.map(d => d.id))
@@ -100,7 +101,7 @@ export function closePhase(root: string, catalog: Catalog, sub: string, { review
   const quality = review ? reviewState(root, sub, env) : { valid: true, detail: '' }
   const results = verifyItems(root, profile, relevant, 'full')
   const pending = results.filter(
-    r => r.state === 'active' && r.level === 'required' && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass' && !deferredIds.has(r.item.id),
+    r => r.state === 'active' && r.level === 'required' && !r.item.prod_only && (r.item.phase === sub || grace.has(r.item.id)) && r.status !== 'pass' && !deferredIds.has(r.item.id),
   )
   if (pending.length || !quality.valid) {
     const parts = [`No se puede cerrar ${sub}:`]
