@@ -867,3 +867,266 @@
   verify:
     - { type: grep, pattern: "nosniff|Content-Disposition|contentDisposition|ResponseContentDisposition|download:\\s*true", glob: "**/*.{ts,tsx,js,jsx,json,toml}" }
     - { type: manual, prompt: "Lo subido se sirve desde un origen distinto al del sitio, con el Content-Type validado y nosniff, y como descarga si no es una imagen" }
+
+# ── Ataques conocidos · una línea por técnica (a partir de 2026.11.5) ──────
+
+- id: username-length-limits
+  title: "Límites de longitud en usuario y contraseña (bcrypt corta a 72 bytes)"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "bcrypt ignora todo después de 72 bytes: dos contraseñas largas con el mismo inicio entran igual, y un usuario de 52+ caracteres puede chocar o desbordar un campo. Sin tope, una contraseña de 10 MB también es un DoS."
+  how: "Tope explícito y igual en cliente, servidor y base de datos (p. ej. usuario ≤ 50, contraseña ≤ 128). Si usas bcrypt, prehash (SHA-256 + base64) o usa argon2."
+  verify:
+    - { type: manual, prompt: "Usuario y contraseña tienen un máximo validado en el servidor, y la longitud nunca se trunca en silencio" }
+
+- id: jwt-algorithm-pinned
+  title: "JWT: algoritmo fijado al verificar, nunca el que dice el token"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Con confusión de algoritmo (alg: none, o RS256 → HS256 usando la llave pública como secreto) cualquiera fabrica un token válido."
+  how: "Verificar con una lista fija de algoritmos y una llave por algoritmo; exigir exp, iss y aud; rechazar alg none. Mejor sesiones de servidor opacas si no necesitas JWT."
+  verify:
+    - { type: manual, prompt: "Cada verificación de JWT fija el algoritmo esperado y valida exp, iss y aud" }
+
+- id: saml-signature-validation
+  title: "SAML/SSO: firma validada sobre el elemento que se usa"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: M, hours: [2, 4] }
+  why: "Los bypass de SAML mueven o duplican elementos firmados (wrapping) o aprovechan diferencias entre parsers para entrar como otra persona."
+  how: "Librería mantenida, firma exigida sobre la Assertion completa, un solo Assertion/NameID, Audience, Destination y NotOnOrAfter validados, y IDs usados una sola vez. Si no usas SAML, no aplica."
+  verify:
+    - { type: manual, prompt: "Si hay SAML/SSO: firma, Audience y vigencia validadas con una librería mantenida; la identidad sale del elemento firmado" }
+
+- id: oauth-immutable-identity
+  title: "OAuth/OIDC: la identidad es el sub del proveedor, no el email (nOAuth)"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un proveedor que deja cambiar el email (nOAuth) permite entrar a la cuenta de otra persona con solo declarar su correo."
+  how: "Enlazar la cuenta con (proveedor, sub) inmutable; exigir email_verified y no fusionar cuentas solo por email sin confirmación."
+  verify:
+    - { type: manual, prompt: "Las cuentas con login social se enlazan por el id inmutable del proveedor, y no se fusionan por email sin verificar" }
+
+- id: mfa-code-single-use
+  title: "2FA: cada código se acepta una sola vez y expira rápido"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un código TOTP o SMS que se puede repetir sirve a quien lo vio por encima o lo interceptó durante su ventana."
+  how: "Guardar el último paso TOTP usado y rechazar repeticiones; ventana de ±1 paso; rate limit por cuenta; invalidar al usarse o al pedir otro."
+  verify:
+    - { type: manual, prompt: "Un código 2FA ya usado se rechaza, y los intentos tienen límite por cuenta" }
+
+- id: tokens-csprng
+  title: "Tokens y códigos con generador criptográfico, nunca Math.random"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Math.random es predecible: tokens de reset, invitaciones o códigos generados con él se pueden adivinar."
+  how: "crypto.randomUUID() / crypto.getRandomValues() / randomBytes con ≥128 bits; tokens guardados con hash."
+  verify:
+    - { type: manual, prompt: "Ningún token, código ni id secreto sale de Math.random o de un contador" }
+
+- id: constant-time-compare
+  title: "Comparar secretos en tiempo constante"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Comparar con === revela, por el tiempo de respuesta, cuántos caracteres acertó el atacante (timing attack)."
+  how: "timingSafeEqual / hmac.compare_digest para tokens, firmas de webhook y llaves; mismo tiempo y mensaje en login para usuario inexistente."
+  verify:
+    - { type: manual, prompt: "Tokens, firmas y llaves se comparan con una función de tiempo constante" }
+
+- id: authenticated-encryption
+  title: "Cifrado autenticado (AES-GCM) y errores uniformes: sin padding oracle"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  when: { signals: { has_db: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "CBC sin MAC con errores distintos para padding inválido deja descifrar datos byte por byte (padding oracle)."
+  how: "AES-GCM o libsodium/secretbox; nunca inventar cifrado propio; ante cualquier fallo, un solo error genérico."
+  verify:
+    - { type: manual, prompt: "Si cifras datos: AES-GCM (o equivalente autenticado) y un solo error genérico al fallar" }
+
+- id: request-smuggling
+  title: "Proxy y servidor de origen interpretan igual cada petición (request smuggling)"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.5"
+  effort: { size: S, hours: [1, 2] }
+  why: "Si el proxy y el origen discrepan en dónde termina una petición (Content-Length vs Transfer-Encoding), un atacante cuela peticiones en la conexión de otras personas."
+  how: "Hosting gestionado y actualizado; HTTP/2 hasta el origen; rechazar peticiones con Content-Length y Transfer-Encoding a la vez; no reutilizar conexiones hacia el origen con proxies viejos."
+  verify:
+    - { type: manual, prompt: "Proxy/CDN y origen están actualizados y rechazan peticiones ambiguas (Content-Length + Transfer-Encoding)" }
+
+- id: http2-rapid-reset
+  title: "HTTP/2: protección contra Rapid Reset y floods de streams"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.5"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Abrir y cancelar streams HTTP/2 sin parar tumba un servidor con muy poco tráfico (Rapid Reset, CVE-2023-44487)."
+  how: "CDN/WAF delante con mitigación activa, servidor y runtime parcheados, límite de streams concurrentes."
+  verify:
+    - { type: manual, prompt: "El sitio está detrás de un CDN/WAF con mitigación HTTP/2 y el runtime está parcheado" }
+
+- id: cache-poisoning
+  title: "Caché: la llave incluye todo lo que cambia la respuesta (cache poisoning)"
+  category: security
+  level: required
+  phase: launch.ops
+  since: "2026.11.5"
+  effort: { size: S, hours: [1, 2] }
+  why: "Si la respuesta depende de un header que la caché no considera (X-Forwarded-Host, idioma, cookie), un atacante guarda una respuesta maliciosa para todos."
+  how: "No reflejar headers sin llave en respuestas cacheables; Vary correcto; Cache-Control: private/no-store en lo personal; ignorar X-Forwarded-Host y X-Original-URL del cliente."
+  verify:
+    - { type: manual, prompt: "Lo personal no se cachea, y ningún header sin llave de caché cambia el contenido de una respuesta cacheable" }
+
+- id: trusted-proxy-ip
+  title: "La IP del cliente viene del proxy de confianza, no de un header falsificable"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Quien manda X-Forwarded-For propio salta el rate limit, el bloqueo por IP y los logs de auditoría."
+  how: "Leer la IP que añade tu proxy/CDN (último salto de confianza) y descartar la que traiga el cliente; configurar trust proxy solo con el número real de saltos."
+  verify:
+    - { type: manual, prompt: "Rate limit y logs usan la IP puesta por el proxy de confianza, no X-Forwarded-For crudo" }
+
+- id: regex-dos
+  title: "Sin regex vulnerables a backtracking sobre datos del usuario (DeDoS)"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  effort: { size: S, hours: [1, 2] }
+  why: "Una regex con cuantificadores anidados puede tardar minutos con una cadena corta y dejar el servidor sin responder."
+  how: "Revisar regex nuevas (safe-regex, regexp-tree), limitar el largo del input antes de evaluarla, y usar RE2 o un parser en validaciones críticas."
+  verify:
+    - { type: manual, prompt: "Las regex que reciben datos del usuario no tienen backtracking exponencial y su entrada tiene un largo máximo" }
+
+- id: graphql-limits
+  title: "GraphQL: límites de profundidad, costo, alias/batching e introspección"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  effort: { size: S, hours: [1, 2] }
+  why: "Los alias y las consultas por lote multiplican un intento de login o una consulta cara en una sola petición y saltan el rate limit."
+  how: "Si hay GraphQL: límite de profundidad y de costo, tope de alias y de operaciones por lote, rate limit por operación, introspección apagada en producción y autorización por campo. Si no, no aplica."
+  verify:
+    - { type: manual, prompt: "Si hay GraphQL: profundidad, costo, alias y lotes tienen tope, y la introspección está apagada en producción" }
+
+- id: websocket-origin-check
+  title: "WebSocket: Origin validado y autenticación al conectar"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [realtime] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Un sitio ajeno puede abrir un WebSocket con las cookies de la víctima (cross-site WebSocket hijacking) si el servidor no revisa el origen."
+  how: "Validar el header Origin contra una lista permitida, autenticar con token en el handshake (no solo cookie) y revisar permisos en cada mensaje."
+  verify:
+    - { type: manual, prompt: "El servidor de WebSocket valida Origin y la identidad al conectar, y autoriza cada mensaje" }
+
+- id: views-respect-rls
+  title: "Vistas y funciones que respetan RLS (sin saltarse las políticas)"
+  category: security
+  level: required
+  phase: build.data
+  since: "2026.11.5"
+  when: { signals: { has_db: true } }
+  effort: { size: S, hours: [1, 2] }
+  why: "En Postgres una vista corre con los permisos de su dueño: sin security_invoker, cualquiera que la consulte se salta el RLS de las tablas de abajo. Lo mismo con funciones SECURITY DEFINER."
+  how: "create view … with (security_invoker = true); funciones SECURITY DEFINER solo con search_path fijo y revisando auth.uid(); probar con un usuario sin permisos."
+  verify:
+    - { type: manual, prompt: "Toda vista usa security_invoker (o no expone datos de otras personas) y las funciones SECURITY DEFINER validan quién llama" }
+
+- id: prototype-pollution
+  title: "Sin prototype pollution al mezclar objetos del usuario"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  when: { signals: { has_javascript: true } }
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Mezclar un JSON del usuario con merge/extend recursivo permite escribir en __proto__ y cambiar el comportamiento de toda la app."
+  how: "Validar el JSON con un esquema (zod) antes de mezclarlo; bloquear __proto__, constructor y prototype; usar Map u Object.create(null); dependencias de merge actualizadas."
+  verify:
+    - { type: manual, prompt: "Los objetos del usuario se validan con esquema antes de mezclarse, y __proto__/constructor/prototype se rechazan" }
+
+- id: template-injection
+  title: "Sin inyección de plantillas: el input nunca se compila como plantilla"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Si el texto del usuario se interpreta como plantilla (Handlebars, Jinja, EJS, eval, new Function) ejecuta código en el servidor."
+  how: "El input solo es dato que se inserta, nunca parte de la plantilla; plantillas de usuario (emails) en un motor sin lógica; sin eval ni new Function."
+  verify:
+    - { type: manual, prompt: "El texto del usuario solo entra como dato en las plantillas; no hay eval ni new Function con él" }
+
+- id: xxe-disabled
+  title: "Parsers XML sin entidades externas ni DTD (XXE)"
+  category: security
+  level: required
+  phase: build.features
+  since: "2026.11.5"
+  effort: { size: XS, hours: [0.5, 1] }
+  why: "Un XML con una entidad externa hace que el servidor lea archivos locales (/etc/passwd, llaves) o llame a servicios internos."
+  how: "Si procesas XML (SVG, SAML, RSS, docx, sitemaps): DTD y entidades externas desactivadas, o usar JSON. Si no procesas XML, no aplica."
+  verify:
+    - { type: manual, prompt: "Si se procesa XML: DTD y entidades externas desactivadas en el parser" }
+
+- id: unicode-normalization
+  title: "Unicode: normalizar y comparar bien usuarios y emails"
+  category: security
+  level: required
+  phase: build.features
+  sensitive: [auth]
+  since: "2026.11.5"
+  when: { capabilities: [auth] }
+  effort: { size: S, hours: [1, 2] }
+  why: "Caracteres que se ven iguales o que cambian al pasar a mayúsculas/minúsculas permiten registrar un usuario o email «idéntico» al de otra persona y tomar su cuenta o suplantarla."
+  how: "Normalizar (NFKC) y pasar a minúsculas antes de guardar y de comparar; índice único sobre el valor normalizado; rechazar caracteres de control, invisibles y mezclas de alfabetos en nombres de usuario."
+  verify:
+    - { type: manual, prompt: "Usuarios y emails se normalizan (NFKC + minúsculas) antes de guardarse, con índice único sobre el valor normalizado" }

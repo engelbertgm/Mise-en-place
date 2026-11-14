@@ -34,3 +34,9 @@ checks:
     items: [no-critical-vulnerabilities, dependency-scan-ci, unused-dependencies]
   - label: "Historial de git revisado en busca de llaves filtradas; las que aparezcan, reemplazadas"
     items: [secrets-scan-ci, secrets-history-clean, key-rotation-procedure]
+  - label: "Tokens, sesiones y códigos 2FA que no se falsifican, repiten ni adivinan (JWT, SSO/SAML, OAuth, aleatoriedad, comparación)"
+    items: [jwt-algorithm-pinned, saml-signature-validation, oauth-immutable-identity, mfa-code-single-use, tokens-csprng, constant-time-compare, username-length-limits, unicode-normalization]
+  - label: "Servidor y red: sin smuggling, Rapid Reset, caché envenenada, IP falsa, regex lentas ni abuso de GraphQL/WebSocket"
+    items: [request-smuggling, http2-rapid-reset, cache-poisoning, trusted-proxy-ip, regex-dos, graphql-limits, websocket-origin-check]
+  - label: "Sin inyección: prototype pollution, plantillas, XXE y vistas que se salten RLS; cifrado autenticado"
+    items: [prototype-pollution, template-injection, xxe-disabled, views-respect-rls, authenticated-encryption]

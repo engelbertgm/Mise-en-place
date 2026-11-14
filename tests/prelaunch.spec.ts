@@ -16,8 +16,8 @@ const real = loadCatalog(REAL_CATALOG)
 const checks = (parse(readFileSync(join(REAL_CATALOG, 'prelaunch.yaml'), 'utf8')) as { checks: PrelaunchCheck[] }).checks
 
 describe('the checklist', () => {
-  test('it has the 16 lines and every item in it exists and is security or auth', () => {
-    assert.equal(checks.length, 16)
+  test('it has the 19 lines and every item in it exists and is security or auth', () => {
+    assert.equal(checks.length, 19)
     const ids = new Map(real.items.map(i => [i.id, i]))
     for (const c of checks) {
       assert.ok(c.items.length, c.label)
@@ -114,6 +114,6 @@ describe('the CLI', () => {
     assert.match(r.out, /mep launch.*exige estos mismos ítems/)
     assert.equal(readFileSync(join(root, '.mep/profile.yaml'), 'utf8'), before)
     const json = JSON.parse(mep(root, ['prelaunch', '--json']).out)
-    assert.equal(json.length, 16)
+    assert.equal(json.length, 19)
   })
 })

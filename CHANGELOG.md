@@ -2,6 +2,10 @@
 
 The catalog has its own changelog in [catalog/CHANGELOG.md](catalog/CHANGELOG.md).
 
+## 0.5.3
+
+- Catalog 2026.11.5: 20 items against known attacks (JWT alg confusion, SAML, nOAuth, 2FA replay, smuggling, Rapid Reset, cache poisoning, ReDoS, GraphQL, WebSocket, RLS views, prototype pollution, SSTI, XXE, Unicode…) and 3 new `mep prelaunch` lines.
+
 ## 0.5.2
 
 - `no-secrets-in-repo` is now checked only at go-live (`prod_only` in the catalog): it no longer blocks pushes, previews or closing sub-phases while building. `mep verify --prod` / `mep launch` still stop on it, with no bypass.

@@ -2,6 +2,10 @@
 
 Cada ítem registra `since` con la versión en que entró. `/mep:update` usa este archivo y `VERSION`.
 
+## 2026.11.5
+
+- **20 ítems de seguridad contra ataques conocidos**, en tres subdominios nuevos de `security` (`auth-attacks`, `server-attacks`, `injection`) y uno en `database.rls`, más tres líneas nuevas en `mep prelaunch`: límites de longitud (bcrypt 72 bytes), JWT con algoritmo fijado, SAML, nOAuth (identidad por `sub`), 2FA de un solo uso, tokens con CSPRNG, comparación en tiempo constante, cifrado autenticado (padding oracle), request smuggling, HTTP/2 Rapid Reset, cache poisoning, IP de proxy de confianza, ReDoS, GraphQL, WebSocket, vistas que respetan RLS, prototype pollution, template injection, XXE y normalización Unicode.
+
 ## 2026.11.4
 
 - **`walking-skeleton` pasa a ⚪ opcional.** Pedir "una página mínima desplegada" en `foundation.setup` empujaba a construir un sitio de relleno solo para que pasara la verificación. Ahora es una opción: si la eliges, se despliega lo que ya exista, nunca una página de prueba. Los proyectos que lo tenían como 🔴 lo ven como ofrecido.

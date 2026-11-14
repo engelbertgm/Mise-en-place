@@ -212,7 +212,7 @@ domains:
       access:
         label: Data access
         description: RLS, least privilege, and encrypted connections.
-        items: [rls-all-tables, rls-policies-per-operation, db-least-privilege, db-ssl]
+        items: [rls-all-tables, rls-policies-per-operation, db-least-privilege, db-ssl, views-respect-rls]
       model:
         label: Data model
         description: Soft delete and UTC dates.
@@ -253,6 +253,18 @@ domains:
         label: Sensitive data
         description: Field-level encryption and access logging.
         items: [sensitive-data-encryption, sensitive-data-access-log]
+      auth-attacks:
+        label: Auth attacks
+        description: Tokens, sessions, SSO and codes that cannot be forged, replayed, guessed or timed.
+        items: [username-length-limits, jwt-algorithm-pinned, saml-signature-validation, oauth-immutable-identity, mfa-code-single-use, tokens-csprng, constant-time-compare, authenticated-encryption, unicode-normalization]
+      server-attacks:
+        label: Network and server attacks
+        description: Smuggling, HTTP/2 floods, cache poisoning, spoofed IPs, ReDoS, GraphQL abuse and WebSockets.
+        items: [request-smuggling, http2-rapid-reset, cache-poisoning, trusted-proxy-ip, regex-dos, graphql-limits, websocket-origin-check]
+      injection:
+        label: Injection
+        description: Prototype pollution, template injection and XXE.
+        items: [prototype-pollution, template-injection, xxe-disabled]
       assurance:
         label: Verification
         description: Pentest before launch.
